@@ -282,3 +282,30 @@ def test_separate_processes_writing_at_the_same_instant_keep_every_section(tmp_p
 
     written = {k for k in read_report(run_dir) if k != "schema_version"}
     assert written == set(keys), f"lost sections: {sorted(set(keys) - written)}"
+
+
+# --- the contract file must be readable by more than its owner ----------------------
+def test_report_json_is_not_written_owner_only(tmp_path: Path) -> None:
+    """`NamedTemporaryFile` creates its file 0600 and `os.replace` preserves the mode.
+
+    Without an explicit chmod, report.json lands owner-only. That is invisible on a laptop
+    and breaks collaboration on a shared filesystem: no other account in the run
+    directory's group can read the one file every module is supposed to join on. Observed
+    on a shared compute node, 2026-09-17.
+    """
+    from s2f.common import io as io_module
+
+    init_report(tmp_path, "run_perms")
+    mode = report_path(tmp_path).stat().st_mode & 0o777
+    expected = 0o666 & ~io_module._UMASK
+
+    assert mode == expected, (
+        f"report.json is mode {mode:04o}, expected {expected:04o} under umask "
+        f"{io_module._UMASK:04o}. The chmod in _atomic_write has been removed, so the "
+        f"file keeps NamedTemporaryFile's 0600."
+    )
+    if expected != 0o600:
+        assert mode & 0o044, (
+            f"report.json is mode {mode:04o}: unreadable outside its owner even though "
+            f"umask {io_module._UMASK:04o} permits it."
+        )

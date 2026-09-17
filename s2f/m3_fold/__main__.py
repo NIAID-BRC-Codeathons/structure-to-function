@@ -16,7 +16,7 @@ import subprocess
 import sys
 import time
 from collections import Counter
-from datetime import UTC, datetime
+from datetime import datetime, timezone
 from pathlib import Path
 
 from ..common.http import CachedJsonClient, DownloadedFile
@@ -43,12 +43,12 @@ def _fixture_fetch(candidate: StructureCandidate) -> DownloadedFile:
     path = STRUCTURE_FIXTURES / f"{name}.cif"
     if not path.exists():
         raise OSError(f"no offline structure fixture for {candidate.accession}")
-    retrieved_at = datetime.fromtimestamp(path.stat().st_mtime, UTC)
+    retrieved_at = datetime.fromtimestamp(path.stat().st_mtime, timezone.utc)
     return DownloadedFile(path.read_bytes(), retrieved_at, from_cache=False)
 
 
 def run(args: argparse.Namespace) -> int:
-    started = datetime.now(UTC)
+    started = datetime.now(timezone.utc)
     clock = time.monotonic()
     run_dir = Path(args.run)
     if args.dry_run:
@@ -114,7 +114,7 @@ def _write_manifest(
     cache_dir: Path | None,
     quality_thresholds: QualityThresholds,
 ) -> None:
-    finished = datetime.now(UTC)
+    finished = datetime.now(timezone.utc)
     source_counts = Counter(record["source"] for record in summary.structures)
     manifest = {
         "module": "m3_fold",

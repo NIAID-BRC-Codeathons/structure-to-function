@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 import os
-from datetime import UTC, datetime
+from datetime import datetime, timezone
 from pathlib import Path
 
 import pytest
@@ -66,7 +66,7 @@ def test_legacy_file_cache_uses_file_mtime_as_original_retrieval_time(tmp_path: 
     cached_path = tmp_path / "structures" / key
     cached_path.parent.mkdir(parents=True)
     cached_path.write_bytes(b"legacy structure")
-    expected = datetime(2026, 9, 17, 12, 30, tzinfo=UTC)
+    expected = datetime(2026, 9, 17, 12, 30, tzinfo=timezone.utc)
     os.utime(cached_path, (expected.timestamp(), expected.timestamp()))
 
     downloaded = client.get_file("structures", url, cache_dir=tmp_path)

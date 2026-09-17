@@ -1,4 +1,6 @@
-from s2f.m2_triage.bvbrc_input import Protein, SpecialtyHit
+import pytest
+
+from s2f.m2_triage.bvbrc_input import Protein, SpecialtyHit, same_genus, same_species
 from s2f.m2_triage.pdb_evidence import SequenceHit
 from s2f.m2_triage.score import (
     MAX_HIT_SCORE,
@@ -118,9 +120,16 @@ def test_no_hit_and_failed_query_are_distinguished() -> None:
 
     assert no_hit.components.pdb_evidence == 0.0
     assert failed.components.pdb_evidence == 0.0
-    assert no_hit.flags["no_pdb_hit"] and failed.flags["no_pdb_hit"]
     assert no_hit.retrieval_status != failed.retrieval_status
     assert failed.error == "HTTP 500"
+
+    # `no_pdb_hit` means "we searched and found nothing", so a failed search must not set it:
+    # downstream consumers treat that file as "no homolog exists" and would launder a network
+    # failure into a structural claim.
+    assert no_hit.flags["no_pdb_hit"] is True
+    assert no_hit.flags["pdb_search_failed"] is False
+    assert failed.flags["no_pdb_hit"] is False
+    assert failed.flags["pdb_search_failed"] is True
 
     ranked = rank_and_select([no_hit, failed], top_n=1)
     reasons = {score.retrieval_status: score.reason for score in ranked}
@@ -150,3 +159,191 @@ def test_best_hit_prefers_higher_scoring_structure() -> None:
     assert scored.best_hit.entity_id == "1HIG_1"
     assert scored.qualifying_hits == 2
     assert scored.distinct_entries == 2
+
+
+# --- issue #12: the components #10 unlocked, and the AMR correction --------------------
+
+
+class FakeAnnotation:
+    """Stands in for function.FunctionalAnnotation; only the fields scoring reads."""
+
+    def __init__(self, *, membrane=False, membrane_source="", secreted=False,
+                 surface_exposed=False, signal_source="", localization_source=""):
+        self.membrane = membrane
+        self.membrane_source = membrane_source
+        self.secreted = secreted
+        self.surface_exposed = surface_exposed
+        self.signal_source = signal_source
+        self.localization_source = localization_source
+
+
+def specialty(property_name, classification="", identity=None, source="PATRIC"):
+    return SpecialtyHit(
+        property_name=property_name, source=source, product="", identity=identity,
+        query_coverage=None, classification=classification,
+    )
+
+
+def test_a_drug_target_in_a_susceptible_species_is_not_resistance_evidence() -> None:
+    """gyrA and rpoB are what fluoroquinolones and rifamycins hit, not resistance genes (#30)."""
+    target = Protein(
+        feature_id="fig|1.1.peg.1", sequence="MKALIV", product="DNA gyrase subunit A",
+        specialty=[specialty("Antibiotic Resistance", "antibiotic target in susceptible species")],
+    )
+    scored = score_protein(target, [make_hit()], "found")
+
+    assert scored.components.virulence_amr == 0.0       # not resistance
+    assert scored.components.drug_target == 1.0          # but it *is* a drug target
+    assert scored.flags["antibiotic_target_not_resistance"] is True
+
+    # rank_and_select writes the reason, and a reader must see why it is not resistance.
+    ranked = rank_and_select([scored], top_n=1)
+    assert "antibiotic target in a susceptible species" in ranked[0].reason
+    assert "not a resistance gene" in ranked[0].reason
+
+
+def test_a_real_resistance_mechanism_still_counts() -> None:
+    efflux = Protein(
+        feature_id="fig|1.1.peg.2", sequence="MKALIV", product="efflux pump",
+        specialty=[specialty("Antibiotic Resistance", "['efflux pump conferring antibiotic resistance']")],
+    )
+    scored = score_protein(efflux, [make_hit()], "found")
+
+    assert scored.components.virulence_amr == 1.0
+    assert "efflux pump" in scored.flags["amr_basis"]
+
+
+def test_an_unclassified_amr_row_is_half_not_full_credit() -> None:
+    """The export sometimes omits classification; that is uncertainty, not confirmation."""
+    unknown = Protein(
+        feature_id="fig|1.1.peg.3", sequence="MKALIV", product="something",
+        specialty=[specialty("Antibiotic Resistance", "")],
+    )
+    scored = score_protein(unknown, [make_hit()], "found")
+
+    assert scored.components.virulence_amr == 0.5
+    assert "no classification" in scored.flags["amr_basis"]
+
+
+def test_a_virulence_factor_still_scores_in_full() -> None:
+    virulent = Protein(
+        feature_id="fig|1.1.peg.4", sequence="MKALIV", product="adhesin",
+        specialty=[specialty("Virulence Factor", identity=84.0)],
+    )
+    assert score_protein(virulent, [make_hit()], "found").components.virulence_amr == 1.0
+
+
+def test_surface_exposure_adds_and_membrane_subtracts() -> None:
+    plain = score_protein(make_protein(), [make_hit()], "found")
+    surface = score_protein(
+        make_protein(), [make_hit()], "found",
+        annotation=FakeAnnotation(secreted=True, surface_exposed=True, signal_source="signalp6"),
+    )
+    membrane = score_protein(
+        make_protein(), [make_hit()], "found",
+        annotation=FakeAnnotation(membrane=True, membrane_source="deeptmhmm"),
+    )
+
+    assert round(surface.score - plain.score, 6) == 0.10
+    assert round(membrane.score - plain.score, 6) == -0.15   # deprioritized, not excluded
+    assert membrane.score > 0  # pitfall #3 says deprioritize, not drop
+
+
+def test_an_unmeasured_flag_is_recorded_as_unmeasured_not_false() -> None:
+    """A missing DeepTMHMM run must not read as "no membrane proteins in this genome"."""
+    unmeasured = score_protein(make_protein(), [make_hit()], "found", annotation=FakeAnnotation())
+    measured_false = score_protein(
+        make_protein(), [make_hit()], "found",
+        annotation=FakeAnnotation(membrane=False, membrane_source="deeptmhmm"),
+    )
+
+    # Both contribute 0 to the score...
+    assert unmeasured.components.membrane_penalty == 0.0
+    assert measured_false.components.membrane_penalty == 0.0
+    # ...but only one of them was actually looked at.
+    assert unmeasured.components_available["membrane_penalty"] is False
+    assert measured_false.components_available["membrane_penalty"] is True
+
+
+def test_no_annotation_at_all_leaves_both_components_unmeasured() -> None:
+    scored = score_protein(make_protein(), [make_hit()], "found")
+
+    assert scored.components_available == {"surface_bonus": False, "membrane_penalty": False}
+    assert scored.components.surface_bonus == 0.0
+
+
+def test_score_is_still_reproducible_from_the_recorded_components() -> None:
+    scored = score_protein(
+        make_protein(product="hypothetical protein"), [make_hit()], "found",
+        annotation=FakeAnnotation(membrane=True, membrane_source="deeptmhmm"),
+    )
+    assert triage_score_from_components(TriageComponents(**scored.components.as_dict())) == scored.score
+
+
+# --- the self-match artifact (@cmmann21 on #12) ----------------------------------------
+
+
+@pytest.mark.parametrize(
+    ("query", "hit", "species", "genus"),
+    [
+        # The genus was renamed: BV-BRC says Mycoplasma, the PDB says Mycoplasmoides.
+        ("Mycoplasma genitalium G37", "Mycoplasmoides genitalium G37", True, True),
+        ("Mycoplasma genitalium G37", "Mycoplasmoides pneumoniae M129", False, True),
+        ("Mycoplasma genitalium G37", "Escherichia coli", False, False),
+        # Distinct genera that share a Greek root must not merge. A 6-character prefix rule
+        # called all three of these the same genus.
+        ("Streptococcus pneumoniae", "Streptomyces coelicolor", False, False),
+        ("Enterococcus faecalis", "Enterobacter cloacae", False, False),
+        ("Pseudomonas aeruginosa", "Pseudoalteromonas haloplanktis", False, False),
+        # Other renamings the same tolerance has to cover.
+        ("Clostridium difficile", "Clostridioides difficile", True, True),
+        ("Mycobacterium abscessus", "Mycobacteroides abscessus", True, True),
+        ("Klebsiella pneumoniae HS11286", "Klebsiella pneumoniae", True, True),
+        ("Klebsiella pneumoniae HS11286", "Klebsiella oxytoca", False, True),
+        ("Mycoplasma genitalium G37", "", False, False),
+        ("", "Escherichia coli", False, False),
+    ],
+)
+def test_organism_comparison(query, hit, species, genus) -> None:
+    assert same_species(query, hit) is species
+    assert same_genus(query, hit) is genus
+
+
+def test_a_self_match_is_flagged_not_rescored() -> None:
+    """Our test organism has its own structures in the PDB; a 100% hit can be a self-match."""
+    self_match = score_protein(
+        make_protein(), [make_hit(identity=1.0, organism="Mycoplasmoides genitalium G37")],
+        "found", query_organism="Mycoplasma genitalium G37",
+    )
+    foreign = score_protein(
+        make_protein(), [make_hit(identity=1.0, organism="Escherichia coli")],
+        "found", query_organism="Mycoplasma genitalium G37",
+    )
+
+    assert self_match.flags["same_species_hit"] is True
+    assert foreign.flags["same_species_hit"] is False
+    # The evidence is genuinely the strongest available, so the score is identical: this is a
+    # label for the report, not a penalty.
+    assert self_match.score == foreign.score
+
+    ranked = rank_and_select([self_match], top_n=1)
+    assert "same species" in ranked[0].reason
+    assert "not a cross-organism transfer" in ranked[0].reason
+
+
+def test_same_genus_is_reported_when_species_differs() -> None:
+    relative = score_protein(
+        make_protein(), [make_hit(organism="Mycoplasmoides pneumoniae M129")],
+        "found", query_organism="Mycoplasma genitalium G37",
+    )
+
+    assert relative.flags["same_species_hit"] is False
+    assert relative.flags["same_genus_hit"] is True
+    assert "same genus" in rank_and_select([relative], top_n=1)[0].reason
+
+
+def test_without_a_query_organism_nothing_is_claimed() -> None:
+    scored = score_protein(make_protein(), [make_hit(organism="Escherichia coli")], "found")
+
+    assert scored.flags["same_species_hit"] is False
+    assert scored.flags["same_genus_hit"] is False

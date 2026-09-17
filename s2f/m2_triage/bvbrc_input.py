@@ -11,7 +11,7 @@ import csv
 import hashlib
 import json
 import re
-from collections import defaultdict
+from collections import Counter, defaultdict
 from dataclasses import dataclass, field
 from pathlib import Path
 
@@ -22,6 +22,7 @@ LOCUS_ALIASES = ("refseq_locus_tag", "locus_tag", "alt_locus_tag")
 PGFAM_ALIASES = ("pgfam_id", "pgfam", "pgfams")
 PLFAM_ALIASES = ("plfam_id", "plfam", "plfams")
 PROPERTY_ALIASES = ("property", "specialty_gene_property", "type")
+CLASSIFICATION_ALIASES = ("classification", "amr_classification", "assertion")
 SOURCE_ALIASES = ("source", "database", "specialty_source")
 IDENTITY_ALIASES = ("identity", "pct_identity", "percent_identity")
 COVERAGE_ALIASES = ("query_coverage", "coverage", "query_cov")
@@ -41,6 +42,19 @@ UNCHARACTERIZED = re.compile(
 )
 
 
+#: An "Antibiotic Resistance" row does not always mean resistance. BV-BRC classifies most of
+#: them as "antibiotic target in susceptible species" — gyrA and rpoB are the *targets* of
+#: fluoroquinolones and rifamycins, not resistance genes (issue #30). Scoring those as
+#: resistance evidence is the specific mistake cmmann21 flagged, and on G37 it would apply to
+#: 10 of 14 AMR rows.
+TARGET_IN_SUSCEPTIBLE = "antibiotic target in susceptible species"
+RESISTANCE_MARKERS = (
+    "conferring antibiotic resistance", "antibiotic efflux", "antibiotic inactivation",
+    "efflux pump", "antibiotic target alteration", "antibiotic target replacement",
+    "antibiotic target protection", "resistance via absence", "reduced permeability",
+)
+
+
 @dataclass
 class SpecialtyHit:
     """One row of the specialty-gene table."""
@@ -50,6 +64,16 @@ class SpecialtyHit:
     product: str
     identity: float | None
     query_coverage: float | None
+    classification: str = ""
+
+    @property
+    def is_resistance_mechanism(self) -> bool:
+        text = (self.classification or "").lower()
+        return any(marker in text for marker in RESISTANCE_MARKERS)
+
+    @property
+    def is_target_in_susceptible_species(self) -> bool:
+        return TARGET_IN_SUSCEPTIBLE in (self.classification or "").lower()
 
 
 @dataclass
@@ -77,12 +101,42 @@ class Protein:
         return bool(self._properties() & (VIRULENCE_PROPERTIES | AMR_PROPERTIES))
 
     @property
+    def is_virulence_factor(self) -> bool:
+        return bool(self._properties() & VIRULENCE_PROPERTIES)
+
+    def _amr_rows(self) -> list[SpecialtyHit]:
+        return [h for h in self.specialty if h.property_name.strip().lower() in AMR_PROPERTIES]
+
+    @property
+    def amr_evidence(self) -> tuple[float, str]:
+        """How much an AMR row supports *resistance*, and on what basis.
+
+        1.0 a classified resistance mechanism; 0.5 an AMR row whose classification is missing,
+        so the export cannot say which it is; 0.0 rows that are only "antibiotic target in
+        susceptible species" — those are drug targets and are scored as such instead.
+        """
+        rows = self._amr_rows()
+        if not rows:
+            return 0.0, ""
+        if any(hit.is_resistance_mechanism for hit in rows):
+            mechanisms = sorted({h.classification for h in rows if h.is_resistance_mechanism})
+            return 1.0, "; ".join(mechanisms)[:120]
+        if all(hit.is_target_in_susceptible_species for hit in rows):
+            return 0.0, TARGET_IN_SUSCEPTIBLE
+        return 0.5, "AMR row with no classification recorded"
+
+    @property
+    def is_antibiotic_target(self) -> bool:
+        """Target of an antibiotic in a susceptible species — a drug target, not resistance."""
+        return any(hit.is_target_in_susceptible_species for hit in self._amr_rows())
+
+    @property
     def is_essential_ortholog(self) -> bool:
         return bool(self._properties() & ESSENTIAL_PROPERTIES)
 
     @property
     def is_drug_target(self) -> bool:
-        return bool(self._properties() & DRUG_TARGET_PROPERTIES)
+        return bool(self._properties() & DRUG_TARGET_PROPERTIES) or self.is_antibiotic_target
 
     @property
     def is_transporter(self) -> bool:
@@ -113,6 +167,9 @@ class InputBundle:
     """Loaded proteins plus what could not be joined, for the run manifest."""
 
     proteins: list[Protein]
+    #: The query genome's organism, read from the FASTA headers. Used to tell a structural hit
+    #: against our own organism from a genuine cross-organism transfer.
+    organism: str = ""
     specialty_without_protein: list[str] = field(default_factory=list)
     table_rows_without_sequence: list[str] = field(default_factory=list)
     sequences_without_table_row: list[str] = field(default_factory=list)
@@ -211,6 +268,108 @@ FIG_ID = re.compile(r"^(fig\|[^|\s]+)")
 ORGANISM_SUFFIX = re.compile(r"\s*\[[^\]]*\]\s*$")
 
 
+def organism_key(name: str) -> tuple[str, str]:
+    """(genus, species) from an organism name, lowercased and stripped of strain detail.
+
+    Genus names get renamed — BV-BRC writes "Mycoplasma genitalium" where the PDB and UniProt
+    now say "Mycoplasmoides genitalium" — so comparison falls back to the species epithet when
+    the genus disagrees.
+    """
+    tokens = [t for t in re.split(r"[\s_]+", (name or "").strip()) if t]
+    if not tokens:
+        return "", ""
+    genus = tokens[0].lower().rstrip(".,")
+    species = tokens[1].lower().rstrip(".,") if len(tokens) > 1 else ""
+    if species in {"sp", "sp.", "subsp", "subsp."} and len(tokens) > 2:
+        species = tokens[2].lower().rstrip(".,")
+    return genus, species
+
+
+#: A renamed genus keeps nearly all of its stem, where two distinct genera sharing a Greek
+#: root diverge early. Measured on the renamings we have to tolerate and the neighbours we
+#: must not merge, the shared fraction of the shorter name separates them with room to spare:
+#:
+#:   Mycoplasma/Mycoplasmoides 0.90   Streptococcus/Streptomyces    0.58
+#:   Clostridium/Clostridioides 0.82  Bacteroides/Bacterium         0.67
+#:   Chlamydia/Chlamydophila 0.78     Pseudomonas/Pseudoalteromonas 0.55
+#:   Mycobacterium/Mycobacteroides 0.77  Enterococcus/Enterobacter  0.50
+#:
+#: A fixed-length prefix does not separate them — 7 characters is both Chlamydia/Chlamydophila
+#: and Streptococcus/Streptomyces.
+GENUS_STEM_RATIO = 0.75
+GENUS_STEM_MIN = 6
+
+
+def _same_genus_name(left: str, right: str) -> bool:
+    """One genus name is the other, or a renaming of it."""
+    if not left or not right:
+        return False
+    if left == right:
+        return True
+    shared = 0
+    for a, b in zip(left, right):
+        if a != b:
+            break
+        shared += 1
+    shorter = min(len(left), len(right))
+    return shared >= GENUS_STEM_MIN and shared / shorter >= GENUS_STEM_RATIO
+
+
+def same_species(query: str, hit: str) -> bool:
+    """Both names denote the same species. Tolerates the genus renaming above."""
+    q_genus, q_species = organism_key(query)
+    h_genus, h_species = organism_key(hit)
+    if not q_species or not h_species:
+        return False
+    if q_species != h_species:
+        return False
+    return _same_genus_name(q_genus, h_genus)
+
+
+def same_genus(query: str, hit: str) -> bool:
+    q_genus, _ = organism_key(query)
+    h_genus, _ = organism_key(hit)
+    return _same_genus_name(q_genus, h_genus)
+
+
+#: A bracketed suffix only names an organism when it reads like a binomial: a capitalised
+#: genus followed by a lowercase epithet. BV-BRC product names end in brackets too — EC-name
+#: qualifiers such as ``[decarboxylating]``, ``[NAD+]`` and ``[acetolactate synthase, ...]`` —
+#: and without this gate the commonest of those becomes the "organism" of the whole genome.
+BINOMIAL = re.compile(r"^[A-Z][a-z]{2,}(?:\s+[a-z][a-z-]{2,})")
+
+#: The fraction of records the winning name must cover before it counts as the genome's
+#: organism. The p3-CLI/web export carries no organism at all (see ``_feature_id_from_header``
+#: for the two layouts in circulation), so on that layout a handful of stray brackets must not
+#: outvote the 99% that say nothing.
+ORGANISM_QUORUM = 0.5
+
+
+def _organism_from_header(header: str) -> str:
+    """`... product [Mycoplasma genitalium G37 | 243273.25]` -> the organism name.
+
+    Returns "" for a bracket that does not read like an organism, so an EC-name qualifier is
+    never mistaken for one.
+    """
+    match = re.search(r"\[([^\]]+)\]\s*$", header or "")
+    if not match:
+        return ""
+    candidate = match.group(1).split("|")[0].strip()
+    return candidate if BINOMIAL.match(candidate) else ""
+
+
+def _genome_organism(organisms: list[str], total: int) -> str:
+    """The organism shared by the genome, or "" when the headers do not agree on one.
+
+    Silence is the honest answer here: a wrong organism makes every hit look foreign, which is
+    the same-species artifact this exists to surface, reported backwards.
+    """
+    if not organisms or total <= 0:
+        return ""
+    name, count = Counter(organisms).most_common(1)[0]
+    return name if count >= total * ORGANISM_QUORUM else ""
+
+
 def _feature_id_from_header(header: str) -> tuple[str, str]:
     """Split a BV-BRC FASTA header into feature ID and product.
 
@@ -259,8 +418,12 @@ def load_input(m1_dir: Path) -> InputBundle:
     proteins: list[Protein] = []
     sequences_without_row: list[str] = []
     seen_ids: set[str] = set()
+    organisms: list[str] = []
     for header, sequence in _read_fasta(fasta_path):
         feature_id, header_product = _feature_id_from_header(header)
+        organism = _organism_from_header(header)
+        if organism:
+            organisms.append(organism)
         if not feature_id or not sequence:
             continue
         if feature_id in seen_ids:
@@ -305,11 +468,13 @@ def load_input(m1_dir: Path) -> InputBundle:
                     product=_pick(row, PRODUCT_ALIASES),
                     identity=_float_or_none(_pick(row, IDENTITY_ALIASES)),
                     query_coverage=_float_or_none(_pick(row, COVERAGE_ALIASES)),
+                    classification=_pick(row, CLASSIFICATION_ALIASES),
                 )
             )
 
     return InputBundle(
         proteins=proteins,
+        organism=_genome_organism(organisms, len(seen_ids)),
         specialty_without_protein=specialty_orphans,
         table_rows_without_sequence=sorted(set(by_id) - seen_ids),
         sequences_without_table_row=sequences_without_row,

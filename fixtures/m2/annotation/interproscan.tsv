@@ -1,0 +1,5 @@
+fig|999999.1.peg.1	d41d8cd98f00b204e9800998ecf8427e	223	Pfam	PF09408	Betacoronavirus-like spike glycoprotein S1, receptor-binding	1	220	1.2E-60	T	17-09-2026	IPR018548	Betacoronavirus spike glycoprotein S1, receptor-binding	GO:0019062|GO:0046813
+fig|999999.1.peg.2	e4d909c290d0fb1ca068ffaddf22cbd0	129	Pfam	PF00062	C-type lysozyme/alpha-lactalbumin family	5	125	3.0E-40	T	17-09-2026	IPR001916	Glycoside hydrolase family 22	GO:0003796|GO:0009253
+fig|999999.1.peg.3	a87ff679a2f3e71d9181a67b7542122c	93	Phobius	TRANSMEMBRANE	Region of a membrane-bound protein predicted to be embedded in the membrane	11	33	-	T	17-09-2026	-	-	-
+fig|999999.1.peg.3	a87ff679a2f3e71d9181a67b7542122c	93	Phobius	TRANSMEMBRANE	Region of a membrane-bound protein predicted to be embedded in the membrane	51	73	-	T	17-09-2026	-	-	-
+fig|999999.1.peg.3	a87ff679a2f3e71d9181a67b7542122c	93	Pfam	PF00664	ABC transporter transmembrane region	12	80	5.0E-15	T	17-09-2026	IPR011527	ABC transporter type 1, transmembrane domain	GO:0016020|GO:0055085

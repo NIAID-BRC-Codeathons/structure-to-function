@@ -107,11 +107,14 @@ Components come from PDB evidence plus the M1 specialty table. Components that n
 | `essential` | **0.15** | 1.0 if an `Essential Gene` specialty row exists; else 0 |
 | `drug_target` | **0.15** | 1.0 if a `Drug Target` specialty row exists (DrugBank, TTD); else 0 |
 | `annotation_gap` | **0.30** | 1.0 if the product is hypothetical, uncharacterized, putative or a DUF; else 0 |
+| `surface_bonus` | **0.10** | 1.0 if #10 calls the protein secreted or surface-exposed; 0 if it called it neither; **unmeasured when no provider covered it** |
+| `membrane_penalty` | **−0.15** | 1.0 if #10 calls it a membrane protein — deprioritized, never excluded (pitfall #3) |
 | `human_homolog` | **−0.25 × identity/100** | applied when a `Human Homolog` specialty row exists (identity is always populated in the export) |
 
 ```
 triage_score = 0.40·pdb_evidence + 0.20·virulence_amr + 0.15·essential
-             + 0.15·drug_target + 0.30·annotation_gap − 0.25·(human_identity/100)
+             + 0.15·drug_target + 0.30·annotation_gap + 0.10·surface_bonus
+             − 0.15·membrane_penalty − 0.25·(human_identity/100)
 ```
 
 Rationale, so the numbers are arguable rather than arbitrary:
@@ -161,6 +164,157 @@ wherever both exist — the precedence order is in
 [00a-data-contract.md](00a-data-contract.md). This is why AlphaFold contributes nothing to the
 triage score: it records what M3 will have to work with, not how good a candidate the protein is.
 
+## Human homology, computed rather than borrowed (issue #29)
+
+`human_homolog_penalty` used to read BV-BRC's precomputed `Human Homolog` rows. Those exist **for
+public genomes only**: a fresh CGA run on G37 returns 17 specialty rows where the public record
+has 174. On a blinded genome the penalty would silently never fire — and it is the only thing
+standing between the pipeline and recommending a target whose close human counterpart makes it a
+toxicity risk (pitfall #3/#4).
+
+`--human-homology` computes it: DIAMOND blastp against the reviewed human proteome (UniProt
+UP000005640, 20,416 sequences), **`--very-sensitive`**, e-value ≤ 1e-5, query coverage ≥ 0.5.
+1.5 s for 542 proteins.
+
+**Use `--very-sensitive`, not the default.** Measured on G37:
+
+| Mode | Time | Proteins with a hit |
+| --- | --- | --- |
+| default | 0.5 s | 107 |
+| `--sensitive` | 2.5 s | 173 |
+| **`--very-sensitive`** | **1.4 s** | **179** |
+| `--ultra-sensitive` | 4.9 s | 180 |
+
+Default mode misses 40% of them, including `rpsL` — a real 50.6% identity, 83-residue, gapless
+alignment to `RT12_HUMAN`, confirmed with an independent pairwise aligner and matching BV-BRC's
+own 50%. A missed human homolog is a target we fail to penalise, so recall matters more than the
+one second.
+
+**Spot check** (the DoD for #29): all five of the genome's known human homologs come back within
+~1% of BV-BRC's identity — atpD 63.7 vs 63, tuf 55.3 vs 55, atpA 54.2 vs 52, rpsL 50.6 vs 50,
+dnaK 50.1 vs 50.
+
+**Coverage gate.** BV-BRC's rows carry an identity and no coverage at all, which would let 50%
+identity over 20 residues penalise a target as hard as a full-length match. A hit counts only at
+≥ 50% query coverage; 26 of 179 G37 hits fall below it and are recorded as hits that do not count.
+
+**The penalty stays continuous** (identity/100 × 0.25), so a 22% homolog costs 0.055 and a 63% one
+costs 0.16. A separate `close_human_homolog` flag marks ≥ 40% identity — that is what M6 should
+state as a selectivity risk and M4 should read for scaffold borrowing, because "has a human
+homolog at 22% identity" is not a risk worth reporting.
+
+## Essentiality, transferred from relatives (issue #29)
+
+Same problem as human homology: BV-BRC's `Essential Gene` rows come from flux-balance analysis on
+**public** genomes. The public G37 record has 148; a fresh CGA run has none.
+
+`--essentiality --essentiality-keyword <genus>` builds a reference set of FBA-essential proteins
+from public relatives and transfers essentiality by orthology: DIAMOND `--very-sensitive`,
+**≥ 40% identity and ≥ 70% query coverage**, the conventional bar for functional transfer between
+bacteria. Every call records which relative genome and what identity justified it.
+
+**Fetch the whole reference set.** Capping it costs recall, measured against G37's 148 known
+essential genes:
+
+| Reference proteins | Genomes | Calls | Agreement with the public record |
+| --- | --- | --- | --- |
+| 5,000 (capped) | 95 | 131 | 113 of 148 |
+| **12,742 (all)** | **96** | **169** | **148 of 148** |
+
+The first fetch takes ~95 s and is cached; the alignment itself is ~1 s. The 21 extra calls are
+proteins with strong orthologs to essential genes in relatives that the public G37 record does
+not list — plausible, and each one names its source so a reviewer can check it.
+
+**What the call means, and does not.** FBA essentiality is a metabolic model's prediction that
+deleting the gene stops growth *in silico*. Transferring it by homology adds a second inference on
+top. Both are recorded, `evidence` stays `FBA`, and the annotation note says plainly that this is
+not an experimental knockout. That matters when M6 writes the report.
+
+## An "Antibiotic Resistance" row usually is not resistance
+
+BV-BRC classifies most AMR specialty rows as **"antibiotic target in susceptible species"** —
+gyrA and rpoB are what fluoroquinolones and rifamycins *hit*, not genes conferring resistance.
+Scoring them as resistance evidence is the specific mistake flagged in issue #30, and the ranking
+we published did exactly that.
+
+`virulence_amr` now reads the classification:
+
+| Evidence | Value | Example |
+| --- | --- | --- |
+| A classified resistance mechanism | **1.0** | efflux pump, antibiotic inactivation, cell-wall charge alteration |
+| An AMR row with no classification recorded | **0.5** | the export omits it; that is uncertainty, not confirmation |
+| Only "antibiotic target in susceptible species" | **0.0** | scored as `drug_target` instead, which is what it is |
+
+Measured on *K. pneumoniae* HS11286, whose export carries classifications: of 130 proteins with an
+AMR row, **95** are real resistance mechanisms, **19** are unclassified, and **16** were being
+counted as resistance evidence when they are drug targets. Every protein records `amr_basis`, so
+a reader sees which of the three applied.
+
+G37's public export has no `classification` column at all, so all 15 of its AMR rows score 0.5.
+The CGA output does carry it — 10 of its 14 AMR rows are "antibiotic target in susceptible
+species" — so the correction takes effect as soon as M1's real output is used.
+
+## Measured or merely zero
+
+`surface_bonus` and `membrane_penalty` depend on providers that may not have run. A component
+with no provider behind it contributes 0 — the same number as "measured, and false" — so each
+protein records `surface_exposed_measured` and `membrane_measured`, and `run.json` carries
+`components_available` per component and `components_nonzero` for all of them.
+
+Without this, a run where DeepTMHMM never ran looks exactly like a genome with no membrane
+proteins. This is the same distinction #10 makes in its own flags, and the same class of bug
+@Ashita2619 found in `no_pdb_hit`.
+
+## The smoke-test genome matches itself
+
+Raised by @cmmann21 on #12, and it changes how the G37 numbers should be read: *M. genitalium*
+**has its own structures in the PDB**, so a 100%-identity "discovery" can be the organism
+matching itself. That is not a cross-organism transfer, and nothing about it will reproduce on a
+novel genome.
+
+Measured on the full G37 run:
+
+| | Top 50 | Whole genome |
+| --- | --- | --- |
+| Best hit is the **same species** | **30** | 34 |
+| Best hit is the **same genus** (mostly *M. pneumoniae*) | **47** | 108 |
+
+So 47 of the 50 selected proteins rest on a hit from the same genus, and 88% of every
+same-species hit in the genome landed in the top 50. The ranking is not wrong — a 100% identity
+hit is the strongest evidence there is — but it is **easy** in a way a blinded or novel genome
+will not be.
+
+`same_species_hit` and `same_genus_hit` are recorded per protein and summarised in `run.json`;
+the protein's `reason` says "not a cross-organism transfer" in words, so M6 can explain why an
+annotation was easy instead of presenting it as a discovery.
+
+**They are flags, not penalties.** The evidence genuinely is the strongest available, so the
+score is unchanged; what changes is what the report is allowed to claim. The operational rule
+that follows: **do not calibrate `WEIGHTS` against this genome**, because the identity
+distribution that produced them does not exist elsewhere.
+
+### Knowing which organism we are
+
+Both flags need the query organism, and it is only sometimes in the input. Two BV-BRC FASTA
+layouts are in circulation: the G37 fixture carries `[Mycoplasma genitalium G37 | 243273.25]` on
+every header, while the p3-CLI/web export used for HS11286 carries no organism at all. A
+bracketed suffix is therefore accepted only when it reads like a binomial and covers at least
+half the records — otherwise EC-name qualifiers become the answer, and on HS11286 exactly three
+of 5,523 headers end in a bracket, all of them qualifiers such as `[decarboxylating]`.
+
+When nothing qualifies, the run warns and records `query_organism_source: "undetermined"` with
+`same_organism_hits.measured: false`. This matters because the flags fail *silently and in the
+wrong direction*: an unknown query organism makes every hit compare as foreign, which is the
+self-match artifact reported backwards. Pass `--organism` to settle it.
+
+Genus comparison has to tolerate a rename — BV-BRC writes *Mycoplasma genitalium* where the PDB
+and UniProt now say *Mycoplasmoides genitalium* — without merging distinct genera that share a
+Greek root. Two names count as one genus when their shared prefix is at least 75% of the shorter
+name: *Mycoplasma*/*Mycoplasmoides* is 0.90 and *Chlamydia*/*Chlamydophila* 0.78, while
+*Streptococcus*/*Streptomyces* is 0.58 and *Enterococcus*/*Enterobacter* 0.50. A fixed-length
+prefix does not separate these — seven characters is both *Chlamydia*/*Chlamydophila* and
+*Streptococcus*/*Streptomyces*.
+
 ## Genome sensitivity of the weights
 
 The weights were tuned on HS11286. They are **not automatically portable**, because the
@@ -204,4 +358,8 @@ Written to `runs/<run_id>/m2_pdb/`:
 | --- | --- | --- |
 | 2026-09-16 | Initial weights, before any full run. | Written from the component list in `02-m2-triage.md` and what the HS11286 specialty export actually provides. |
 | 2026-09-16 | `pdb_evidence` normalized by 1.20 instead of clipped at 1.0. Weights unchanged. | A 10-protein smoke run put two different-quality hits (raw 1.09 and 1.043) at an identical 0.40, because clipping discards the bonus range exactly where ranking matters. Found before any full run. |
+| 2026-09-17 | Added `surface_bonus` (+0.10) and `membrane_penalty` (−0.15), fed by #10's localization flags. | #10 shipped the flags and deliberately left them unscored, noting the weights belonged here. Surface-exposed proteins are the accessible ones (and M5's vaccine/antibody angle); membrane proteins fold and dock badly, so pitfall #3 says deprioritize rather than exclude — hence a penalty a strong protein can still outweigh. On G37: 19 proteins surface-exposed, 91 membrane, 1 of each in the top 50. |
+| 2026-09-17 | `virulence_amr` now reads the AMR classification instead of counting any AMR row. | Issue #30: most "Antibiotic Resistance" rows are "antibiotic target in susceptible species" — drug targets, not resistance genes. On HS11286, 16 of 130 such proteins were being scored as resistance evidence. Those now score `drug_target` instead, unclassified rows get 0.5, and `amr_basis` records which applied. Weight unchanged at 0.20. |
+| 2026-09-17 | `essential` now comes from orthology to FBA-essential proteins in public relatives, not BV-BRC's precomputed rows. Weight unchanged at 0.15. | Same reason as the human-homolog change: those rows exist for public genomes only (issue #29). Recovers 148 of G37's 148 known essential genes, plus 21 more that each name their source relative and identity. |
+| 2026-09-17 | `human_homolog_penalty` now comes from our own DIAMOND search, not BV-BRC's precomputed rows. Weight unchanged at −0.25. | Those rows exist for public genomes only, so on a blinded genome the penalty never fired (issue #29). The source change is larger than it sounds: 153 G37 proteins now carry a penalty where the public record listed 5. Ranking is barely affected — between penalising everything and penalising nothing, at most 5 of the top 50 change — but the recorded evidence is now ours and reproducible. |
 | 2026-09-16 | `annotation_gap` 0.10 → 0.30. **Changed after seeing the first full run** (pitfall #12 — recorded here rather than left implicit). | The HS11286 run selected 0 uncharacterized proteins out of 1,338 (best rank 57), because a known target collects 0.50 from virulence/essential/drug-target while a hypothetical can earn 0.10. That contradicts the project's purpose. Sensitivity over the recorded components: 0.20 → 6/50, 0.25 → 9/50, **0.30 → 10/50**, 0.35 → 15/50, 0.40 → 26/50. 0.30 admits 10, every one with a PDB hit and 8 with a ligand-bound homolog, while keeping 40 characterized targets as the validation set. Decision: project lead, 2026-09-16. |

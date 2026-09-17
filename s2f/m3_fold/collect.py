@@ -8,7 +8,7 @@ import re
 import tempfile
 import time
 from dataclasses import dataclass
-from datetime import UTC, datetime
+from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any, Callable
 from urllib.parse import urlparse
@@ -20,7 +20,7 @@ PDB_DOWNLOAD_URL = "https://files.rcsb.org/download/{entry_id}.cif"
 
 
 def _utc_now() -> datetime:
-    return datetime.now(UTC)
+    return datetime.now(timezone.utc)
 
 
 @dataclass(frozen=True)

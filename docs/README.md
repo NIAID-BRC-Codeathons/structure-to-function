@@ -21,10 +21,14 @@ Each module doc carries scope, inputs, outputs, tools, steps, acceptance checks,
 
 | Module | Doc | Owns in `report.json` |
 | --- | --- | --- |
-| M1 genome | [01-m1-genome.md](01-m1-genome.md) | `run`, `genome`, `proteins` (list) |
+| M1 genome | [01-m1-genome.md](01-m1-genome.md) | `run`, `genome`, `proteins` (list), `proteins[].m1_priority` |
+| M1b API route | [01b-m1-api-mode.md](01b-m1-api-mode.md) | the no-account route, its caveats, and the shared contract |
 | M2 triage | [02-m2-triage.md](02-m2-triage.md) | `proteins.*` enrichment, `kg` |
 | M2a PDB evidence | [02a-m2-pdb-evidence.md](02a-m2-pdb-evidence.md) | query parameters, scoring weights, weight change log |
 | M2b knowledge graph | [02b-m2-knowledge-graph.md](02b-m2-knowledge-graph.md) | source survey, edge types, caps, the homolog bridge |
+| M2c structure search | [02c-m2-structure-search.md](02c-m2-structure-search.md) | Foldseek: why sequence search is not enough, the significance gate, TM-score gap |
+| M2c functional annotation | [02c-m2-functional-annotation.md](02c-m2-functional-annotation.md) | source precedence, flag definitions, external-tool setup |
+| M2d remote runbook | [02d-remote-runbook.md](02d-remote-runbook.md) | running the annotation providers on a compute node: environment, two-pass sequence, what to check |
 | M3 fold | [03-m3-fold.md](03-m3-fold.md) | `structures` |
 | M4 ligands | [04-m4-ligands.md](04-m4-ligands.md) | `ligands`, `docking` |
 | M5 disease | [05-m5-disease.md](05-m5-disease.md) | `disease` |

@@ -25,6 +25,15 @@ Input: unknown bacterial genome assembly (contig FASTA). Output: coding genes an
 | --- | --- | --- |
 | Coding genes / proteins | **BV-BRC Comprehensive Genome Analysis (RASTtk)** | CDS, products, subsystems, protein FASTA, JSON genome object |
 | AMR | **CGA specialty genes** (CARD, NCBI reference gene catalog) | Offline cross-check: AMRFinderPlus, or RGI against CARD |
+
+> **Yield is organism-dependent.** CGA runs VFDB, Victors, CARD/RGI, AMRFinderPlus
+> and the MIC/SIR classifiers for every genome, but they return rows only for
+> organisms those databases represent: 375 specialty rows for *S. aureus* USA300
+> (124 virulence, 15 MIC/SIR) against 17 for *M. genitalium* (no virulence, no
+> phenotype). Treat an empty table as absence of evidence, not as a failure, and
+> check `quality.json` for which analyses ran. Human-homolog and essential-gene
+> rows are **not** produced by CGA at all — they exist only on BV-BRC's
+> precomputed public records. See `01a-cga-coverage.md`.
 | Phylogenetics | **CGA tree** (Newick, NEXUS) | Alternative: BV-BRC Phylogenetic Tree service (codon trees) |
 | Related species / genomes | **BV-BRC Similar Genome Finder** (Mash/MinHash) | Run *before* CGA — annotation needs a taxon at genus level or below |
 | Identity to relatives | **skani** (or fastANI) | CGA reports Mash distance, not ANI |

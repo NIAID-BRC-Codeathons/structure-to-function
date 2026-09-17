@@ -108,3 +108,137 @@ The known taxon was passed directly, so this run is not blinded.
 
 Do not parse `genome_sequence.json` or `feature_sequence.json` into
 `report.json`: sequences belong in `proteins.faa`.
+
+## Taxon resolution experiment (2026-09-17)
+
+Same contigs, submitted twice: once with the exact taxon and genetic code, once
+as a blinded unknown where the only fact available is "it is a bacterium". The
+floor run used taxon 2 (Bacteria) and genetic code 11, which is what BV-BRC's
+own taxonomy record for taxon 2 returns.
+
+| | Exact: taxon 243273, code 4 | Floor: taxon 2, code 11 |
+| --- | --- | --- |
+| Genome ID | 243273.147 | 2.119822 |
+| Runtime | 164.5 s | 156.4 s |
+| CDS | 530 | **1070** |
+| Mean protein length | 346.5 aa | **142.2 aa** |
+| Median protein length | 284 aa | 103 aa |
+| Total coding aa | 183,623 | **152,170** |
+| Proteins under 100 aa | 44 (8%) | **517 (48%)** |
+| Hypothetical | 139 (34.2%) | 333 (41.1%) |
+| Genome quality | Good | **Poor** |
+| Quality flags | none | **Abnormal CDS ratio** |
+| Fine consistency | 99.7 | 92.1 |
+| PLFAM assignments | 521 | **none** |
+| PGFAM assignments | 524 | 1007 |
+| Specialty genes | 17 | 38 |
+| Subsystem rows / distinct | 341 / 85 | 571 / 84 |
+| Pathway rows / distinct | 226 / 42 | 452 / 41 |
+| Tree ingroup | same 10 genomes | same 10 genomes |
+
+The mechanism is UGA read as a stop instead of tryptophan, so genes fragment:
+
+- `rpoB` is one 1390 aa protein in the exact run; in the floor run it is three
+  pieces (89, 358, 898 aa).
+- `ileS` is one 895 aa protein; in the floor run, five pieces (71, 45, 81, 90,
+  121 aa and more).
+- `gyrA` survives intact at 836 aa in both, so the damage is uneven.
+
+Downstream consequences:
+
+1. **Fragment inflation looks like more data, not less.** Specialty genes go
+   from 17 to 38 because one gene is counted several times: gyrB appears 5
+   times, Iso-tRNA 5, EF-G, GdpD, rpoB and rpoC 3 each. Subsystem and pathway
+   row counts roughly double while distinct counts stay flat. Any triage score
+   that counts hits rather than distinct genes will be badly skewed.
+2. **PLFAM assignment disappears entirely**, since local families are defined
+   per genus and there is no genus. PGFAM assignment still works.
+3. **CGA does flag it**: quality Poor, `Abnormal CDS ratio`, fine consistency
+   92.1. M1 should treat those as a hard gate, not a note.
+4. **The codon tree ingroup is unaffected** - the same 10 genomes, including
+   243273.25, in both runs. Ingroup selection is sequence-based, not taxon-based,
+   so it is a usable relative-finder even when the taxon is wrong.
+
+Conclusion: taxon and genetic code must come from Minhash before CGA runs, and
+the M1 parser should refuse a run whose genome quality is Poor or whose quality
+flags are non-empty.
+
+## USA300 versus M. genitalium (2026-09-17, issue #33)
+
+Everything that came back empty for *M. genitalium* populates for *S. aureus*
+USA300_FPR3757, so the analyses run for every genome — the smoke-test organism
+simply has little to find. Blinded contigs, taxon called by Minhash at species
+level (1280), genetic code 11, genome 1280.69637.
+
+| Analysis | USA300 (2.92 Mb) | M. genitalium (580 kb) |
+| --- | --- | --- |
+| CDS | 2767 | 530 |
+| CGA compute | **682 s** | 252 s |
+| Specialty rows, total | 375 | 17 |
+| Virulence: VFDB | 89 | none |
+| Virulence: Victors | 35 | none |
+| AMR: PATRIC k-mer | 41 | 14 |
+| AMR: CARD via RGI (homolog + variant models) | 24 | none |
+| AMR: NDARO via AMRFinderPlus | 10 | none |
+| AMR phenotype (`genome_amr`, MIC/SIR) | **15** | none |
+| Transporter: TCDB | 140 | 2 |
+| Drug target: TTD | 27 | 1 |
+| Metal resistance: BacMet | 9 | none |
+| cgMLST, loci called | **96.35%** | 0% |
+| MLST sequence type | **none called** | none called |
+| Subsystem rows | 1417 | 340 |
+| Pathway rows | 1287 | 225 |
+
+Consequences:
+
+1. **`pipeline.md` is correct about virulence and AMR sources**, but their yield is
+   organism-dependent. A poorly-characterized organism returns nothing from VFDB,
+   Victors, CARD or AMRFinderPlus, and that is a real absence of evidence, not a
+   broken pipeline. M2 and M5 must distinguish "no hits" from "not run" — the
+   specialty summary in `quality.json` says which analyses executed.
+
+2. **AMR phenotype data will exist for the real test genome, with caveats.**
+   `genome_amr` carries 15 rows for USA300 and none for *M. genitalium*: 3 MIC
+   predictions (daptomycin 1.0, oxacillin 4.0, vancomycin 2.0 mg/L) and 12 SIR
+   calls. Every row is XGBoost model output - `evidence: Computational Method`,
+   `vendor: BVBRC`, `computational_method_version: 20250225` - so these are
+   predictions, not laboratory measurements, and M5 must present them as such.
+
+   | Call | Antibiotics |
+   | --- | --- |
+   | Resistant | ciprofloxacin, clindamycin, erythromycin, cefoxitin, methicillin, oxacillin, penicillin, tetracycline, daptomycin |
+   | Susceptible | fusidic acid, `geamycin`, `co_trimoxazole` |
+
+   Three handling requirements for M5:
+
+   - **Gate on `computational_method_performance`.** Each row carries its own F1 or
+     W1 score with a confidence interval. Most are 0.91-0.99; daptomycin SIR is
+     **F1 0.3, CI[-0.26, 0.85]**, an interval spanning zero, and should be dropped
+     rather than reported.
+   - **MIC and SIR can contradict each other.** Daptomycin is called Resistant by
+     the SIR model while the MIC model returns 1.0 mg/L, the susceptible
+     breakpoint. A documented reconciliation rule is needed; here the
+     low-confidence SIR row is the one to discard.
+   - **Normalize antibiotic names before joining to ChEMBL or openFDA.** This run
+     contains `geamycin` (gentamicin) and `co_trimoxazole`. Same class of problem
+     as BV-BRC's `Virulance factor` spelling, which its own data also carries.
+
+   The remaining calls are consistent with MRSA: methicillin, oxacillin, cefoxitin
+   and penicillin resistant, the oxacillin MIC of 4.0 mg/L agreeing with its SIR
+   call, and vancomycin susceptible at 2.0 mg/L.
+
+3. **Human homolog is still missing.** BV-BRC's public record for 451515.3 has 648
+   specialty rows including 21 human-homolog rows and 34 DrugBank rows; a fresh CGA
+   run gives 375 and neither category. So the finding above holds even for a
+   well-characterized pathogen: M2 has to compute human homology itself. (DrugBank
+   is not shippable anyway.)
+
+4. **MLST is unreliable.** `p3x-compute-mlst` ran and called no sequence type, even
+   though cgMLST called 96.35% of loci and BV-BRC's public record types this genome
+   as ST8. Do not depend on MLST.
+
+5. **Runtime scales sub-linearly with CDS count**: 5.2x the CDS for 2.7x the compute.
+   Queue time still dominates wall-clock.
+
+`scripts/cga_coverage_report.py` regenerates this table from two retrieved CGA
+directories.

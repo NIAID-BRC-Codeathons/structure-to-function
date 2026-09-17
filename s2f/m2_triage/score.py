@@ -11,8 +11,9 @@ numbers alone (``triage_score_from_components``).
 from __future__ import annotations
 
 from dataclasses import asdict, dataclass, field
+from typing import Any
 
-from .bvbrc_input import Protein
+from .bvbrc_input import Protein, same_genus, same_species
 from .pdb_evidence import SequenceHit
 
 # Scoring gates for a hit to count as evidence at all.
@@ -28,8 +29,16 @@ WEIGHTS = {
     "essential": 0.15,
     "drug_target": 0.15,
     "annotation_gap": 0.30,
+    "surface_bonus": 0.10,
+    "membrane_penalty": -0.15,
     "human_homolog_penalty": -0.25,
 }
+
+#: Components that need a provider that may not have run. A component whose provider was absent
+#: contributes 0 — the same number as "we checked and it is false" — so the two are recorded
+#: separately per protein and summarised per run. Otherwise a missing DeepTMHMM run reads as
+#: "no membrane proteins in this genome" (issue #10's flag_row makes the same distinction).
+OPTIONAL_COMPONENTS = ("surface_bonus", "membrane_penalty")
 
 LIGAND_BONUS = 0.10
 PARTNER_BONUS = 0.05
@@ -40,6 +49,10 @@ ANNOTATION_BONUS = 0.05
 MAX_HIT_SCORE = 1.0 + LIGAND_BONUS + PARTNER_BONUS + ANNOTATION_BONUS
 
 HUMAN_TAXONOMY_ID = 9606
+
+#: Identity at or above which a human homolog is a selectivity risk worth reporting (pitfall #4).
+#: The penalty itself is continuous; this only drives the flag M6 states and M4 reads.
+CLOSE_HUMAN_HOMOLOG_IDENTITY = 40.0
 
 
 def hit_qualifies(hit: SequenceHit) -> bool:
@@ -95,6 +108,8 @@ class TriageComponents:
     essential: float = 0.0
     drug_target: float = 0.0
     annotation_gap: float = 0.0
+    surface_bonus: float = 0.0
+    membrane_penalty: float = 0.0
     human_homolog_penalty: float = 0.0
 
     def as_dict(self) -> dict[str, float]:
@@ -114,6 +129,9 @@ class ProteinScore:
     distinct_entries: int = 0
     qualifying_hits: int = 0
     flags: dict[str, object] = field(default_factory=dict)
+    #: Which optional components had a provider behind them for this protein. A component that
+    #: is False here contributed 0 because nothing measured it, not because it is absent.
+    components_available: dict[str, bool] = field(default_factory=dict)
     rank: int = 0
     selected: bool = False
     reason: str = ""
@@ -128,20 +146,64 @@ def triage_score_from_components(components: TriageComponents) -> float:
 
 
 def score_protein(
-    protein: Protein, hits: list[SequenceHit], retrieval_status: str, error: str = ""
+    protein: Protein,
+    hits: list[SequenceHit],
+    retrieval_status: str,
+    error: str = "",
+    *,
+    human_identity: float | None = None,
+    human_homolog_source: str = "",
+    essential: bool | None = None,
+    essential_source: str = "",
+    annotation: Any = None,
+    query_organism: str = "",
 ) -> ProteinScore:
-    """Score one protein from its PDB hits and M1 specialty rows."""
+    """Score one protein from its PDB hits and M1 specialty rows.
+
+    ``human_identity`` overrides the specialty table with evidence we computed ourselves
+    (issue #29). BV-BRC precomputes `Human Homolog` rows for public genomes only, so on a blinded
+    genome the specialty value is absent and the penalty would silently never fire.
+    """
     qualifying = [hit for hit in hits if hit_qualifies(hit)]
     top = best_hit(hits)
     pdb_evidence = (hit_score(top) / MAX_HIT_SCORE) if top is not None else 0.0
 
-    human_identity = protein.human_homolog_identity
+    if human_identity is None:
+        human_identity = protein.human_homolog_identity
+        human_homolog_source = human_homolog_source or "bvbrc_specialty"
+    if essential is None:
+        essential = protein.is_essential_ortholog
+        essential_source = essential_source or "bvbrc_specialty"
+
+    # Localization and membrane state come from #10. A flag with no source behind it is
+    # unknown, not false: `annotate` leaves it empty when no provider covered the protein.
+    surface_known = membrane_known = False
+    surface_value = membrane_value = 0.0
+    surface_source = membrane_source = ""
+    if annotation is not None:
+        membrane_source = getattr(annotation, "membrane_source", "") or ""
+        if membrane_source:
+            membrane_known = True
+            membrane_value = 1.0 if getattr(annotation, "membrane", False) else 0.0
+        surface_source = (
+            getattr(annotation, "signal_source", "") or getattr(annotation, "localization_source", "") or ""
+        )
+        if surface_source:
+            surface_known = True
+            surface_value = 1.0 if (
+                getattr(annotation, "surface_exposed", False) or getattr(annotation, "secreted", False)
+            ) else 0.0
+
+    amr_value, amr_basis = protein.amr_evidence
+    virulence_amr = max(1.0 if protein.is_virulence_factor else 0.0, amr_value)
     components = TriageComponents(
         pdb_evidence=round(pdb_evidence, 6),
-        virulence_amr=1.0 if protein.has_virulence_or_amr else 0.0,
-        essential=1.0 if protein.is_essential_ortholog else 0.0,
+        virulence_amr=virulence_amr,
+        essential=1.0 if essential else 0.0,
         drug_target=1.0 if protein.is_drug_target else 0.0,
         annotation_gap=1.0 if protein.is_uncharacterized else 0.0,
+        surface_bonus=surface_value,
+        membrane_penalty=membrane_value,
         human_homolog_penalty=round(human_identity / 100.0, 6) if human_identity else 0.0,
     )
 
@@ -153,10 +215,29 @@ def score_protein(
         "transporter": protein.is_transporter,
         "metal_resistance": protein.has_metal_resistance,
         "human_homolog_identity": human_identity if human_identity is not None else "",
-        "no_pdb_hit": not qualifying,
+        "close_human_homolog": bool(
+            human_identity is not None and human_identity >= CLOSE_HUMAN_HOMOLOG_IDENTITY
+        ),
+        "human_homolog_source": human_homolog_source or "",
+        "essential_source": essential_source or "",
+        "amr_basis": amr_basis,
+        "antibiotic_target_not_resistance": protein.is_antibiotic_target,
+        "surface_exposed_source": surface_source,
+        "membrane_source": membrane_source,
+        # "no qualifying hit" must not absorb "the search failed" — a network failure would
+        # otherwise be laundered into a structural claim downstream (found by @Ashita2619
+        # while building #43 on top of this file).
+        "no_pdb_hit": not qualifying and retrieval_status != "query-failed",
+        "pdb_search_failed": retrieval_status == "query-failed",
         "pdb_hit_organism": top.organism if top else "",
         "human_pdb_hit": bool(top and top.taxonomy_id == HUMAN_TAXONOMY_ID),
         "uniprot_of_best_hit": ";".join(top.uniprot_ids) if top else "",
+        # A hit against our own organism is not a cross-organism transfer: the test genome has
+        # its own structures in the PDB, so a 100% identity "discovery" can be a self-match
+        # (raised by @cmmann21 on #12). Recorded, never scored differently — but M6 must be able
+        # to say why an annotation was easy.
+        "same_species_hit": bool(top and query_organism and same_species(query_organism, top.organism)),
+        "same_genus_hit": bool(top and query_organism and same_genus(query_organism, top.organism)),
     }
 
     return ProteinScore(
@@ -169,6 +250,10 @@ def score_protein(
         distinct_entries=len({hit.entry_id for hit in qualifying}),
         qualifying_hits=len(qualifying),
         flags=flags,
+        components_available={
+            "surface_bonus": surface_known,
+            "membrane_penalty": membrane_known,
+        },
         error=error,
     )
 
@@ -197,8 +282,18 @@ def _reason(score: ProteinScore) -> str:
         parts.append("known drug target")
     if score.components.annotation_gap:
         parts.append("uncharacterized product")
+    if score.components.surface_bonus:
+        parts.append("surface-exposed or secreted")
+    if score.components.membrane_penalty:
+        parts.append("predicted membrane protein (penalty)")
     if score.components.human_homolog_penalty:
         parts.append(f"human homolog {score.components.human_homolog_penalty:.0%} identity (penalty)")
+    if score.flags.get("same_species_hit"):
+        parts.append("best structural hit is the same species — not a cross-organism transfer")
+    elif score.flags.get("same_genus_hit"):
+        parts.append("best structural hit is the same genus")
+    if score.flags.get("antibiotic_target_not_resistance"):
+        parts.append("antibiotic target in a susceptible species, not a resistance gene")
     return "; ".join(parts)
 
 

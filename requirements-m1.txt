@@ -1,0 +1,11 @@
+requests>=2.31,<3
+jsonschema>=4.20,<5
+
+# Optional. The gene-content phylogeny (s2f/m1_genome/tree.py) needs these; without them
+# the tree reports why it was skipped and the run succeeds without it.
+scipy>=1.10,<2
+numpy>=1.24
+
+# Optional. Publication figures only (s2f/m1_genome/figures.py). The HTML report already
+# carries inline SVG versions of every figure, so this is for papers and slides.
+matplotlib>=3.7,<4

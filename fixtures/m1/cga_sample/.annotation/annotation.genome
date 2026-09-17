@@ -1,0 +1,1286 @@
+{
+ "features": [
+  {
+   "go_terms": [
+    [
+     "GO:0003918",
+     "DNA topoisomerase type II (ATP-hydrolyzing) activity"
+    ]
+   ],
+   "annotations": [
+    [
+     "Add feature called by PRODIGAL",
+     "prodigal",
+     1789655106.28429,
+     "944F695A-B2A3-11F1-A388-C542D24D7A8A"
+    ],
+    [
+     "Function updated to DNA gyrase subunit A (EC 5.99.1.3)",
+     "annotate_proteins_kmer_v2",
+     1789655113.5231,
+     "989FF4DE-B2A3-11F1-AA45-8F5FF5B34E91"
+    ],
+    [
+     "Feature renumbered from fig|243273.147.peg.4 to fig|243273.147.peg.4",
+     "USER@bvbrc",
+     1789655125.57413,
+     "9FCDB994-B2A3-11F1-9195-94DA575918DD"
+    ]
+   ],
+   "type": "CDS",
+   "pathways": [],
+   "quality": {
+    "priority": 265.801595812337,
+    "hit_count": "648",
+    "weighted_hit_count": "689.711"
+   },
+   "location": [
+    [
+     "contig_1",
+     "4812",
+     "+",
+     2511
+    ]
+   ],
+   "ec_numbers": [
+    [
+     "5.99.1.3",
+     "DNA topoisomerase (ATP-hydrolyzing)"
+    ]
+   ],
+   "function": "DNA gyrase subunit A (EC 5.99.1.3)",
+   "id": "fig|243273.147.peg.4",
+   "similarity_associations": [],
+   "feature_creation_event": "944F695A-B2A3-11F1-A388-C542D24D7A8A",
+   "family_assignments": [
+    [
+     "PGFAM",
+     "PGF_03272313",
+     "DNA gyrase subunit A (EC 5.99.1.3)",
+     "2018-0531",
+     1120
+    ],
+    [
+     "PLFAM",
+     "PLF_2093_00001144",
+     "DNA gyrase subunit A (EC 5.99.1.3)",
+     "2018-0531"
+    ]
+   ]
+  },
+  {
+   "feature_creation_event": "944F695A-B2A3-11F1-A388-C542D24D7A8A",
+   "similarity_associations": [],
+   "id": "fig|243273.147.peg.11",
+   "family_assignments": [
+    [
+     "PGFAM",
+     "PGF_00098790",
+     "hypothetical protein",
+     "2018-0531",
+     263
+    ],
+    [
+     "PLFAM",
+     "PLF_2093_00004476",
+     "hypothetical protein",
+     "2018-0531"
+    ]
+   ],
+   "location": [
+    [
+     "contig_1",
+     "13564",
+     "-",
+     864
+    ]
+   ],
+   "function": "hypothetical protein",
+   "annotations": [
+    [
+     "Add feature called by PRODIGAL",
+     "prodigal",
+     1789655106.28435,
+     "944F695A-B2A3-11F1-A388-C542D24D7A8A"
+    ],
+    [
+     "Function updated to hypothetical protein",
+     "annotate_proteins_kmer_v2",
+     1789655113.52319,
+     "989FF4DE-B2A3-11F1-AA45-8F5FF5B34E91"
+    ],
+    [
+     "Feature renumbered from fig|243273.147.peg.11 to fig|243273.147.peg.11",
+     "USER@bvbrc",
+     1789655125.5742,
+     "9FCDB994-B2A3-11F1-9195-94DA575918DD"
+    ]
+   ],
+   "type": "CDS",
+   "quality": {
+    "hit_count": "241",
+    "priority": 127.519620684318,
+    "weighted_hit_count": "179.0662"
+   }
+  },
+  {
+   "id": "fig|243273.147.peg.94",
+   "similarity_associations": [],
+   "feature_creation_event": "944F695A-B2A3-11F1-A388-C542D24D7A8A",
+   "family_assignments": [
+    [
+     "PGFAM",
+     "PGF_06941403",
+     "SSU ribosomal protein S12p (S23e)",
+     "2018-0531",
+     256
+    ],
+    [
+     "PLFAM",
+     "PLF_2093_00000006",
+     "SSU ribosomal protein S12p (S23e)",
+     "2018-0531"
+    ]
+   ],
+   "location": [
+    [
+     "contig_1",
+     "113895",
+     "+",
+     420
+    ]
+   ],
+   "function": "SSU ribosomal protein S12p (S23e)",
+   "annotations": [
+    [
+     "Add feature called by PRODIGAL",
+     "prodigal",
+     1789655106.28506,
+     "944F695A-B2A3-11F1-A388-C542D24D7A8A"
+    ],
+    [
+     "Function updated to SSU ribosomal protein S12p (S23e)",
+     "annotate_proteins_kmer_v2",
+     1789655113.52424,
+     "989FF4DE-B2A3-11F1-AA45-8F5FF5B34E91"
+    ],
+    [
+     "Feature renumbered from fig|243273.147.peg.95 to fig|243273.147.peg.94",
+     "USER@bvbrc",
+     1789655125.57512,
+     "9FCDB994-B2A3-11F1-9195-94DA575918DD"
+    ]
+   ],
+   "type": "CDS",
+   "quality": {
+    "weighted_hit_count": "308.726",
+    "priority": 78.6402877459515,
+    "hit_count": "125"
+   }
+  },
+  {
+   "function": "Uncharacterized amino acid permease, GabP family",
+   "location": [
+    [
+     "contig_1",
+     "270405",
+     "+",
+     1470
+    ]
+   ],
+   "family_assignments": [
+    [
+     "PGFAM",
+     "PGF_00778630",
+     "Uncharacterized amino acid permease, GabP family",
+     "2018-0531",
+     444
+    ],
+    [
+     "PLFAM",
+     "PLF_2093_00003459",
+     "Uncharacterized amino acid permease, GabP family",
+     "2018-0531"
+    ]
+   ],
+   "id": "fig|243273.147.peg.254",
+   "similarity_associations": [
+    [
+     "TCDB",
+     "TCDB|P47467",
+     "100",
+     "100",
+     "100",
+     "0.0",
+     {
+      "source_id": "P47467",
+      "tool": "diamond",
+      "classification": "2.A.3.3.15",
+      "source": "TCDB",
+      "organism": "Mycoplasma genitalium strain ATCC 33530",
+      "property": "Transporter",
+      "product": "Uncharacterized protein MG225",
+      "event_id": "AB50871A-B2A3-11F1-8D95-8611019A6076"
+     }
+    ]
+   ],
+   "feature_creation_event": "944F695A-B2A3-11F1-A388-C542D24D7A8A",
+   "quality": {
+    "hit_count": "394",
+    "priority": 183.590717639953,
+    "weighted_hit_count": "294.306"
+   },
+   "type": "CDS",
+   "annotations": [
+    [
+     "Add feature called by PRODIGAL",
+     "prodigal",
+     1789655106.28648,
+     "944F695A-B2A3-11F1-A388-C542D24D7A8A"
+    ],
+    [
+     "Function updated to Uncharacterized amino acid permease, GabP family",
+     "annotate_proteins_kmer_v2",
+     1789655113.52593,
+     "989FF4DE-B2A3-11F1-AA45-8F5FF5B34E91"
+    ],
+    [
+     "Feature renumbered from fig|243273.147.peg.255 to fig|243273.147.peg.254",
+     "USER@bvbrc",
+     1789655125.57707,
+     "9FCDB994-B2A3-11F1-9195-94DA575918DD"
+    ]
+   ]
+  },
+  {
+   "pathways": [],
+   "quality": {
+    "priority": 198.551641823914,
+    "hit_count": "431",
+    "weighted_hit_count": "529.393"
+   },
+   "annotations": [
+    [
+     "Add feature called by PRODIGAL",
+     "prodigal",
+     1789655106.28858,
+     "944F695A-B2A3-11F1-A388-C542D24D7A8A"
+    ],
+    [
+     "Function updated to 2,3-bisphosphoglycerate-independent phosphoglycerate mutase (EC 5.4.2.12)",
+     "annotate_proteins_kmer_v2",
+     1789655113.5283,
+     "989FF4DE-B2A3-11F1-AA45-8F5FF5B34E91"
+    ],
+    [
+     "Feature renumbered from fig|243273.147.peg.483 to fig|243273.147.peg.485",
+     "USER@bvbrc",
+     1789655125.5798,
+     "9FCDB994-B2A3-11F1-9195-94DA575918DD"
+    ]
+   ],
+   "type": "CDS",
+   "ec_numbers": [
+    [
+     "5.4.2.12",
+     "Phosphoglycerate mutase (2,3-diphosphoglycerate-independent)"
+    ]
+   ],
+   "function": "2,3-bisphosphoglycerate-independent phosphoglycerate mutase (EC 5.4.2.12)",
+   "location": [
+    [
+     "contig_1",
+     "537564",
+     "-",
+     1524
+    ]
+   ],
+   "go_terms": [],
+   "family_assignments": [
+    [
+     "PGFAM",
+     "PGF_00021217",
+     "2,3-bisphosphoglycerate-independent phosphoglycerate mutase (EC 5.4.2.12)",
+     "2018-0531",
+     842
+    ],
+    [
+     "PLFAM",
+     "PLF_2093_00005111",
+     "2,3-bisphosphoglycerate-independent phosphoglycerate mutase (EC 5.4.2.12)",
+     "2018-0531"
+    ]
+   ],
+   "id": "fig|243273.147.peg.485",
+   "similarity_associations": [
+    [
+     "TTD",
+     "TTD|T54526",
+     "100",
+     "100",
+     "100",
+     "0.0",
+     {
+      "source_id": "T54526",
+      "tool": "diamond",
+      "product": "Mycobacterium Bisphosphoglycerate phosphoglycerate mutase",
+      "event_id": "ADC8DB14-B2A3-11F1-8903-881A84B015B4",
+      "source": "TTD",
+      "property": "Drug Target"
+     }
+    ]
+   ],
+   "feature_creation_event": "944F695A-B2A3-11F1-A388-C542D24D7A8A"
+  }
+ ],
+ "ncbi_genus": "Mycoplasmoides",
+ "job_data": {
+  "assembly": {},
+  "annotation": {
+   "app_name": "GenomeAnnotation",
+   "attributes": {},
+   "parameters": {
+    "output_path": "/USER@bvbrc/home/s2f/.mgen_G37_cga",
+    "skip_indexing": false,
+    "scientific_name": "Mycoplasma genitalium",
+    "queue_nowait": 1,
+    "code": 4,
+    "taxonomy_id": 243273,
+    "contigs": "/USER@bvbrc/home/s2f/uploads/mgen_G37.blinded.fna",
+    "analyze_quality": 1,
+    "output_file": "annotation",
+    "domain": "Bacteria"
+   },
+   "completion_time": "2026-09-17T14:27:32Z",
+   "start_time": "2026-09-17T14:24:40Z",
+   "job_id": "annotation_672412",
+   "elapsed_time": 172
+  }
+ },
+ "contigs": [
+  {
+   "dna": "taagttattatttagttaatacttttaacaatattattaaggtatttaaaaaatactattatagtatttaacatagttaaataccttccttaatactgttaaattatattcaatcaatacatatataatattattaaaatacttgataagtattatttagatattagacaaatactaattttatattgctttaatactta...truncated for fixture",
+   "genbank_locus": {},
+   "id": "contig_1"
+  }
+ ],
+ "genetic_code": 4,
+ "ncbi_taxonomy_id": "243273",
+ "domain": "Bacteria",
+ "job_metadata": {
+  "job_end": 1789655222.10057,
+  "job_start": 1789655083.62429,
+  "workflow": {
+   "stages": [
+    {
+     "name": "call_features_rRNA_SEED"
+    },
+    {
+     "name": "call_features_tRNA_trnascan"
+    },
+    {
+     "name": "call_features_repeat_region_SEED",
+     "repeat_region_SEED_parameters": {}
+    },
+    {
+     "failure_is_not_fatal": 1,
+     "name": "call_selenoproteins"
+    },
+    {
+     "name": "call_pyrrolysoproteins",
+     "failure_is_not_fatal": 1
+    },
+    {
+     "name": "call_features_strep_suis_repeat",
+     "condition": "$genome->{scientific_name} =~ /^Streptococcus\\s/"
+    },
+    {
+     "condition": "$genome->{scientific_name} =~ /^Streptococcus\\s/",
+     "name": "call_features_strep_pneumo_repeat"
+    },
+    {
+     "name": "call_features_crispr",
+     "failure_is_not_fatal": 1
+    },
+    {
+     "name": "call_features_CDS_prodigal"
+    },
+    {
+     "name": "call_features_CDS_glimmer3",
+     "glimmer3_parameters": {},
+     "failure_is_not_fatal": 1
+    },
+    {
+     "prune_invalid_CDS_features_parameters": {
+      "max_homopolymer_frequency": 0.9,
+      "minimum_contig_length": 0
+     },
+     "name": "prune_invalid_CDS_features"
+    },
+    {
+     "kmer_v2_parameters": {},
+     "name": "annotate_proteins_kmer_v2"
+    },
+    {
+     "name": "annotate_proteins_phage",
+     "phage_parameters": {
+      "annotate_null_only": 1
+     }
+    },
+    {
+     "similarity_parameters": {
+      "annotate_null_only": 1
+     },
+     "name": "annotate_proteins_similarity"
+    },
+    {
+     "name": "propagate_genbank_feature_metadata",
+     "propagate_genbank_feature_metadata_parameters": {
+      "min_rna_pct_coverage": 90
+     }
+    },
+    {
+     "resolve_overlapping_features_parameters": {},
+     "name": "resolve_overlapping_features"
+    },
+    {
+     "failure_is_not_fatal": 1,
+     "name": "classify_amr_v2",
+     "condition": "scalar @{$genome->{contigs}} != grep { $_->{replicon_type} eq \"plasmid\" } @{$genome->{contigs}}"
+    },
+    {
+     "name": "renumber_features"
+    },
+    {
+     "name": "annotate_special_proteins_v2"
+    },
+    {
+     "name": "annotate_families_patric"
+    },
+    {
+     "name": "annotate_null_to_hypothetical"
+    },
+    {
+     "name": "project_subsystems",
+     "failure_is_not_fatal": 1
+    },
+    {
+     "name": "annotate_strain_type_MLST_v2"
+    },
+    {
+     "failure_is_not_fatal": 1,
+     "name": "annotate_strain_type_cgMLST"
+    },
+    {
+     "name": "compute_genome_quality_control"
+    },
+    {
+     "name": "evaluate_genome",
+     "failure_is_not_fatal": 1,
+     "evaluate_genome_parameters": {}
+    }
+   ]
+  },
+  "slurm_jobname": "t-23587516",
+  "task_id": "23587516",
+  "container": "/disks/patric-common/container-cache/ubuntu-210-build12-2.sif",
+  "hostname": "pear.cels.anl.gov",
+  "slurm_jobid": "20997626",
+  "params": {
+   "skip_indexing": 0,
+   "output_path": "/USER@bvbrc/home/s2f/.mgen_G37_cga",
+   "queue_nowait": "1",
+   "taxonomy_id": "243273",
+   "skip_workspace_output": false,
+   "analyze_quality": "1",
+   "lowvan_fallback_viral_taxon": false,
+   "domain": "Bacteria",
+   "public": false,
+   "lowvan_min_contig_length": 300,
+   "scientific_name": "Mycoplasma genitalium",
+   "code": 4,
+   "lowvan_max_contig_length": 40000,
+   "contigs": "/USER@bvbrc/home/s2f/uploads/mgen_G37.blinded.fna",
+   "output_file": "annotation"
+  },
+  "job_elapsed": 138.476273059845,
+  "user": "USER@bvbrc"
+ },
+ "owner": "USER@bvbrc",
+ "id": "243273.147",
+ "ncbi_superkingdom": "Bacteria",
+ "scientific_name": "Mycoplasma genitalium",
+ "quality": {
+  "genome_quality_flags": [],
+  "protein_summary": {
+   "hypothetical": 139,
+   "pathway_assignment": 113,
+   "plfam_assignment": 521,
+   "function_assignment": 391,
+   "go_assignment": 127,
+   "pgfam_assignment": 524,
+   "ec_assignment": 161
+  },
+  "feature_summary": {
+   "tRNA": 35,
+   "repeat_region": 16,
+   "rRNA": 3,
+   "partial_cds": 0,
+   "misc_RNA": 0,
+   "cds": 530,
+   "mat_peptide": 0
+  },
+  "cds_ratio": 0.913673380729422,
+  "fine_consistency": "99.7",
+  "hypothetical_cds_ratio": 0.341509433962264,
+  "coarse_consistency": "99.9",
+  "genome_length": 580076,
+  "contigs": 1,
+  "genome_quality": "Good"
+ },
+ "typing": [
+  {
+   "typing_method": "MLST",
+   "event_id": "B281EC2C-B2A3-11F1-9233-FD14E04E1851",
+   "tag": "-",
+   "database": "-"
+  }
+ ],
+ "close_genomes": [],
+ "ncbi_species": "Mycoplasmoides genitalium",
+ "subsystems": [
+  {
+   "classification": [
+    "PROTEIN PROCESSING",
+    "Protein Synthesis",
+    "Ribosome biogenesis"
+   ],
+   "event_id": "B1CF07E2-B2A3-11F1-A734-C5E1735FBEA8",
+   "name": "Ribosomal_proteins,_single-copy",
+   "role_bindings": [
+    {
+     "features": [
+      "fig|243273.147.peg.89"
+     ],
+     "role_id": "LSU ribosomal protein L1p (L10Ae)"
+    },
+    {
+     "features": [
+      "fig|243273.147.peg.170"
+     ],
+     "role_id": "LSU ribosomal protein L2p (L8e)"
+    },
+    {
+     "role_id": "LSU ribosomal protein L3p (L3e)",
+     "features": [
+      "fig|243273.147.peg.167"
+     ]
+    },
+    {
+     "role_id": "LSU ribosomal protein L4p (L1e)",
+     "features": [
+      "fig|243273.147.peg.168"
+     ]
+    },
+    {
+     "features": [
+      "fig|243273.147.peg.179"
+     ],
+     "role_id": "LSU ribosomal protein L5p (L11e)"
+    },
+    {
+     "features": [
+      "fig|243273.147.peg.182"
+     ],
+     "role_id": "LSU ribosomal protein L6p (L9e)"
+    },
+    {
+     "features": [
+      "fig|243273.147.peg.416"
+     ],
+     "role_id": "LSU ribosomal protein L7p/L12p (P1/P2)"
+    },
+    {
+     "features": [
+      "fig|243273.147.peg.100"
+     ],
+     "role_id": "LSU ribosomal protein L9p"
+    },
+    {
+     "features": [
+      "fig|243273.147.peg.415"
+     ],
+     "role_id": "LSU ribosomal protein L10p (P0)"
+    },
+    {
+     "features": [
+      "fig|243273.147.peg.88"
+     ],
+     "role_id": "LSU ribosomal protein L11p (L12e)"
+    },
+    {
+     "role_id": "LSU ribosomal protein L13p (L13Ae)",
+     "features": [
+      "fig|243273.147.peg.474"
+     ]
+    },
+    {
+     "role_id": "LSU ribosomal protein L14p (L23e)",
+     "features": [
+      "fig|243273.147.peg.177"
+     ]
+    },
+    {
+     "role_id": "LSU ribosomal protein L15p (L27Ae)",
+     "features": [
+      "fig|243273.147.peg.185"
+     ]
+    },
+    {
+     "features": [
+      "fig|243273.147.peg.174"
+     ],
+     "role_id": "LSU ribosomal protein L16p (L10e)"
+    },
+    {
+     "features": [
+      "fig|243273.147.peg.194"
+     ],
+     "role_id": "LSU ribosomal protein L17p"
+    },
+    {
+     "features": [
+      "fig|243273.147.peg.183"
+     ],
+     "role_id": "LSU ribosomal protein L18p (L5e)"
+    },
+    {
+     "features": [
+      "fig|243273.147.peg.499"
+     ],
+     "role_id": "LSU ribosomal protein L19p"
+    },
+    {
+     "features": [
+      "fig|243273.147.peg.223"
+     ],
+     "role_id": "LSU ribosomal protein L20p"
+    },
+    {
+     "features": [
+      "fig|243273.147.peg.262"
+     ],
+     "role_id": "LSU ribosomal protein L21p"
+    },
+    {
+     "role_id": "LSU ribosomal protein L22p (L17e)",
+     "features": [
+      "fig|243273.147.peg.172"
+     ]
+    },
+    {
+     "features": [
+      "fig|243273.147.peg.169"
+     ],
+     "role_id": "LSU ribosomal protein L23p (L23Ae)"
+    },
+    {
+     "features": [
+      "fig|243273.147.peg.178"
+     ],
+     "role_id": "LSU ribosomal protein L24p (L26e)"
+    },
+    {
+     "features": [
+      "fig|243273.147.peg.264"
+     ],
+     "role_id": "LSU ribosomal protein L27p"
+    },
+    {
+     "features": [
+      "fig|243273.147.peg.175"
+     ],
+     "role_id": "LSU ribosomal protein L29p (L35e)"
+    },
+    {
+     "features": [
+      "fig|243273.147.peg.524"
+     ],
+     "role_id": "LSU ribosomal protein L34p"
+    },
+    {
+     "features": [
+      "fig|243273.147.peg.222"
+     ],
+     "role_id": "LSU ribosomal protein L35p"
+    },
+    {
+     "features": [
+      "fig|243273.147.peg.77"
+     ],
+     "role_id": "SSU ribosomal protein S2p (SAe)"
+    },
+    {
+     "role_id": "SSU ribosomal protein S3p (S3e)",
+     "features": [
+      "fig|243273.147.peg.173"
+     ]
+    },
+    {
+     "features": [
+      "fig|243273.147.peg.184"
+     ],
+     "role_id": "SSU ribosomal protein S5p (S2e)"
+    },
+    {
+     "features": [
+      "fig|243273.147.peg.97"
+     ],
+     "role_id": "SSU ribosomal protein S6p"
+    },
+    {
+     "features": [
+      "fig|243273.147.peg.95"
+     ],
+     "role_id": "SSU ribosomal protein S7p (S5e)"
+    },
+    {
+     "role_id": "SSU ribosomal protein S8p (S15Ae)",
+     "features": [
+      "fig|243273.147.peg.181"
+     ]
+    },
+    {
+     "role_id": "SSU ribosomal protein S9p (S16e)",
+     "features": [
+      "fig|243273.147.peg.473"
+     ]
+    },
+    {
+     "features": [
+      "fig|243273.147.peg.166"
+     ],
+     "role_id": "SSU ribosomal protein S10p (S20e)"
+    },
+    {
+     "role_id": "SSU ribosomal protein S11p (S14e)",
+     "features": [
+      "fig|243273.147.peg.192"
+     ]
+    },
+    {
+     "features": [
+      "fig|243273.147.peg.94"
+     ],
+     "role_id": "SSU ribosomal protein S12p (S23e)"
+    },
+    {
+     "features": [
+      "fig|243273.147.peg.191"
+     ],
+     "role_id": "SSU ribosomal protein S13p (S18e)"
+    },
+    {
+     "features": [
+      "fig|243273.147.peg.479"
+     ],
+     "role_id": "SSU ribosomal protein S15p (S13e)"
+    },
+    {
+     "features": [
+      "fig|243273.147.peg.501"
+     ],
+     "role_id": "SSU ribosomal protein S16p"
+    },
+    {
+     "features": [
+      "fig|243273.147.peg.176"
+     ],
+     "role_id": "SSU ribosomal protein S17p (S11e)"
+    },
+    {
+     "features": [
+      "fig|243273.147.peg.171"
+     ],
+     "role_id": "SSU ribosomal protein S19p (S15e)"
+    },
+    {
+     "features": [
+      "fig|243273.147.peg.418"
+     ],
+     "role_id": "SSU ribosomal protein S20p"
+    }
+   ],
+   "variant_code": "active"
+  },
+  {
+   "event_id": "B1CF07E2-B2A3-11F1-A734-C5E1735FBEA8",
+   "classification": [
+    "DNA PROCESSING",
+    "DNA Processing",
+    "DNA replication"
+   ],
+   "name": "DNA_topoisomerases,_Type_II,_ATP-dependent",
+   "role_bindings": [
+    {
+     "features": [
+      "fig|243273.147.peg.4"
+     ],
+     "role_id": "DNA gyrase subunit A (EC 5.99.1.3)"
+    },
+    {
+     "role_id": "DNA gyrase subunit B (EC 5.99.1.3)",
+     "features": [
+      "fig|243273.147.peg.3"
+     ]
+    },
+    {
+     "features": [],
+     "role_id": "DNA reverse gyrase (EC 3.6.4.12) (EC 5.99.1.3)"
+    },
+    {
+     "role_id": "DNA topoisomerase II (EC 5.99.1.3)",
+     "features": []
+    },
+    {
+     "features": [],
+     "role_id": "DNA topoisomerase VI subunit A (EC 5.99.1.3)"
+    },
+    {
+     "role_id": "DNA topoisomerase VI subunit B (EC 5.99.1.3)",
+     "features": []
+    },
+    {
+     "role_id": "DNA topoisomerase IV subunit A (EC 5.99.1.3)",
+     "features": [
+      "fig|243273.147.peg.229"
+     ]
+    },
+    {
+     "features": [
+      "fig|243273.147.peg.228"
+     ],
+     "role_id": "DNA topoisomerase IV subunit B (EC 5.99.1.3)"
+    }
+   ],
+   "variant_code": "active"
+  },
+  {
+   "variant_code": "active",
+   "role_bindings": [
+    {
+     "features": [
+      "fig|243273.147.peg.4"
+     ],
+     "role_id": "DNA gyrase subunit A (EC 5.99.1.3)"
+    },
+    {
+     "features": [
+      "fig|243273.147.peg.3"
+     ],
+     "role_id": "DNA gyrase subunit B (EC 5.99.1.3)"
+    },
+    {
+     "features": [
+      "fig|243273.147.peg.229"
+     ],
+     "role_id": "DNA topoisomerase IV subunit A (EC 5.99.1.3)"
+    },
+    {
+     "role_id": "DNA topoisomerase IV subunit B (EC 5.99.1.3)",
+     "features": [
+      "fig|243273.147.peg.228"
+     ]
+    }
+   ],
+   "classification": [
+    "STRESS RESPONSE, DEFENSE, VIRULENCE",
+    "Stress Response, Defense and Virulence",
+    "Resistance to antibiotics and toxic compounds"
+   ],
+   "event_id": "B1CF07E2-B2A3-11F1-A734-C5E1735FBEA8",
+   "name": "Antibiotic_targets_in_DNA_processing"
+  },
+  {
+   "name": "Glycolysis_and_Gluconeogenesis",
+   "classification": [
+    "ENERGY",
+    "Energy and Precursor Metabolites Generation",
+    "Central Metabolism"
+   ],
+   "event_id": "B1CF07E2-B2A3-11F1-A734-C5E1735FBEA8",
+   "variant_code": "active",
+   "role_bindings": [
+    {
+     "role_id": "Glucokinase (EC 2.7.1.2)",
+     "features": []
+    },
+    {
+     "role_id": "Hexokinase (EC 2.7.1.1)",
+     "features": []
+    },
+    {
+     "role_id": "Polyphosphate glucokinase (EC 2.7.1.63)",
+     "features": []
+    },
+    {
+     "features": [
+      "fig|243273.147.peg.119"
+     ],
+     "role_id": "Glucose-6-phosphate isomerase (EC 5.3.1.9)"
+    },
+    {
+     "role_id": "Glucose-6-phosphate isomerase, archaeal (EC 5.3.1.9)",
+     "features": []
+    },
+    {
+     "features": [],
+     "role_id": "Glucose-6-phosphate isomerase, archaeal II (EC 5.3.1.9)"
+    },
+    {
+     "features": [
+      "fig|243273.147.peg.243"
+     ],
+     "role_id": "6-phosphofructokinase (EC 2.7.1.11)"
+    },
+    {
+     "role_id": "6-phosphofructokinase class II (EC 2.7.1.11)",
+     "features": []
+    },
+    {
+     "role_id": "6-phosphofructokinase, fungal/animal type (EC 2.7.1.11)",
+     "features": []
+    },
+    {
+     "role_id": "Pyrophosphate-dependent fructose 6-phosphate-1-kinase (EC 2.7.1.90)",
+     "features": []
+    },
+    {
+     "role_id": "Fructose-1,6-bisphosphatase, type I (EC 3.1.3.11)",
+     "features": []
+    },
+    {
+     "features": [],
+     "role_id": "Fructose-1,6-bisphosphatase, Bacillus type (EC 3.1.3.11)"
+    },
+    {
+     "role_id": "Fructose-1,6-bisphosphatase, GlpX type (EC 3.1.3.11)",
+     "features": []
+    },
+    {
+     "features": [],
+     "role_id": "Fructose-1,6-bisphosphatase, Mycobacterial type SUP1 (EC 3.1.3.11)"
+    },
+    {
+     "features": [],
+     "role_id": "Fructose-bisphosphate aldolase class I (EC 4.1.2.13)"
+    },
+    {
+     "features": [
+      "fig|243273.147.peg.21"
+     ],
+     "role_id": "Fructose-bisphosphate aldolase class II (EC 4.1.2.13)"
+    },
+    {
+     "features": [],
+     "role_id": "Fructose-bisphosphate aldolase, archaeal class I (EC 4.1.2.13)"
+    },
+    {
+     "role_id": "Predicted Fructose-bisphosphate aldolase (EC 4.1.2.13) in Geobacter",
+     "features": []
+    },
+    {
+     "features": [],
+     "role_id": "Fructose-bisphosphate aldolase/bisphosphatase ancestral bifunctional (EC 4.1.2.13) (EC 3.1.3.11)"
+    },
+    {
+     "role_id": "Triosephosphate isomerase (EC 5.3.1.1)",
+     "features": [
+      "fig|243273.147.peg.486"
+     ]
+    },
+    {
+     "features": [
+      "fig|243273.147.peg.344"
+     ],
+     "role_id": "NAD-dependent glyceraldehyde-3-phosphate dehydrogenase (EC 1.2.1.12)"
+    },
+    {
+     "role_id": "NADP-dependent glyceraldehyde-3-phosphate dehydrogenase (EC 1.2.1.13)",
+     "features": []
+    },
+    {
+     "features": [],
+     "role_id": "Glyceraldehyde-3-phosphate dehydrogenase (NADP(+)) (EC 1.2.1.9)"
+    },
+    {
+     "role_id": "Phosphoglycerate kinase (EC 2.7.2.3)",
+     "features": [
+      "fig|243273.147.peg.343"
+     ]
+    },
+    {
+     "role_id": "Phosphoglycerate mutase (EC 5.4.2.11)",
+     "features": []
+    },
+    {
+     "role_id": "2,3-bisphosphoglycerate-independent phosphoglycerate mutase (EC 5.4.2.12)",
+     "features": [
+      "fig|243273.147.peg.485"
+     ]
+    },
+    {
+     "features": [
+      "fig|243273.147.peg.465"
+     ],
+     "role_id": "Enolase (EC 4.2.1.11)"
+    },
+    {
+     "role_id": "Pyruvate kinase (EC 2.7.1.40)",
+     "features": [
+      "fig|243273.147.peg.244"
+     ]
+    },
+    {
+     "features": [],
+     "role_id": "Phosphoenolpyruvate synthase (EC 2.7.9.2)"
+    },
+    {
+     "role_id": "Pyruvate,phosphate dikinase (EC 2.7.9.1)",
+     "features": []
+    },
+    {
+     "role_id": "Putative phosphoenolpyruvate synthase/pyruvate phosphate dikinase, N-terminal domain",
+     "features": []
+    },
+    {
+     "features": [],
+     "role_id": "Putative phosphoenolpyruvate synthase/pyruvate phosphate dikinase, C-terminal domain"
+    }
+   ]
+  },
+  {
+   "name": "Antibiotic_targets_in_protein_synthesis",
+   "classification": [
+    "STRESS RESPONSE, DEFENSE, VIRULENCE",
+    "Stress Response, Defense and Virulence",
+    "Resistance to antibiotics and toxic compounds"
+   ],
+   "event_id": "B1CF07E2-B2A3-11F1-A734-C5E1735FBEA8",
+   "role_bindings": [
+    {
+     "features": [
+      "fig|243273.147.rna.4"
+     ],
+     "role_id": "SSU rRNA"
+    },
+    {
+     "features": [
+      "fig|243273.147.rna.5"
+     ],
+     "role_id": "LSU rRNA"
+    },
+    {
+     "features": [
+      "fig|243273.147.peg.94"
+     ],
+     "role_id": "SSU ribosomal protein S12p (S23e)"
+    },
+    {
+     "features": [
+      "fig|243273.147.peg.166"
+     ],
+     "role_id": "SSU ribosomal protein S10p (S20e)"
+    },
+    {
+     "features": [
+      "fig|243273.147.peg.96"
+     ],
+     "role_id": "Translation elongation factor G"
+    },
+    {
+     "features": [
+      "fig|243273.147.peg.182"
+     ],
+     "role_id": "LSU ribosomal protein L6p (L9e)"
+    },
+    {
+     "role_id": "Translation elongation factor Tu",
+     "features": [
+      "fig|243273.147.peg.507"
+     ]
+    },
+    {
+     "features": [
+      "fig|243273.147.peg.395"
+     ],
+     "role_id": "Isoleucyl-tRNA synthetase (EC 6.1.1.5)"
+    }
+   ],
+   "variant_code": "active"
+  }
+ ],
+ "ncbi_lineage": [
+  [
+   "cellular organisms",
+   131567,
+   "cellular root"
+  ],
+  [
+   "Bacteria",
+   2,
+   "domain"
+  ],
+  [
+   "Bacillati",
+   1783272,
+   "kingdom"
+  ],
+  [
+   "Mycoplasmatota",
+   544448,
+   "phylum"
+  ],
+  [
+   "Mycoplasmoidales",
+   2790996,
+   "order"
+  ],
+  [
+   "Mycoplasmoidaceae",
+   2790998,
+   "family"
+  ],
+  [
+   "Mycoplasmoides",
+   2995234,
+   "genus"
+  ],
+  [
+   "Mycoplasmoides genitalium",
+   2097,
+   "species"
+  ],
+  [
+   "Mycoplasmoides genitalium G37",
+   243273,
+   "strain"
+  ]
+ ],
+ "analysis_events": [
+  {
+   "parameters": [
+    "coverage",
+    0.7,
+    "descript",
+    "5S rRNA ## 5S ribosomal RNA",
+    "extrapol",
+    10,
+    "ftrtype",
+    "rna",
+    "identity",
+    0.5,
+    "loc_format",
+    "CBDL",
+    "maxsplit",
+    20,
+    "seedexp",
+    1e-10,
+    "tag",
+    null
+   ],
+   "execute_time": 1789655083.80426,
+   "hostname": "pear",
+   "tool_name": "RNA_reps_5S_rRNA",
+   "id": "86E96126-B2A3-11F1-97E2-A5A4D2F4841D"
+  },
+  {
+   "hostname": "pear",
+   "execute_time": 1789655087.94688,
+   "parameters": [
+    "coverage",
+    0.2,
+    "descript",
+    "LSU rRNA ## 23S rRNA, large subunit ribosomal RNA",
+    "extrapol",
+    25,
+    "ftrtype",
+    "rna",
+    "identity",
+    0.5,
+    "loc_format",
+    "CBDL",
+    "maxsplit",
+    20,
+    "seedexp",
+    1e-20,
+    "tag",
+    null
+   ],
+   "id": "89616F34-B2A3-11F1-9C00-9C21DD158E48",
+   "tool_name": "RNA_reps_LSU_rRNA"
+  },
+  {
+   "tool_name": "RNA_reps_SSU_rRNA",
+   "id": "899C0A68-B2A3-11F1-AAB4-B7DC054B1F58",
+   "parameters": [
+    "coverage",
+    0.2,
+    "descript",
+    "SSU rRNA ## 16S rRNA, small subunit ribosomal RNA",
+    "extrapol",
+    15,
+    "ftrtype",
+    "rna",
+    "identity",
+    0.5,
+    "loc_format",
+    "CBDL",
+    "maxsplit",
+    20,
+    "seedexp",
+    1e-20,
+    "tag",
+    null
+   ],
+   "execute_time": 1789655088.33093,
+   "hostname": "pear"
+  },
+  {
+   "tool_name": "tRNAscan-SE",
+   "id": "8A3A89FE-B2A3-11F1-9FAC-9ED51A16D271",
+   "parameters": [
+    "tRNAscan-SE",
+    "-B",
+    "-o",
+    "/tmp/coTNoDDdbz",
+    "-m",
+    "/tmp/bwEH6JKpLu",
+    "-l",
+    "/tmp/Fi6OhnoZv3",
+    "-Q",
+    "--brief",
+    "/tmp/4TLH3p_QkW"
+   ],
+   "execute_time": 1789655089.36953,
+   "hostname": "pear"
+  },
+  {
+   "id": "91F54418-B2A3-11F1-9750-8912213C77C2",
+   "tool_name": "svr_big_repeats | svr_condense_repeats",
+   "hostname": "pear",
+   "execution_time": 1789655102.33741,
+   "parameters": []
+  },
+  {
+   "tool_name": "find_special_proteins selenoprotein",
+   "id": "9237489A-B2A3-11F1-B1EC-AB6017155FA2",
+   "parameters": [
+    "-tmpdir",
+    "/tmp/tmp_dir_bKeVakBF"
+   ],
+   "execute_time": 1789655102.76969,
+   "hostname": "pear"
+  }
+ ]
+}

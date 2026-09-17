@@ -107,6 +107,19 @@ class AlphaFoldModel:
             )
         return True, f"mean pLDDT {self.mean_plddt} ({self.confidence_band})"
 
+    def usable_for_structure_search(self, *, min_plddt: float = BAND_LOW) -> tuple[bool, str]:
+        """Looser gate than docking: Foldseek only needs a fold, not a pocket.
+
+        A model at pLDDT 65 covering half the protein is a poor docking receptor but a perfectly
+        good search query — the alignment span comes back per hit anyway. Requiring the docking
+        gate here would drop most candidates before they were ever searched.
+        """
+        if not self.found:
+            return False, f"no AlphaFold model ({self.status})"
+        if self.mean_plddt is not None and self.mean_plddt < min_plddt:
+            return False, f"mean pLDDT {self.mean_plddt} ({self.confidence_band}), below {min_plddt}"
+        return True, f"mean pLDDT {self.mean_plddt} ({self.confidence_band})"
+
     def as_dict(self) -> dict[str, Any]:
         payload = asdict(self)
         payload["confidence_band"] = self.confidence_band

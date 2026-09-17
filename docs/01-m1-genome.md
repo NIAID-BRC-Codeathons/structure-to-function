@@ -2,6 +2,14 @@
 
 **Scope:** take an unknown bacterial assembly to genes, AMR calls, phylogeny and closest relatives, and write the `run`, `genome` and `proteins` sections.
 
+> **Two routes.** This document is the CGA-service route, which annotates the submitted
+> assembly and is authoritative. [01b-m1-api-mode.md](01b-m1-api-mode.md) is the BV-BRC
+> Data API route (`--from-bvbrc-api`): no account, seconds instead of hours, but it
+> describes a *reference genome for the organism* rather than your sample. Both write the
+> same `report.json` sections and the same `<run>/m1/` files, so M2 cannot tell them apart.
+> Reporting is shared too: `--html` writes the interactive report from either route, and
+> both fill `proteins[].m1_priority`.
+
 ## Inputs
 
 - Contig FASTA (blinded: headers stripped to `contig_1`, …).
@@ -12,7 +20,12 @@
 - `genome`: `taxonomy` (predicted taxon + how it was called), `closest_genomes[]` (genome_id, name, mash_distance, ani, snp_distance), `tree_newick`, `cga_job_id`.
 - `proteins[]`: `feature_id`, `locus_tag`, `contig`, `start`, `end`, `strand`, `product`, `subsystems[]`, `specialty[]` (type: virulence|amr|drug_target|transporter, database, hit, identity, coverage).
 - `proteins.faa` — all protein sequences.
+- `proteins[].m1_priority`: pathogenesis priority score, rank, mechanism categories, a mechanism hypothesis and the full score breakdown. Distinct from M2's `triage` and expected to disagree with it — see [00a-data-contract.md](00a-data-contract.md).
 - `run`: versions, job IDs, timestamps, seeds.
+- `<run>/m1/report.md`: a plain-markdown summary — counts, the top-ranked candidates, the caveats. Built by `s2f/m1_genome/report_md.py`.
+- `<run>/m1/proteins_ranked.csv`: the full ranking as a table.
+- `<run>/m1/report.html` (with `--html`): a self-contained interactive report — searchable, sortable protein table with mechanism hypotheses, gene-content phylogeny with human-associated relatives flagged, mechanism → host effect → disease flow diagram, cited references. Built by `s2f/m1_genome/report_html.py`, which reads `report.json` so it works for either route and for runs made before it existed.
+- `<run>/m1/figures/` (with `--figures`): publication PNGs, if matplotlib is installed.
 
 ## Tools and order
 

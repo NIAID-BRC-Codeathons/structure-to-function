@@ -1,0 +1,5 @@
+SeqID	Localization	Score
+fig|999999.1.peg.1	Extracellular	9.49
+fig|999999.1.peg.2	Extracellular	9.26
+fig|999999.1.peg.3	Cytoplasmic Membrane	9.99
+fig|999999.1.peg.4	Cellwall	8.10
