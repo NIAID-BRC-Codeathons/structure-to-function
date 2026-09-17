@@ -1,9 +1,4 @@
-"""Collect existing PDB and AlphaFold DB structures selected by M2.
-
-This module implements the first scope item of issue 13. It deliberately does not predict
-missing structures or decide whether a collected structure is good enough for docking. Those
-steps need the still-open confidence policy.
-"""
+"""Collect and quality-gate existing PDB and AlphaFold DB structures selected by M2."""
 
 from __future__ import annotations
 
@@ -19,6 +14,7 @@ from typing import Any, Callable
 from urllib.parse import urlparse
 
 from ..common.http import DownloadedFile
+from .quality import QualityThresholds, assess_structure
 
 PDB_DOWNLOAD_URL = "https://files.rcsb.org/download/{entry_id}.cif"
 
@@ -131,10 +127,12 @@ def collect_existing(
     fetch: Callable[[StructureCandidate], bytes | DownloadedFile],
     *,
     limit: int = 0,
+    quality_thresholds: QualityThresholds | None = None,
     clock: Callable[[], float] = time.monotonic,
     now: Callable[[], datetime] = _utc_now,
 ) -> CollectionSummary:
     """Collect existing structures for selected proteins and return schema-ready records."""
+    quality_thresholds = quality_thresholds or QualityThresholds()
     selected = [
         protein
         for protein in report.get("proteins", [])
@@ -171,6 +169,13 @@ def collect_existing(
                 reason=f"existing structure could not be collected: {exc}",
             )
         else:
+            evidence = (
+                candidate.experimental_homolog
+                if candidate.source == "pdb"
+                else candidate.predicted_model
+            )
+            quality = assess_structure(candidate.source, evidence, payload, quality_thresholds)
+            record["params"]["confidence_gate_applied"] = True
             record.update(
                 path=str(destination.relative_to(run_dir)),
                 sha256=hashlib.sha256(payload).hexdigest(),
@@ -178,8 +183,9 @@ def collect_existing(
                 collected_at=now().isoformat(),
                 cache_hit=download.from_cache,
                 collection_status="collected",
-                usable_for_docking=None,
-                reason="existing structure collected; confidence gate pending",
+                usable_for_docking=quality.usable_for_docking,
+                reason=quality.reason,
+                quality_gate=quality.details,
                 **_source_metadata(candidate, payload),
             )
         record["elapsed_seconds"] = round(clock() - started, 6)

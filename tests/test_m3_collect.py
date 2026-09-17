@@ -94,12 +94,18 @@ def test_collection_writes_selected_structures_and_marks_the_gap(tmp_path: Path)
     by_id = {record["feature_id"]: record for record in summary.structures}
     pdb = by_id["fig|1.1.peg.1"]
     assert pdb["collection_status"] == "collected"
-    assert pdb["usable_for_docking"] is None
+    assert pdb["usable_for_docking"] is True
     assert pdb["pockets"] == []
     assert pdb["method"] == "download_existing_structure"
-    assert pdb["params"]["confidence_gate_applied"] is False
+    assert pdb["params"]["confidence_gate_applied"] is True
+    assert pdb["quality_gate"]["provisional"] is True
+    assert pdb["quality_gate"]["observed"]["identity"] == 0.91
     assert pdb["cache_hit"] is False
     assert (tmp_path / pdb["path"]).read_bytes() == b"data_1abc_2\n"
+    afdb = by_id["fig|1.1.peg.2"]
+    assert afdb["usable_for_docking"] is False
+    assert "per-residue pLDDT" in afdb["reason"]
+
 
     missing = by_id["fig|1.1.peg.3"]
     assert missing["collection_status"] == "prediction_required"

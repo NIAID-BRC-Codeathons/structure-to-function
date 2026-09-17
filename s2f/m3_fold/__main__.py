@@ -2,8 +2,8 @@
 
     python -m s2f.m3_fold --run runs/<run_id> [--offline] [--dry-run]
 
-This first issue-13 slice collects PDB/AlphaFold DB structures. Prediction and confidence
-gating are intentionally not part of this command yet.
+This issue-13 slice collects PDB/AlphaFold DB structures and applies a provisional,
+configurable quality gate. Prediction is intentionally not part of this command yet.
 """
 
 from __future__ import annotations
@@ -22,6 +22,7 @@ from pathlib import Path
 from ..common.http import CachedJsonClient, DownloadedFile
 from ..common.io import read_report, report_path, update_section
 from .collect import StructureCandidate, collect_existing
+from .quality import POLICY_VERSION, QualityThresholds
 
 REPO_ROOT = Path(__file__).resolve().parents[2]
 REPORT_FIXTURE = REPO_ROOT / "fixtures" / "report.fixture.json"
@@ -70,7 +71,17 @@ def run(args: argparse.Namespace) -> int:
             assert cache_dir is not None
             return client.get_file("m3_structure", candidate.url, cache_dir=cache_dir)
 
-    summary = collect_existing(report, run_dir, fetch, limit=args.limit)
+    quality_thresholds = QualityThresholds(
+        min_pdb_identity=args.min_pdb_identity,
+        min_pdb_coverage=args.min_pdb_coverage,
+        max_pdb_resolution=args.max_pdb_resolution,
+        min_mean_plddt=args.min_mean_plddt,
+        min_afdb_coverage=args.min_afdb_coverage,
+        min_local_plddt=args.min_local_plddt,
+    )
+    summary = collect_existing(
+        report, run_dir, fetch, limit=args.limit, quality_thresholds=quality_thresholds
+    )
     update_section(run_dir, "structures", summary.structures)
     _write_manifest(
         run_dir,
@@ -80,11 +91,14 @@ def run(args: argparse.Namespace) -> int:
         elapsed_seconds=time.monotonic() - clock,
         input_report_sha256=input_report_sha256,
         cache_dir=cache_dir,
+        quality_thresholds=quality_thresholds,
     )
 
     print(
         f"{summary.selected} selected proteins: {summary.collected} existing structures collected, "
-        f"{summary.prediction_required} require prediction, {summary.failed} failed."
+        f"{summary.prediction_required} require prediction, {summary.failed} failed; "
+        f"{sum(record.get('usable_for_docking') is True for record in summary.structures)} "
+        "passed the provisional quality gate."
     )
     return 0 if summary.failed == 0 else 1
 
@@ -98,6 +112,7 @@ def _write_manifest(
     elapsed_seconds: float,
     input_report_sha256: str,
     cache_dir: Path | None,
+    quality_thresholds: QualityThresholds,
 ) -> None:
     finished = datetime.now(UTC)
     source_counts = Counter(record["source"] for record in summary.structures)
@@ -119,7 +134,11 @@ def _write_manifest(
         "parameters": {
             "limit": args.limit,
             "selection_policy": "experimental_homolog_then_afdb",
-            "confidence_gate_applied": False,
+            "confidence_gate_applied": True,
+            "quality_gate": {
+                "policy_version": POLICY_VERSION,
+                "thresholds": quality_thresholds.as_dict(),
+            },
         },
         "environment": {
             "python": platform.python_version(),
@@ -134,6 +153,15 @@ def _write_manifest(
             "failed": summary.failed,
             "cache_hits": sum(record.get("cache_hit") is True for record in summary.structures),
             "sources": dict(sorted(source_counts.items())),
+            "usable_for_docking": sum(
+                record.get("usable_for_docking") is True for record in summary.structures
+            ),
+            "not_usable_for_docking": sum(
+                record.get("usable_for_docking") is False for record in summary.structures
+            ),
+            "quality_pending": sum(
+                record.get("usable_for_docking") is None for record in summary.structures
+            ),
         },
         "failures": [
             {"feature_id": record["feature_id"], "reason": record.get("reason")}
@@ -174,6 +202,43 @@ def build_parser() -> argparse.ArgumentParser:
     parser.add_argument("--cache", default="", help="override the downloaded-file cache directory")
     parser.add_argument("--offline", action="store_true", help="use cached files; never call the network")
     parser.add_argument("--dry-run", action="store_true", help="use committed report and structure fixtures")
+    gate = parser.add_argument_group("provisional quality gate")
+    gate.add_argument(
+        "--min-pdb-identity",
+        type=float,
+        default=0.25,
+        help="minimum PDB-homolog sequence identity (default: 0.25)",
+    )
+    gate.add_argument(
+        "--min-pdb-coverage",
+        type=float,
+        default=0.50,
+        help="minimum PDB-homolog query coverage (default: 0.50)",
+    )
+    gate.add_argument(
+        "--max-pdb-resolution",
+        type=float,
+        default=3.50,
+        help="maximum X-ray/EM resolution in angstroms (default: 3.50)",
+    )
+    gate.add_argument(
+        "--min-mean-plddt",
+        type=float,
+        default=70.0,
+        help="minimum AFDB mean pLDDT (default: 70)",
+    )
+    gate.add_argument(
+        "--min-afdb-coverage",
+        type=float,
+        default=0.80,
+        help="minimum AFDB sequence coverage (default: 0.80)",
+    )
+    gate.add_argument(
+        "--min-local-plddt",
+        type=float,
+        default=70.0,
+        help="mask AFDB residues below this pLDDT (default: 70)",
+    )
     return parser
 
 

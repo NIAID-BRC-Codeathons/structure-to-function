@@ -20,7 +20,8 @@ def test_dry_run_collects_fixture_structures_without_network(tmp_path: Path) -> 
     assert len(structures) == 3
     assert {record["source"] for record in structures} == {"pdb"}
     assert all(record["collection_status"] == "collected" for record in structures)
-    assert all(record["usable_for_docking"] is None for record in structures)
+    assert all(record["usable_for_docking"] is True for record in structures)
+    assert all(record["quality_gate"]["provisional"] is True for record in structures)
     assert all((run_dir / record["path"]).exists() for record in structures)
     assert all("elapsed_seconds" in record for record in structures)
     assert all(record["method"] == "download_existing_structure" for record in structures)
@@ -32,6 +33,10 @@ def test_dry_run_collects_fixture_structures_without_network(tmp_path: Path) -> 
     assert manifest["command"][-2:] == ["--run", str(run_dir)]
     assert manifest["counts"]["selected"] == 3
     assert manifest["counts"]["collected"] == 3
+    assert manifest["counts"]["usable_for_docking"] == 3
+    assert manifest["counts"]["not_usable_for_docking"] == 0
+    assert manifest["counts"]["quality_pending"] == 0
+    assert manifest["parameters"]["confidence_gate_applied"] is True
     assert manifest["counts"]["failed"] == 0
     assert len(manifest["input_report_sha256"]) == 64
     assert len(manifest["output_report_sha256"]) == 64
