@@ -180,7 +180,11 @@ def score_protein(
         ),
         "human_homolog_source": human_homolog_source or "",
         "essential_source": essential_source or "",
-        "no_pdb_hit": not qualifying,
+        # "no qualifying hit" must not absorb "the search failed" — a network failure would
+        # otherwise be laundered into a structural claim downstream (found by @Ashita2619
+        # while building #43 on top of this file).
+        "no_pdb_hit": not qualifying and retrieval_status != "query-failed",
+        "pdb_search_failed": retrieval_status == "query-failed",
         "pdb_hit_organism": top.organism if top else "",
         "human_pdb_hit": bool(top and top.taxonomy_id == HUMAN_TAXONOMY_ID),
         "uniprot_of_best_hit": ";".join(top.uniprot_ids) if top else "",

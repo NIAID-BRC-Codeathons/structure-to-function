@@ -118,9 +118,16 @@ def test_no_hit_and_failed_query_are_distinguished() -> None:
 
     assert no_hit.components.pdb_evidence == 0.0
     assert failed.components.pdb_evidence == 0.0
-    assert no_hit.flags["no_pdb_hit"] and failed.flags["no_pdb_hit"]
     assert no_hit.retrieval_status != failed.retrieval_status
     assert failed.error == "HTTP 500"
+
+    # `no_pdb_hit` means "we searched and found nothing", so a failed search must not set it:
+    # downstream consumers treat that file as "no homolog exists" and would launder a network
+    # failure into a structural claim.
+    assert no_hit.flags["no_pdb_hit"] is True
+    assert no_hit.flags["pdb_search_failed"] is False
+    assert failed.flags["no_pdb_hit"] is False
+    assert failed.flags["pdb_search_failed"] is True
 
     ranked = rank_and_select([no_hit, failed], top_n=1)
     reasons = {score.retrieval_status: score.reason for score in ranked}
