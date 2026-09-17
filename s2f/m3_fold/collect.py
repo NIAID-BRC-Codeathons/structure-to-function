@@ -18,6 +18,8 @@ from pathlib import Path
 from typing import Any, Callable
 from urllib.parse import urlparse
 
+from ..common.http import DownloadedFile
+
 PDB_DOWNLOAD_URL = "https://files.rcsb.org/download/{entry_id}.cif"
 
 
@@ -126,7 +128,7 @@ def choose_existing(protein: dict[str, Any]) -> StructureCandidate | None:
 def collect_existing(
     report: dict[str, Any],
     run_dir: str | Path,
-    fetch: Callable[[StructureCandidate], bytes],
+    fetch: Callable[[StructureCandidate], bytes | DownloadedFile],
     *,
     limit: int = 0,
     clock: Callable[[], float] = time.monotonic,
@@ -156,7 +158,8 @@ def collect_existing(
         try:
             if not candidate.url:
                 raise ValueError(f"M2 did not provide a download URL for {candidate.accession}")
-            payload = fetch(candidate)
+            download = _as_downloaded_file(fetch(candidate), now)
+            payload = download.content
             if not payload:
                 raise ValueError(f"download for {candidate.accession} was empty")
             destination = structures_dir / f"{_safe_name(candidate.feature_id)}{candidate.suffix}"
@@ -171,10 +174,13 @@ def collect_existing(
             record.update(
                 path=str(destination.relative_to(run_dir)),
                 sha256=hashlib.sha256(payload).hexdigest(),
-                retrieved_at=now().isoformat(),
+                retrieved_at=download.retrieved_at.isoformat(),
+                collected_at=now().isoformat(),
+                cache_hit=download.from_cache,
                 collection_status="collected",
                 usable_for_docking=None,
                 reason="existing structure collected; confidence gate pending",
+                **_source_metadata(candidate, payload),
             )
         record["elapsed_seconds"] = round(clock() - started, 6)
         records.append(record)
@@ -198,6 +204,14 @@ def _candidate_record(candidate: StructureCandidate) -> dict[str, Any]:
         "confidence": candidate.confidence,
         "confidence_metric": candidate.confidence_metric,
         "download_url": candidate.url or None,
+        "source_version": None,
+        "release_date": None,
+        "method": "download_existing_structure",
+        "params": {
+            "selection_policy": "experimental_homolog_then_afdb",
+            "format": candidate.suffix.lstrip("."),
+            "confidence_gate_applied": False,
+        },
         "holo_template": None,
         "pockets": [],
     }
@@ -217,6 +231,13 @@ def _prediction_required_record(protein: dict[str, Any], elapsed: float) -> dict
         "path": None,
         "confidence": None,
         "confidence_metric": None,
+        "source_version": None,
+        "release_date": None,
+        "method": "lookup_existing_structure",
+        "params": {
+            "selection_policy": "experimental_homolog_then_afdb",
+            "confidence_gate_applied": False,
+        },
         "holo_template": None,
         "pockets": [],
         "collection_status": "prediction_required",
@@ -235,6 +256,44 @@ def _number_or_none(value: Any) -> float | None:
         return float(value) if value is not None else None
     except (TypeError, ValueError):
         return None
+
+
+def _as_downloaded_file(
+    value: bytes | DownloadedFile, now: Callable[[], datetime]
+) -> DownloadedFile:
+    if isinstance(value, DownloadedFile):
+        return value
+    return DownloadedFile(content=value, retrieved_at=now(), from_cache=False)
+
+
+def _source_metadata(candidate: StructureCandidate, payload: bytes) -> dict[str, str | None]:
+    if candidate.source == "pdb":
+        release_date, revision_date = _pdb_revision_dates(payload)
+        return {
+            "source_version": f"revision:{revision_date}" if revision_date else None,
+            "release_date": release_date,
+        }
+
+    predicted = candidate.predicted_model or {}
+    version = predicted.get("version")
+    if not version:
+        match = re.search(r"model_v(\d+)", candidate.url)
+        version = f"v{match.group(1)}" if match else None
+    return {
+        "source_version": str(version) if version else None,
+        "release_date": str(predicted.get("created") or "") or None,
+    }
+
+
+def _pdb_revision_dates(payload: bytes) -> tuple[str | None, str | None]:
+    """Read initial and latest revision dates from an RCSB mmCIF header."""
+    text = payload.decode("utf-8", errors="replace")
+    marker = "_pdbx_audit_revision_history.revision_date"
+    if marker not in text:
+        return None, None
+    revision_block = text.split(marker, 1)[1].split("#", 1)[0]
+    dates = re.findall(r"\b\d{4}-\d{2}-\d{2}\b", revision_block)
+    return (min(dates), max(dates)) if dates else (None, None)
 
 
 def _atomic_write(path: Path, payload: bytes) -> None:

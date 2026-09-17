@@ -96,6 +96,9 @@ def test_collection_writes_selected_structures_and_marks_the_gap(tmp_path: Path)
     assert pdb["collection_status"] == "collected"
     assert pdb["usable_for_docking"] is None
     assert pdb["pockets"] == []
+    assert pdb["method"] == "download_existing_structure"
+    assert pdb["params"]["confidence_gate_applied"] is False
+    assert pdb["cache_hit"] is False
     assert (tmp_path / pdb["path"]).read_bytes() == b"data_1abc_2\n"
 
     missing = by_id["fig|1.1.peg.3"]
@@ -103,6 +106,32 @@ def test_collection_writes_selected_structures_and_marks_the_gap(tmp_path: Path)
     assert missing["path"] is None
     assert "prediction required" in missing["reason"]
     validate("structures", summary.structures)
+
+
+def test_pdb_release_and_revision_dates_are_recorded(tmp_path: Path) -> None:
+    report = {"proteins": [_protein("fig|1.1.peg.1", experimental=EXPERIMENTAL)]}
+    cif = b"""data_1ABC
+loop_
+_pdbx_audit_revision_history.ordinal
+_pdbx_audit_revision_history.revision_date
+1 2020-01-02
+2 2024-05-06
+#
+"""
+
+    summary = collect_existing(report, tmp_path, lambda _candidate: cif)
+    record = summary.structures[0]
+
+    assert record["release_date"] == "2020-01-02"
+    assert record["source_version"] == "revision:2024-05-06"
+
+
+def test_afdb_version_is_read_from_the_model_url(tmp_path: Path) -> None:
+    report = {"proteins": [_protein("fig|1.1.peg.2", predicted=PREDICTED)]}
+
+    summary = collect_existing(report, tmp_path, lambda _candidate: b"data_AFDB\n")
+
+    assert summary.structures[0]["source_version"] == "v6"
 
 
 def test_download_failure_is_explicit_and_does_not_abort_other_proteins(tmp_path: Path) -> None:
