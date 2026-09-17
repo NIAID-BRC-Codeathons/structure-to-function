@@ -209,7 +209,6 @@
   ],
   "family": "Enterobacteriaceae",
   "gc_content": 57.1,
-  "genetic_code": 11,
   "genome_id": "1125630.4",
   "genome_length": 5682322,
   "genome_name": "Klebsiella pneumoniae subsp. pneumoniae HS11286",
@@ -438,6 +437,7 @@
  ],
  "taxonomy": [
   {
+   "genetic_code": 11,
    "lineage_ids": [
     "2",
     "1224",

@@ -24,17 +24,20 @@ from ..common.http import HttpError
 from .bvbrc_api import (GENOME_URL, BvbrcApi, nonempty_facets, rql_value, top_nonempty)
 from .parse import FEATURE_COLUMNS, SPECIALTY_COLUMNS, _as_float
 
+# `cell_arrangement` and `ph_range` are deliberately absent: neither is in BV-BRC's
+# `genome` Solr schema, so faceting on them returns HTTP 400 `undefined field` for every
+# genome, on every run. Confirmed against the live API 2026-09-17:
+#   "msg": "... undefined field: \"cell_arrangement\"", "code": 400
+# Re-adding one costs a guaranteed-dead request and a Solr stack trace in the console.
 GROWTH_FIELDS = [
     ("gram_stain", "Gram stain"),
     ("cell_shape", "Cell shape"),
-    ("cell_arrangement", "Cell arrangement"),
     ("motility", "Motility"),
     ("sporulation", "Sporulation"),
     ("optimal_temperature", "Optimal temperature (C)"),
     ("temperature_range", "Temperature range"),
     ("oxygen_requirement", "Oxygen requirement"),
     ("salinity", "Salinity"),
-    ("ph_range", "pH range"),
     ("habitat", "Habitat"),
 ]
 ISOLATION_FIELDS = [
@@ -155,16 +158,22 @@ def collect_taxonomy(api: BvbrcApi, genome: dict[str, Any]) -> dict[str, Any]:
     names = genome.get("taxon_lineage_names")
     ids = genome.get("taxon_lineage_ids")
     ranks = None
+    # The genome core does not return `genetic_code` at all -- BV-BRC omits unset fields
+    # rather than returning null, so the key is simply absent from a real genome record
+    # (verified live against 1125630.4, 68 fields, no genetic_code). The taxonomy core
+    # does carry it, which is where the CGA route reads it too (taxon.py).
+    genetic_code = None
     if taxon_id:
         hits = api.query(
             "taxonomy",
             f"eq(taxon_id,{rql_value(taxon_id)})&select(taxon_id,taxon_name,taxon_rank,"
-            "lineage_names,lineage_ranks,lineage_ids)&limit(1)",
+            "genetic_code,lineage_names,lineage_ranks,lineage_ids)&limit(1)",
         )
         if hits:
             names = hits[0].get("lineage_names", names)
             ranks = hits[0].get("lineage_ranks")
             ids = hits[0].get("lineage_ids", ids)
+            genetic_code = hits[0].get("genetic_code")
 
     names = names or []
     ranks = ranks or [""] * len(names)
@@ -181,7 +190,8 @@ def collect_taxonomy(api: BvbrcApi, genome: dict[str, Any]) -> dict[str, Any]:
             "eq(reference_genome,Representative)))"
             "&select(genome_id,genome_name,species,reference_genome)&sort(+species)&limit(15)",
         )
-    return {"taxon_id": taxon_id, "lineage": lineage, "neighbors": neighbors}
+    return {"taxon_id": taxon_id, "lineage": lineage, "neighbors": neighbors,
+            "genetic_code": genetic_code}
 
 
 def collect_growth(api: BvbrcApi, genome: dict[str, Any]) -> list[dict[str, Any]]:
@@ -497,7 +507,7 @@ def genome_section(genome: dict[str, Any], bundle: dict[str, Any],
             "scientific_name": genome.get("genome_name"),
             "lineage_names": lineage_names,
             "lineage_ranked": taxonomy.get("lineage"),
-            "genetic_code": genome.get("genetic_code"),
+            "genetic_code": taxonomy.get("genetic_code") or genome.get("genetic_code"),
             "called_by": "bvbrc_api",
             "called_rank": "species" if genome.get("species") else None,
             "top_hit_distance": None,

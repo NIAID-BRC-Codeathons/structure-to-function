@@ -8,6 +8,25 @@ API route was developed against. 13 KB, so it can live in git; the run it came f
 It backs `tests/test_m1_bvbrc_api.py`, which serves these payloads through a fake
 `requests` session. No test in this repo touches the network.
 
+## Where it deviates from the live API, and why that matters
+
+BV-BRC omits unset fields from a record rather than returning them as null, so a real
+`genome` response carries only the fields that have a value: 68 for this genome, and
+`genetic_code` is **not** among them.
+
+This fixture's `genome` record nonetheless carries `cell_shape`, `collection_year`,
+`disease`, `gram_stain`, `host_name`, `isolation_country`, `oxygen_requirement` and
+`publication`, which the live record for `1125630.4` does not return. They are kept
+because they exercise the "this genome" branch of `collect_growth` and its neighbours --
+but note the consequence, because it is the opposite of what you want: the
+*species-facet fallback*, which is the branch that actually runs against the live API for
+every one of those fields, is the branch this fixture does **not** cover.
+
+`genetic_code` was moved rather than kept. It has no fallback, so with it present in the
+`genome` record the tests passed while every live run wrote `genetic_code: null`. It now
+sits in the `taxonomy` record, which is where BV-BRC really returns it and where the CGA
+route reads it from (`taxon.py`).
+
 ## Keys
 
 | Key | Serves | Core |
@@ -17,7 +36,7 @@ It backs `tests/test_m1_bvbrc_api.py`, which serves these payloads through a fak
 | `specialty` | 7 specialty-gene rows (4 VFDB virulence, 3 AMR) | `sp_gene` |
 | `amr_phenotypes` | 8 laboratory/computational AMR records | `genome_amr` |
 | `neighbors` | 3 reference/representative genus neighbours | `genome` |
-| `taxonomy` | the lineage with ranks | `taxonomy` |
+| `taxonomy` | the lineage with ranks, and `genetic_code` | `taxonomy` |
 | `subsystems` | 4 metabolic subsystems | `subsystem` |
 | `close_pathogens_facet` | 6 human-associated *Klebsiella* species | `genome` facet |
 | `sequences` | one stub sequence per feature md5 | `feature_sequence` |

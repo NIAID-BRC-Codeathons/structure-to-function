@@ -321,3 +321,94 @@ def test_amr_phenotypes_are_written_even_when_no_phenotype_is_resistant(bundle, 
     lines = (tmp_path / "m1/amr_phenotypes.csv").read_text().splitlines()
     assert lines[0].startswith("antibiotic,resistant_phenotype")
     assert len(lines) == len(bundle["amr_phenotypes"]) + 1
+
+
+# --- regressions found by the first live run against the BV-BRC API ----------------
+# 2026-09-17, genome 1125630.4, on a compute node. Every bug below passed the whole
+# offline suite first, for one shared reason: the fixture-backed double replies with the
+# full record whatever the query selected. So a field missing from a `select(...)` list,
+# or a field the live core does not define at all, is invisible offline. The assertions
+# here are therefore on the *query* and on a select-honouring double, not only on the
+# parsed result.
+
+#: Fields BV-BRC's `genome` Solr core does not define. Faceting on one returns HTTP 400
+#: `undefined field: "<name>"` for every genome, on every run: a guaranteed dead request
+#: plus a Solr stack trace in the operator's console.
+BVBRC_UNDEFINED_GENOME_FIELDS = {"cell_arrangement", "ph_range"}
+
+
+def test_no_metadata_field_is_one_the_genome_core_does_not_define() -> None:
+    from s2f.m1_genome.collect import GROWTH_FIELDS, ISOLATION_FIELDS
+
+    requested = ({field for field, _ in GROWTH_FIELDS}
+                 | {field for field, _ in ISOLATION_FIELDS})
+    offenders = sorted(requested & BVBRC_UNDEFINED_GENOME_FIELDS)
+    assert not offenders, (
+        f"{offenders} are not in BV-BRC's genome Solr schema, so faceting on them returns "
+        f"HTTP 400 'undefined field' for every genome. Confirmed against the live API "
+        f"2026-09-17. Drop the field rather than have every run issue a dead request."
+    )
+
+
+def test_genetic_code_is_read_from_the_taxonomy_core_not_the_genome_record(
+        api_bundle, kp_payload) -> None:
+    """The genome core does not return `genetic_code`, so it must come from taxonomy.
+
+    BV-BRC omits unset fields rather than returning null, and `genetic_code` is simply
+    absent from a real `/genome/` record -- verified live against 1125630.4, which returns
+    68 fields and not that one. The fixture used to supply it there, so the section was
+    populated under test and `null` on every real run: a contract field present on the CGA
+    route and missing on this one.
+    """
+    from s2f.m1_genome.collect import genome_section
+
+    assert "genetic_code" not in kp_payload["genome"], (
+        "the fixture's genome record has regained `genetic_code`. The live core does not "
+        "return it, so putting it back makes this test pass while real runs write null."
+    )
+
+    section = genome_section(kp_payload["genome"], api_bundle, "explicit genome_id")
+    assert section["taxonomy"]["genetic_code"] == 11, (
+        "genome.taxonomy.genetic_code is not being set from the taxonomy record. The CGA "
+        "route fills it from its taxon call, so losing it here breaks the claim that both "
+        "M1 routes write an indistinguishable contract."
+    )
+
+
+def test_the_taxonomy_query_actually_selects_genetic_code(
+        kp_payload, fake_session, make_api) -> None:
+    """Closes the blind spot that hid the bug: the double returns unselected fields.
+
+    `FakeSession` replies with the whole fixture row whatever `select(...)` names, so
+    removing a field from a select list cannot fail a fixture-only assertion. This drives
+    the collector through a double that strips anything the query did not ask for, which
+    is what the real server does.
+    """
+    import re
+
+    from s2f.m1_genome.collect import collect_taxonomy
+
+    base = type(fake_session())        # FakeSession, without importing from conftest
+
+    class SelectHonouringTaxonomy(base):
+        """Returns only the fields the query selected, as the real API does."""
+
+        def get(self, url, params=None, timeout=None, headers=None):
+            response = super().get(url, params, timeout, headers)
+            if "/taxonomy/" not in url:
+                return response
+            selected = re.search(r"select\(([^)]*)\)", url)
+            if selected and isinstance(response._body, list):
+                keep = {name.strip() for name in selected.group(1).split(",")}
+                response._body = [{k: v for k, v in row.items() if k in keep}
+                                  for row in response._body]
+            return response
+
+    api, _ = make_api(SelectHonouringTaxonomy(kp_payload))
+    taxonomy = collect_taxonomy(api, kp_payload["genome"])
+
+    assert taxonomy["genetic_code"] == 11, (
+        "collect_taxonomy did not ask for `genetic_code` in its select(...) list, so a "
+        "real server returns the row without it and the field silently becomes null."
+    )
+    assert taxonomy["lineage"], "the select-honouring double broke the lineage as well"

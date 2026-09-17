@@ -32,6 +32,14 @@ from .schema import SCHEMA_VERSION, SchemaError, validate
 REPORT_NAME = "report.json"
 LOCK_NAME = "report.json.lock"
 
+#: Read at import, which is single-threaded: `os.umask` can only be *read* by setting it,
+#: so doing this lazily would race. `NamedTemporaryFile` creates its file 0600 and
+#: `os.replace` preserves the mode, so without the chmod below every report.json landed
+#: owner-only -- unreadable to collaborators on a shared filesystem, and to any other
+#: account in the run directory's group. Observed on a shared node, 2026-09-17.
+_UMASK = os.umask(0)
+os.umask(_UMASK)
+
 
 def report_path(run_dir: str | Path) -> Path:
     return Path(run_dir) / REPORT_NAME
@@ -73,6 +81,9 @@ def _atomic_write(path: Path, payload: dict[str, Any]) -> None:
             handle.write("\n")
             handle.flush()
             os.fsync(handle.fileno())
+        # Before the rename, never after: a reader that opens the new inode must not be
+        # able to observe a 0600 window.
+        os.chmod(handle.name, 0o666 & ~_UMASK)
         os.replace(handle.name, path)
     except BaseException:
         Path(handle.name).unlink(missing_ok=True)
