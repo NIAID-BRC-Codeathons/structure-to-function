@@ -41,6 +41,10 @@ MAX_HIT_SCORE = 1.0 + LIGAND_BONUS + PARTNER_BONUS + ANNOTATION_BONUS
 
 HUMAN_TAXONOMY_ID = 9606
 
+#: Identity at or above which a human homolog is a selectivity risk worth reporting (pitfall #4).
+#: The penalty itself is continuous; this only drives the flag M6 states and M4 reads.
+CLOSE_HUMAN_HOMOLOG_IDENTITY = 40.0
+
 
 def hit_qualifies(hit: SequenceHit) -> bool:
     """A hit counts only if it is significant and covers half the query."""
@@ -128,18 +132,36 @@ def triage_score_from_components(components: TriageComponents) -> float:
 
 
 def score_protein(
-    protein: Protein, hits: list[SequenceHit], retrieval_status: str, error: str = ""
+    protein: Protein,
+    hits: list[SequenceHit],
+    retrieval_status: str,
+    error: str = "",
+    *,
+    human_identity: float | None = None,
+    human_homolog_source: str = "",
+    essential: bool | None = None,
+    essential_source: str = "",
 ) -> ProteinScore:
-    """Score one protein from its PDB hits and M1 specialty rows."""
+    """Score one protein from its PDB hits and M1 specialty rows.
+
+    ``human_identity`` overrides the specialty table with evidence we computed ourselves
+    (issue #29). BV-BRC precomputes `Human Homolog` rows for public genomes only, so on a blinded
+    genome the specialty value is absent and the penalty would silently never fire.
+    """
     qualifying = [hit for hit in hits if hit_qualifies(hit)]
     top = best_hit(hits)
     pdb_evidence = (hit_score(top) / MAX_HIT_SCORE) if top is not None else 0.0
 
-    human_identity = protein.human_homolog_identity
+    if human_identity is None:
+        human_identity = protein.human_homolog_identity
+        human_homolog_source = human_homolog_source or "bvbrc_specialty"
+    if essential is None:
+        essential = protein.is_essential_ortholog
+        essential_source = essential_source or "bvbrc_specialty"
     components = TriageComponents(
         pdb_evidence=round(pdb_evidence, 6),
         virulence_amr=1.0 if protein.has_virulence_or_amr else 0.0,
-        essential=1.0 if protein.is_essential_ortholog else 0.0,
+        essential=1.0 if essential else 0.0,
         drug_target=1.0 if protein.is_drug_target else 0.0,
         annotation_gap=1.0 if protein.is_uncharacterized else 0.0,
         human_homolog_penalty=round(human_identity / 100.0, 6) if human_identity else 0.0,
@@ -153,6 +175,11 @@ def score_protein(
         "transporter": protein.is_transporter,
         "metal_resistance": protein.has_metal_resistance,
         "human_homolog_identity": human_identity if human_identity is not None else "",
+        "close_human_homolog": bool(
+            human_identity is not None and human_identity >= CLOSE_HUMAN_HOMOLOG_IDENTITY
+        ),
+        "human_homolog_source": human_homolog_source or "",
+        "essential_source": essential_source or "",
         "no_pdb_hit": not qualifying,
         "pdb_hit_organism": top.organism if top else "",
         "human_pdb_hit": bool(top and top.taxonomy_id == HUMAN_TAXONOMY_ID),
