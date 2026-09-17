@@ -290,6 +290,14 @@ def test_score_is_still_reproducible_from_the_recorded_components() -> None:
         ("Mycoplasma genitalium G37", "Mycoplasmoides genitalium G37", True, True),
         ("Mycoplasma genitalium G37", "Mycoplasmoides pneumoniae M129", False, True),
         ("Mycoplasma genitalium G37", "Escherichia coli", False, False),
+        # Distinct genera that share a Greek root must not merge. A 6-character prefix rule
+        # called all three of these the same genus.
+        ("Streptococcus pneumoniae", "Streptomyces coelicolor", False, False),
+        ("Enterococcus faecalis", "Enterobacter cloacae", False, False),
+        ("Pseudomonas aeruginosa", "Pseudoalteromonas haloplanktis", False, False),
+        # Other renamings the same tolerance has to cover.
+        ("Clostridium difficile", "Clostridioides difficile", True, True),
+        ("Mycobacterium abscessus", "Mycobacteroides abscessus", True, True),
         ("Klebsiella pneumoniae HS11286", "Klebsiella pneumoniae", True, True),
         ("Klebsiella pneumoniae HS11286", "Klebsiella oxytoca", False, True),
         ("Mycoplasma genitalium G37", "", False, False),

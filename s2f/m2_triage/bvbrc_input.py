@@ -285,6 +285,36 @@ def organism_key(name: str) -> tuple[str, str]:
     return genus, species
 
 
+#: A renamed genus keeps nearly all of its stem, where two distinct genera sharing a Greek
+#: root diverge early. Measured on the renamings we have to tolerate and the neighbours we
+#: must not merge, the shared fraction of the shorter name separates them with room to spare:
+#:
+#:   Mycoplasma/Mycoplasmoides 0.90   Streptococcus/Streptomyces    0.58
+#:   Clostridium/Clostridioides 0.82  Bacteroides/Bacterium         0.67
+#:   Chlamydia/Chlamydophila 0.78     Pseudomonas/Pseudoalteromonas 0.55
+#:   Mycobacterium/Mycobacteroides 0.77  Enterococcus/Enterobacter  0.50
+#:
+#: A fixed-length prefix does not separate them — 7 characters is both Chlamydia/Chlamydophila
+#: and Streptococcus/Streptomyces.
+GENUS_STEM_RATIO = 0.75
+GENUS_STEM_MIN = 6
+
+
+def _same_genus_name(left: str, right: str) -> bool:
+    """One genus name is the other, or a renaming of it."""
+    if not left or not right:
+        return False
+    if left == right:
+        return True
+    shared = 0
+    for a, b in zip(left, right):
+        if a != b:
+            break
+        shared += 1
+    shorter = min(len(left), len(right))
+    return shared >= GENUS_STEM_MIN and shared / shorter >= GENUS_STEM_RATIO
+
+
 def same_species(query: str, hit: str) -> bool:
     """Both names denote the same species. Tolerates the genus renaming above."""
     q_genus, q_species = organism_key(query)
@@ -293,25 +323,51 @@ def same_species(query: str, hit: str) -> bool:
         return False
     if q_species != h_species:
         return False
-    # Same species epithet: accept when the genus matches, or when one genus name is a
-    # lengthened form of the other (Mycoplasma -> Mycoplasmoides).
-    return q_genus == h_genus or q_genus.startswith(h_genus[:6]) or h_genus.startswith(q_genus[:6])
+    return _same_genus_name(q_genus, h_genus)
 
 
 def same_genus(query: str, hit: str) -> bool:
     q_genus, _ = organism_key(query)
     h_genus, _ = organism_key(hit)
-    if not q_genus or not h_genus:
-        return False
-    return q_genus == h_genus or q_genus.startswith(h_genus[:6]) or h_genus.startswith(q_genus[:6])
+    return _same_genus_name(q_genus, h_genus)
+
+
+#: A bracketed suffix only names an organism when it reads like a binomial: a capitalised
+#: genus followed by a lowercase epithet. BV-BRC product names end in brackets too — EC-name
+#: qualifiers such as ``[decarboxylating]``, ``[NAD+]`` and ``[acetolactate synthase, ...]`` —
+#: and without this gate the commonest of those becomes the "organism" of the whole genome.
+BINOMIAL = re.compile(r"^[A-Z][a-z]{2,}(?:\s+[a-z][a-z-]{2,})")
+
+#: The fraction of records the winning name must cover before it counts as the genome's
+#: organism. The p3-CLI/web export carries no organism at all (see ``_feature_id_from_header``
+#: for the two layouts in circulation), so on that layout a handful of stray brackets must not
+#: outvote the 99% that say nothing.
+ORGANISM_QUORUM = 0.5
 
 
 def _organism_from_header(header: str) -> str:
-    """`... product [Mycoplasma genitalium G37 | 243273.25]` -> the organism name."""
+    """`... product [Mycoplasma genitalium G37 | 243273.25]` -> the organism name.
+
+    Returns "" for a bracket that does not read like an organism, so an EC-name qualifier is
+    never mistaken for one.
+    """
     match = re.search(r"\[([^\]]+)\]\s*$", header or "")
     if not match:
         return ""
-    return match.group(1).split("|")[0].strip()
+    candidate = match.group(1).split("|")[0].strip()
+    return candidate if BINOMIAL.match(candidate) else ""
+
+
+def _genome_organism(organisms: list[str], total: int) -> str:
+    """The organism shared by the genome, or "" when the headers do not agree on one.
+
+    Silence is the honest answer here: a wrong organism makes every hit look foreign, which is
+    the same-species artifact this exists to surface, reported backwards.
+    """
+    if not organisms or total <= 0:
+        return ""
+    name, count = Counter(organisms).most_common(1)[0]
+    return name if count >= total * ORGANISM_QUORUM else ""
 
 
 def _feature_id_from_header(header: str) -> tuple[str, str]:
@@ -418,7 +474,7 @@ def load_input(m1_dir: Path) -> InputBundle:
 
     return InputBundle(
         proteins=proteins,
-        organism=(Counter(organisms).most_common(1)[0][0] if organisms else ""),
+        organism=_genome_organism(organisms, len(seen_ids)),
         specialty_without_protein=specialty_orphans,
         table_rows_without_sequence=sorted(set(by_id) - seen_ids),
         sequences_without_table_row=sequences_without_row,
