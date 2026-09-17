@@ -1,0 +1,66 @@
+{
+ "amr_gene_summary": {
+  "antibiotic target in susceptible species": [
+   "EF-G",
+   "EF-Tu",
+   "folA, Dfr",
+   "gyrA",
+   "gyrB",
+   "Iso-tRNA",
+   "rpoB",
+   "rpoC",
+   "S10p",
+   "S12p"
+  ],
+  "gene conferring resistance via absence": [
+   "gidB"
+  ],
+  "protein altering cell wall charge conferring antibiotic resistance": [
+   "GdpD",
+   "PgsA"
+  ]
+ },
+ "cds_ratio": 0.913673380729422,
+ "coarse_consistency": "99.9",
+ "contigs": 1,
+ "feature_summary": {
+  "cds": 530,
+  "mat_peptide": 0,
+  "misc_RNA": 0,
+  "partial_cds": 0,
+  "rRNA": 3,
+  "repeat_region": 16,
+  "tRNA": 35
+ },
+ "fine_consistency": "99.7",
+ "gc_content": 31.6891234941628,
+ "genome_length": 580076,
+ "genome_metrics": {
+  "L50": 1,
+  "L70": 1,
+  "L90": 1,
+  "N50": 580076,
+  "N70": 580076,
+  "N90": 580076,
+  "complete": 1,
+  "totlen": 580076
+ },
+ "genome_quality": "Good",
+ "genome_quality_flags": [],
+ "hypothetical_cds_ratio": 0.341509433962264,
+ "partial_cds_ratio": 0,
+ "protein_summary": {
+  "ec_assignment": 161,
+  "function_assignment": 391,
+  "go_assignment": 127,
+  "hypothetical": 139,
+  "pathway_assignment": 113,
+  "pgfam_assignment": 524,
+  "plfam_assignment": 521
+ },
+ "specialty_gene_summary": {
+  "Antibiotic Resistance:PATRIC": 14,
+  "Drug Target:TTD": 1,
+  "Transporter:TCDB": 2
+ }
+}

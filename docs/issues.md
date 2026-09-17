@@ -373,3 +373,147 @@ labels: priority:p0, type:decision
 **Definition of done**
 - [ ] Decisions recorded in this issue and reflected in `docs/07-decisions-and-risks.md`
 - [ ] Defaults taken silently if nobody objects by the first checkpoint
+
+## M2: essentiality and human-homolog evidence
+labels: module:m2, priority:p0, type:code
+**Goal:** produce the two triage components that no upstream service gives us.
+
+**Docs:** `docs/01a-cga-coverage.md`, `docs/02-m2-triage.md`, `docs/pitfalls.md` (#3)
+
+A fresh CGA run returns 17 specialty-gene rows. The public BV-BRC record for the
+same genome has 174, and the extra 157 are mostly `Essential Gene` (148, from
+flux-balance analysis) and `Human Homolog` (5, from BLASTP). Those are
+precomputed for public genomes only, so a blinded genome gets neither — yet
+#12's score has an essentiality component and a human-homolog penalty.
+
+**Scope**
+- Human homology: BLASTP or DIAMOND of every protein against the human
+  proteome (UniProt UP000005640). Record identity, coverage and e-value per hit.
+- Essentiality: orthologs against an essential-gene set (DEG, OGEE, or the
+  FBA essential genes on close BV-BRC public relatives). Record which relative
+  and what identity justified the call.
+- Write both into `annotations[]` with provenance, in the shape `triage`
+  expects. Explicit null when there is no hit; never a silent zero.
+
+**Definition of done**
+- [ ] Every protein has a human-homolog record or an explicit "no hit"
+- [ ] Essentiality calls name their source and the identity behind them
+- [ ] Spot check against the public record for 243273.25: the 5 known human
+      homologs (atpD, tuf, atpA, rpsL, dnaK) come back at comparable identity
+- [ ] Runtime for a full proteome measured and recorded
+
+**Watch out for:** the human-homolog paradox (pitfall #3) - a close human
+homolog both helps find ligands and disqualifies the target. Record the
+identity, do not collapse it to a boolean.
+
+## M1: normalize specialty-gene evidence, and run AMRFinderPlus and RGI locally
+labels: module:m1, priority:p1, type:code
+**Goal:** make every specialty-gene row carry evidence a reader can judge, and
+stop AMR calls from being read as resistance when they are not.
+
+**Docs:** `docs/01a-cga-coverage.md`, `docs/01-m1-genome.md`
+
+Two findings from the first CGA run. First, `K-mer Search` rows have null
+`identity`, `query_coverage`, `subject_coverage` and `e_value`; their confidence
+lives per feature in `annotation.genome` as `quality.hit_count`,
+`quality.weighted_hit_count` and `quality.priority`. Only `DIAMOND` rows carry
+identity and coverage. Second, 10 of the 14 AMR rows are classified "antibiotic
+target in susceptible species", 2 alter cell wall charge, 1 confers resistance
+via absence - none is an acquired resistance gene.
+
+**Scope**
+- Carry `classification` and `evidence` onto every specialty record, not just
+  `property`, and expose them to M2 scoring and the M6 report.
+- For k-mer rows, carry the per-feature k-mer confidence instead of faking an
+  identity. A null identity stays null.
+- Run AMRFinderPlus and RGI locally on the proteins, since CGA's copies returned
+  header-only files, and merge their hits with identity and coverage.
+- Decide and document what "AMR hit" means for the triage score, given that most
+  rows are conserved drug targets.
+
+**Definition of done**
+- [ ] No specialty record loses its classification on the way into `report.json`
+- [ ] Every record carries either identity plus coverage, or a k-mer confidence,
+      and which one it is is explicit
+- [ ] AMRFinderPlus and RGI produce non-empty output for at least one genome
+- [ ] #5's "database, identity and coverage" check updated to match reality
+
+**Watch out for:** scoring gyrA and rpoB as resistance evidence. In this genome
+they are simply the drug targets of fluoroquinolones and rifamycins.
+
+## Ops: find the Similar Genome Finder access path
+labels: module:m1, priority:p0, type:ops, good-first-task
+**Goal:** settle how we call Similar Genome Finder, since CGA does not give us
+closest genomes.
+
+**Docs:** `docs/01a-cga-coverage.md`, `docs/01-m1-genome.md`
+
+`close_genomes` in the CGA output is an empty list. The codon tree names 10
+relative genome IDs with branch lengths, but no Mash distance and no identity.
+M1 needs a predicted taxon before CGA can annotate a blinded genome, and
+`genome.closest_genomes[]` needs real distances. No `p3-` command for the
+service has been identified; `p3-closest-seqs` exists but has not been shown to
+be the same Mash service.
+
+**Scope**
+- Establish the access path: a `p3-` command, the service API, or the website.
+- Confirm what it returns (genome IDs, Mash distance, predicted taxon) and at
+  what taxonomic resolution.
+- Write the finding into `docs/01-m1-genome.md` and note it in this issue.
+
+**Definition of done**
+- [ ] One documented, repeatable call that returns closest genomes for a FASTA
+- [ ] Output fields mapped onto `genome.closest_genomes[]`
+- [ ] If no programmatic path exists, that is recorded and the manual fallback
+      is written down
+
+## M1: phylogeny gate on the codon tree
+labels: module:m1, priority:p1, type:code
+**Goal:** refuse to publish a tree built from too few genes.
+
+**Docs:** `docs/01a-cga-coverage.md`, `docs/06-m6-report.md`
+
+`codontree.genesPerGenome.txt` from the first run reports
+`Filtered_SingleCopy = 5` for every genome in the ingroup: the tree came from
+five single-copy genes. That is fine for a smoke test and not defensible in the
+report.
+
+**Scope**
+- Parse `codontree.genesPerGenome.txt` and `codontree.homologAlignmentStats.txt`
+  and record the gene count in the `genome` section.
+- Set a minimum gene count below which the tree is marked not publishable, and
+  say so in the report rather than hiding it.
+- If the count is too low, fall back to the BV-BRC Phylogenetic Tree service
+  with a wider ingroup.
+
+**Definition of done**
+- [ ] Gene count and alignment stats recorded per run
+- [ ] A tree under the threshold is flagged in `report.json` and in M6
+- [ ] Threshold written down with the reason for the number chosen
+
+## Ops: verify CGA on the real test genome before relying on virulence and AMR phenotype
+labels: module:m1, priority:p0, type:ops
+**Goal:** find out which CGA analyses only work for well-characterized pathogens,
+before the pipeline depends on them.
+
+**Docs:** `docs/01a-cga-coverage.md`, `docs/pipeline.md`
+
+Several analyses ran on *M. genitalium* G37 and produced nothing:
+`genome_amr.json` is `[]` despite two `models.spcAb.*` AMR classification models
+executing, cgMLST called 0 percent of loci, and the AMRFinderPlus and RGI tables
+are header-only. Zero virulence rows came back, and `specialty-blast.txt` shows
+only TCDB and TTD were searched, so we do not know whether VFDB and Victors run
+at all. `pipeline.md` assumes virulence factors come from CGA specialty genes,
+and M5 assumes AMR phenotype data exists.
+
+**Scope**
+- Run CGA on *S. aureus* USA300, the decided test genome, blinded.
+- Record which of these populate: virulence rows (VFDB, Victors), `genome_amr`
+  MIC and SIR predictions, MLST and cgMLST, AMRFinderPlus, RGI.
+- Record the runtime for a 2.8 Mb genome against the 164.5 s for 580 kb.
+- Post the results as a comment and update `docs/pipeline.md` where it is wrong.
+
+**Definition of done**
+- [ ] A table of analysis to populated/empty for USA300, posted in this issue
+- [ ] `pipeline.md` corrected wherever it assumes data CGA does not produce
+- [ ] M5 told whether AMR phenotype data will exist for the real genome
