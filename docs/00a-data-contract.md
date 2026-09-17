@@ -35,6 +35,8 @@ test reproduces it with real subprocesses.
 | `run` | M1 | `run_id`, `created_at` |
 | `genome` | M1 | — |
 | `proteins` | M1 writes the list; M2 enriches | `feature_id` per record |
+| `proteins[].m1_priority` | M1 | — (see below) |
+| `proteins[].triage` | M2 | `score`, `components`, `selected`, `reason` |
 | `structures` | M3 | `feature_id`, `source` (`pdb`/`afdb`/`predicted`/`esm_atlas`) |
 | `kg` | M2 | every edge: `source_id`, `target_id`, `type`, `provenance` |
 | `ligands` | M4 | `ligand_id`, `provenance` |
@@ -57,10 +59,39 @@ Three things are enforced from day one, because they are what makes the report d
 2. **Anything retrieved externally carries `source` and `retrieved_at`.**
 3. **Anything transferred from another protein carries the identity that justified it** (pitfall #4).
 
+## Two scores, two owners, one protein
+
+`proteins[].m1_priority` and `proteins[].triage` are different keys on purpose and neither
+module may write the other's.
+
+| | `m1_priority` (M1) | `triage` (M2) |
+| --- | --- | --- |
+| Ranks by | host-interaction evidence in the annotation | structural tractability |
+| Available | before any structure is looked at | after PDB and AlphaFold lookups |
+| Weights | virulence +3, drug target +3, essential/AMR/mechanism +2, surface/named/transporter +1, human homolog −2 | `pdb_evidence` 0.40, AlphaFold 0.00, … |
+| Shape | `score`, `rank`, `categories`, `mechanism_hypothesis`, `breakdown`, `selected`, `weights` | `score`, `components`, `selected`, `reason` |
+
+**They are expected to disagree.** A virulence factor with no solved homolog ranks high in
+M1 and low in M2; that is the pipeline working, not a bug. Collapsing them into one
+`score` would either discard the annotation evidence M1 has and M2 does not, or overwrite
+the structural evidence M3 gates on.
+
+`m1_priority` carries its full `breakdown` — the points and the sentence that earned them —
+and the `weights` it ran with, so M2 can re-rank with its own weights instead of inheriting
+M1's, and so a reader can audit a ranking rather than trusting a number. Code:
+`s2f/m1_genome/priority.py`.
+
 ## Two shapes worth arguing about
 
 **`annotations[]` requires `source`.** M2 sequence hits, Foldseek (#9) and eggNOG (#10) all write
 here. Without `source`, a TM-score row and a sequence-identity row are indistinguishable.
+
+**`genome.annotation_route` is stated by both M1 routes, never inferred.** `"cga"` means the
+features describe the *submitted assembly*. `"api"` means they describe an already-annotated
+reference genome for the same organism, so gene presence or absence is a property of that
+reference and not of the isolate ([01b-m1-api-mode.md](01b-m1-api-mode.md)). Read the field;
+do not infer the route from `cga_job_id` being present. That inference survives in the two
+report renderers only so that runs written before both routes declared themselves still render.
 
 **Structure evidence has two independent axes**, kept apart in `flags`:
 

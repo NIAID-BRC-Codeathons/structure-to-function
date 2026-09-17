@@ -35,6 +35,25 @@ def build_parser() -> argparse.ArgumentParser:
     p.add_argument("--contigs", help="assembly FASTA for M1")
     p.add_argument("--ws-dir", help="BV-BRC workspace dir, e.g. /USER@bvbrc/home/s2f")
     p.add_argument("--from-cga-dir", help="M1 parses this directory instead of submitting a job")
+    p.add_argument("--from-bvbrc-api", action="store_true",
+                   help="M1 uses the BV-BRC Data API route instead of the CGA service")
+    p.add_argument("--species", help="M1 API route: species name to resolve")
+    p.add_argument("--genome-id", help="M1 API route: explicit BV-BRC genome id")
+    p.add_argument("--html", action="store_true",
+                   help="M1 also writes the interactive HTML report")
+    p.add_argument("--figures", action="store_true",
+                   help="M1 also writes publication figures (needs matplotlib)")
+    p.add_argument("--annotation", choices=["PATRIC", "RefSeq"],
+                   help="M1 API route: annotation source for CDS features")
+    p.add_argument("--max-features", type=int, help="M1 API route: cap on CDS features")
+    p.add_argument("--seq-cap", type=int, help="M1 API route: cap on protein sequences")
+    p.add_argument("--tree-leaves", type=int,
+                   help="M1 API route: max genomes on the gene-content phylogeny")
+    p.add_argument("--no-tree", action="store_true",
+                   help="M1 API route: skip the gene-content phylogeny")
+    p.add_argument("--taxon-id", type=int, help="M1 CGA route: skip the Minhash call")
+    p.add_argument("--genetic-code", type=int,
+                   help="M1 CGA route: translation table; required with --taxon-id")
     p.add_argument("--skip", action="append", default=[], metavar="STAGE",
                    help="skip a stage; repeatable")
     p.add_argument("--only", action="append", default=[], metavar="STAGE",
@@ -48,7 +67,8 @@ def build_parser() -> argparse.ArgumentParser:
                    help="M2: InterProScan output to ingest, or 'auto' to find a local install")
     for tool in ("eggnog", "deeptmhmm", "signalp", "psortb"):
         p.add_argument(f"--{tool}", metavar="PATH", help=f"M2: {tool} output file")
-    p.add_argument("--offline", action="store_true", help="M2: replay from cache, no network")
+    p.add_argument("--offline", action="store_true",
+                   help="replay from cache with no network (M2, and M1's API route)")
     p.add_argument("--allow-poor", action="store_true", help="passed to M1")
     p.add_argument("--dry-run", action="store_true",
                    help="print the command for each stage without running it")
@@ -71,11 +91,26 @@ def stage_args(stage: str, args: argparse.Namespace) -> list[str]:
     if stage == "m1":
         out = list(common)
         for flag, value in (("--contigs", args.contigs), ("--ws-dir", args.ws_dir),
-                            ("--from-cga-dir", args.from_cga_dir)):
-            if value:
-                out += [flag, value]
-        if args.allow_poor:
-            out.append("--allow-poor")
+                            ("--from-cga-dir", args.from_cga_dir),
+                            ("--species", args.species), ("--genome-id", args.genome_id),
+                            ("--annotation", args.annotation),
+                            ("--max-features", args.max_features),
+                            ("--seq-cap", args.seq_cap),
+                            ("--tree-leaves", args.tree_leaves),
+                            ("--taxon-id", args.taxon_id),
+                            ("--genetic-code", args.genetic_code)):
+            if value is not None:
+                out += [flag, str(value)]
+        for flag, on in (("--allow-poor", args.allow_poor), ("--html", args.html),
+                         ("--figures", args.figures), ("--no-tree", args.no_tree)):
+            if on:
+                out.append(flag)
+        if args.from_bvbrc_api:
+            out.append("--from-bvbrc-api")
+            # --offline only means anything on the API route; the CGA route's network is
+            # the p3 CLI, which has no cache to replay from.
+            if args.offline:
+                out.append("--offline")
         return out
     if stage == "m2":
         # --report is not optional here: the point of the runner is one report.json

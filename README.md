@@ -12,7 +12,7 @@ Project page: https://niaid-brc-codeathons.github.io/projects/structure-to-funct
 
 | Stage | Module | State |
 | --- | --- | --- |
-| M1 genome | `s2f.m1_genome` | taxon call, CGA submit/poll/parse, quality gate |
+| M1 genome | `s2f.m1_genome` | taxon call, CGA submit/poll/parse, quality gate, BV-BRC Data API route, priority ranking, interactive report |
 | M2 triage | `s2f.m2_triage` | PDB evidence, AlphaFold, knowledge graph, triage scoring |
 | M3 fold | - | not started |
 | M4 ligands | - | not started |
@@ -27,7 +27,9 @@ Project page: https://niaid-brc-codeathons.github.io/projects/structure-to-funct
 
 - **Python 3.11 or newer.** The code uses `datetime.UTC`, which 3.10 does not have.
 - `curl`, for the BV-BRC services that reject some HTTP client user agents.
-- For the live M1 path only: the **BV-BRC command-line tools**
+- Optional, for M1: `scipy` and `numpy` for the gene-content phylogeny, `matplotlib`
+  for publication figures. Without them the run succeeds and says what it skipped.
+- For M1's CGA route only: the **BV-BRC command-line tools**
   (<https://www.bv-brc.org/docs/cli_tutorial/index.html>) and a BV-BRC account.
   Everything else runs offline from fixtures.
 
@@ -37,7 +39,7 @@ Project page: https://niaid-brc-codeathons.github.io/projects/structure-to-funct
 git clone https://github.com/NIAID-BRC-Codeathons/structure-to-function.git
 cd structure-to-function
 python3.11 -m venv .venv && source .venv/bin/activate
-pip install -r requirements-common.txt -r requirements-m2.txt
+pip install -r requirements-common.txt -r requirements-m1.txt -r requirements-m2.txt
 ```
 
 ### Notes
@@ -56,7 +58,13 @@ than any hard-coded location.
 
 ```bash
 # M1 parses a trimmed real CGA output committed as a fixture
-python -m s2f.m1_genome --run runs/demo --from-cga-dir fixtures/m1/cga_sample
+python -m s2f.m1_genome --run runs/demo --from-cga-dir fixtures/m1/cga_sample --html
+# -> runs/demo/m1/report.html, openable offline
+
+# M1 without a BV-BRC account, straight from the public Data API (needs network).
+# NOTE: this characterises a reference genome for the organism, not your assembly
+# (docs/01b-m1-api-mode.md). Re-run with --offline afterwards to replay from cache.
+python -m s2f.m1_genome --run runs/kp --from-bvbrc-api --genome-id 1125630.4 --html
 
 # M2 from its own fixtures, in its own run directory
 python -m s2f.m2_triage --run runs/m2demo --dry-run --report
