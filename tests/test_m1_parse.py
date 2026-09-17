@@ -124,3 +124,70 @@ def test_poor_quality_is_detected(run, tmp_path):
     poor.genome["genome_quality"] = "Poor"
     assert poor.is_poor is True
     assert "Poor" in poor.quality_reason()
+
+
+class TestUploadSafety:
+    """p3-cp exits 0 without overwriting, so a reused filename silently feeds Minhash
+    the previous run's genome. That happened once; these pin the guard."""
+
+    def test_ls_size_is_parsed_from_a_p3_ls_row(self):
+        from s2f.m1_genome.cga import LS_SIZE
+
+        row = "-rw-- someone@bvbrc 20866 Sep 17 09:32 mgen_G37_cga"
+        assert LS_SIZE.match(row).group(1) == "20866"
+
+    def test_upload_rejects_a_workspace_copy_of_the_wrong_size(self, tmp_path, monkeypatch):
+        from s2f.m1_genome import cga
+
+        local = tmp_path / "run_a.contigs.fna"
+        local.write_text(">contig_1\nACGT\n")
+
+        monkeypatch.setattr(cga, "_run", lambda *a, **k: "")
+        monkeypatch.setattr(cga, "remote_size", lambda path: 999999)
+        with pytest.raises(cga.CgaError, match="not this run's file|is not "):
+            cga.upload(local, "/someone@bvbrc/home/s2f")
+
+    def test_upload_returns_the_path_when_sizes_agree(self, tmp_path, monkeypatch):
+        from s2f.m1_genome import cga
+
+        local = tmp_path / "run_a.contigs.fna"
+        local.write_text(">contig_1\nACGT\n")
+
+        monkeypatch.setattr(cga, "_run", lambda *a, **k: "")
+        monkeypatch.setattr(cga, "remote_size", lambda path: local.stat().st_size)
+        assert cga.upload(local, "/someone@bvbrc/home/s2f") == \
+            "/someone@bvbrc/home/s2f/uploads/run_a.contigs.fna"
+
+    def test_upload_rejects_a_missing_workspace_copy(self, tmp_path, monkeypatch):
+        from s2f.m1_genome import cga
+
+        local = tmp_path / "run_a.contigs.fna"
+        local.write_text(">contig_1\nACGT\n")
+
+        monkeypatch.setattr(cga, "_run", lambda *a, **k: "")
+        monkeypatch.setattr(cga, "remote_size", lambda path: None)
+        with pytest.raises(cga.CgaError, match="left nothing"):
+            cga.upload(local, "/someone@bvbrc/home/s2f")
+
+
+def test_cga_files_that_are_not_valid_utf8_still_parse(tmp_path):
+    """A real USA300 sp_gene.json carried a 0xa0 byte (Latin-1 NBSP) and broke a
+    strict UTF-8 read. BV-BRC's encoding is not guaranteed; the parser must cope."""
+    from s2f.m1_genome.parse import _load_json, _read_text
+
+    path = tmp_path / "sp_gene.json"
+    path.write_bytes(b'[{"gene": "mecA", "product": "penicillin\xa0binding protein"}]')
+    assert "binding protein" in _read_text(path)
+    assert _load_json(path)[0]["gene"] == "mecA"
+
+
+def test_specialty_identity_is_normalized_to_float(tmp_path):
+    """DIAMOND rows carry identity as a string ('99'), AMRFinderPlus and RGI as a
+    float (99.77). One type downstream; a k-mer row's absent identity stays None."""
+    from s2f.m1_genome.parse import _as_float
+
+    assert _as_float("99") == 99.0
+    assert _as_float(99.77) == 99.77
+    assert _as_float(None) is None
+    assert _as_float("") is None
+    assert _as_float("not a number") is None

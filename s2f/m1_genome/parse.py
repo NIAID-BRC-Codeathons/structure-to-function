@@ -88,8 +88,40 @@ def _as_int(value: Any) -> int | None:
         return None
 
 
+def _read_text(path: Path) -> str:
+    """Read a CGA file whose encoding is not guaranteed.
+
+    BV-BRC writes bytes that are not valid UTF-8 into some tables - a 0xa0
+    (Latin-1 non-breaking space) inside a real `sp_gene.json` killed a strict
+    read. Fall back rather than fail: the field values matter, the exact
+    codepoint of a stray space does not.
+    """
+    data = path.read_bytes()
+    for encoding in ("utf-8", "utf-8-sig", "cp1252", "latin-1"):
+        try:
+            return data.decode(encoding)
+        except UnicodeDecodeError:
+            continue
+    return data.decode("utf-8", errors="replace")
+
+
+def _as_float(value: Any) -> float | None:
+    """Numeric fields arrive as strings from some sources and numbers from others.
+
+    In one USA300 run, DIAMOND rows carried `identity: '99'` while AMRFinderPlus and
+    RGI carried `identity: 99.77`. Downstream comparisons need one type. None stays
+    None: a k-mer row has no identity, which is not the same as zero.
+    """
+    if value is None or value == "":
+        return None
+    try:
+        return float(value)
+    except (TypeError, ValueError):
+        return None
+
+
 def _load_json(path: Path) -> Any:
-    return json.loads(path.read_text(encoding="utf-8"))
+    return json.loads(_read_text(path))
 
 
 def _read_fasta(path: Path) -> dict[str, str]:
@@ -97,7 +129,7 @@ def _read_fasta(path: Path) -> dict[str, str]:
     out: dict[str, str] = {}
     key: str | None = None
     chunks: list[str] = []
-    for line in path.read_text(encoding="utf-8").splitlines():
+    for line in _read_text(path).splitlines():
         line = line.strip()
         if not line:
             continue
@@ -151,7 +183,7 @@ def load_cga(cga_dir: str | Path) -> CgaRun:
         specialty=_load_json(load / "sp_gene.json"),
         subsystem_rows=_load_json(load / "subsystem.json"),
         sequences=_read_fasta(ann / "annotation.feature_protein.fasta"),
-        tree_newick=tree.read_text(encoding="utf-8").strip() if tree.exists() else None,
+        tree_newick=_read_text(tree).strip() if tree.exists() else None,
         ingroup=ingroup_file.read_text().split() if ingroup_file.exists() else [],
     )
 
@@ -191,10 +223,12 @@ def _specialty_by_feature(run: CgaRun) -> dict[str, list[dict[str, Any]]]:
                 "evidence": row.get("evidence"),
                 "gene": row.get("gene"),
                 "hit": row.get("source_id") or row.get("product"),
-                "identity": row.get("identity"),
-                "coverage": row.get("query_coverage"),
-                "subject_coverage": row.get("subject_coverage"),
-                "e_value": row.get("e_value"),
+                "identity": _as_float(row.get("identity")),
+                "coverage": _as_float(row.get("query_coverage")),
+                "subject_coverage": _as_float(row.get("subject_coverage")),
+                "e_value": _as_float(row.get("e_value")),
+                "same_species": row.get("same_species"),
+                "same_genus": row.get("same_genus"),
                 "antibiotics": antibiotics if isinstance(antibiotics, list) else [antibiotics],
                 "pmid": row.get("pmid") or [],
             }
