@@ -124,3 +124,47 @@ def test_poor_quality_is_detected(run, tmp_path):
     poor.genome["genome_quality"] = "Poor"
     assert poor.is_poor is True
     assert "Poor" in poor.quality_reason()
+
+
+class TestUploadSafety:
+    """p3-cp exits 0 without overwriting, so a reused filename silently feeds Minhash
+    the previous run's genome. That happened once; these pin the guard."""
+
+    def test_ls_size_is_parsed_from_a_p3_ls_row(self):
+        from s2f.m1_genome.cga import LS_SIZE
+
+        row = "-rw-- someone@bvbrc 20866 Sep 17 09:32 mgen_G37_cga"
+        assert LS_SIZE.match(row).group(1) == "20866"
+
+    def test_upload_rejects_a_workspace_copy_of_the_wrong_size(self, tmp_path, monkeypatch):
+        from s2f.m1_genome import cga
+
+        local = tmp_path / "run_a.contigs.fna"
+        local.write_text(">contig_1\nACGT\n")
+
+        monkeypatch.setattr(cga, "_run", lambda *a, **k: "")
+        monkeypatch.setattr(cga, "remote_size", lambda path: 999999)
+        with pytest.raises(cga.CgaError, match="not this run's file|is not "):
+            cga.upload(local, "/someone@bvbrc/home/s2f")
+
+    def test_upload_returns_the_path_when_sizes_agree(self, tmp_path, monkeypatch):
+        from s2f.m1_genome import cga
+
+        local = tmp_path / "run_a.contigs.fna"
+        local.write_text(">contig_1\nACGT\n")
+
+        monkeypatch.setattr(cga, "_run", lambda *a, **k: "")
+        monkeypatch.setattr(cga, "remote_size", lambda path: local.stat().st_size)
+        assert cga.upload(local, "/someone@bvbrc/home/s2f") == \
+            "/someone@bvbrc/home/s2f/uploads/run_a.contigs.fna"
+
+    def test_upload_rejects_a_missing_workspace_copy(self, tmp_path, monkeypatch):
+        from s2f.m1_genome import cga
+
+        local = tmp_path / "run_a.contigs.fna"
+        local.write_text(">contig_1\nACGT\n")
+
+        monkeypatch.setattr(cga, "_run", lambda *a, **k: "")
+        monkeypatch.setattr(cga, "remote_size", lambda path: None)
+        with pytest.raises(cga.CgaError, match="left nothing"):
+            cga.upload(local, "/someone@bvbrc/home/s2f")
