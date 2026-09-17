@@ -197,9 +197,35 @@ Consequences:
    broken pipeline. M2 and M5 must distinguish "no hits" from "not run" — the
    specialty summary in `quality.json` says which analyses executed.
 
-2. **AMR phenotype data will exist for the real test genome.** `genome_amr` carries
-   15 MIC/SIR prediction rows for USA300 and none for *M. genitalium*, so M5 can
-   rely on it for USA300 while treating it as optional in general.
+2. **AMR phenotype data will exist for the real test genome, with caveats.**
+   `genome_amr` carries 15 rows for USA300 and none for *M. genitalium*: 3 MIC
+   predictions (daptomycin 1.0, oxacillin 4.0, vancomycin 2.0 mg/L) and 12 SIR
+   calls. Every row is XGBoost model output - `evidence: Computational Method`,
+   `vendor: BVBRC`, `computational_method_version: 20250225` - so these are
+   predictions, not laboratory measurements, and M5 must present them as such.
+
+   | Call | Antibiotics |
+   | --- | --- |
+   | Resistant | ciprofloxacin, clindamycin, erythromycin, cefoxitin, methicillin, oxacillin, penicillin, tetracycline, daptomycin |
+   | Susceptible | fusidic acid, `geamycin`, `co_trimoxazole` |
+
+   Three handling requirements for M5:
+
+   - **Gate on `computational_method_performance`.** Each row carries its own F1 or
+     W1 score with a confidence interval. Most are 0.91-0.99; daptomycin SIR is
+     **F1 0.3, CI[-0.26, 0.85]**, an interval spanning zero, and should be dropped
+     rather than reported.
+   - **MIC and SIR can contradict each other.** Daptomycin is called Resistant by
+     the SIR model while the MIC model returns 1.0 mg/L, the susceptible
+     breakpoint. A documented reconciliation rule is needed; here the
+     low-confidence SIR row is the one to discard.
+   - **Normalize antibiotic names before joining to ChEMBL or openFDA.** This run
+     contains `geamycin` (gentamicin) and `co_trimoxazole`. Same class of problem
+     as BV-BRC's `Virulance factor` spelling, which its own data also carries.
+
+   The remaining calls are consistent with MRSA: methicillin, oxacillin, cefoxitin
+   and penicillin resistant, the oxacillin MIC of 4.0 mg/L agreeing with its SIR
+   call, and vancomycin susceptible at 2.0 mg/L.
 
 3. **Human homolog is still missing.** BV-BRC's public record for 451515.3 has 648
    specialty rows including 21 human-homolog rows and 34 DrugBank rows; a fresh CGA
