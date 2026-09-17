@@ -12,7 +12,7 @@ development), `seed_proteins` writes the minimal list first so the enrichment ha
 
 from __future__ import annotations
 
-from datetime import UTC, datetime
+from datetime import datetime, timezone
 from typing import Any, Iterable
 
 from ..common.ids import Xrefs
@@ -22,7 +22,7 @@ from .score import ProteinScore
 
 
 def _now() -> str:
-    return datetime.now(UTC).isoformat()
+    return datetime.now(timezone.utc).isoformat()
 
 
 def seed_proteins(proteins: Iterable[Protein]) -> list[dict[str, Any]]:

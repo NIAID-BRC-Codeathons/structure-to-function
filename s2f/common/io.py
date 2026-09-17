@@ -23,7 +23,7 @@ import json
 import os
 import tempfile
 from contextlib import contextmanager
-from datetime import UTC, datetime
+from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any, Iterator
 
@@ -87,7 +87,7 @@ def init_report(run_dir: str | Path, run_id: str, **run_fields: Any) -> dict[str
         return report
     run_section = {
         "run_id": run_id,
-        "created_at": datetime.now(UTC).isoformat(),
+        "created_at": datetime.now(timezone.utc).isoformat(),
         "schema_version": SCHEMA_VERSION,
         **run_fields,
     }
