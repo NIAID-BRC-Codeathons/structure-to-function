@@ -14,7 +14,9 @@ from __future__ import annotations
 
 import hashlib
 import json
+import os
 import sqlite3
+import tempfile
 import threading
 import time
 from datetime import UTC, datetime, timedelta
@@ -175,6 +177,36 @@ class CachedJsonClient:
         if self.cache is not None:
             self.cache.set(namespace, key, body)
         return body
+
+    def get_bytes(self, namespace: str, url: str, *, cache_dir: str | Path) -> bytes:
+        """Download a file through the shared retry/rate-limit path and cache it on disk.
+
+        Structure files are not JSON, so they do not belong in :class:`JsonCache`. The URL is
+        hashed into a small file cache instead. Keeping this operation on the shared client
+        preserves the repository rule that all outbound HTTP uses one retry, rate-limit, and
+        user-agent implementation.
+        """
+        key = self.cache_key({"url": url})
+        path = Path(cache_dir) / namespace / key
+        if path.exists():
+            return path.read_bytes()
+        if self.offline:
+            raise OfflineCacheMiss(f"no cached file for {namespace}:{key[:12]} ({url})")
+
+        response = self._request_with_retry("GET", url)
+        payload = response.content
+        path.parent.mkdir(parents=True, exist_ok=True)
+        handle = tempfile.NamedTemporaryFile("wb", dir=path.parent, prefix=".download-", delete=False)
+        try:
+            with handle:
+                handle.write(payload)
+                handle.flush()
+                os.fsync(handle.fileno())
+            os.replace(handle.name, path)
+        except BaseException:
+            Path(handle.name).unlink(missing_ok=True)
+            raise
+        return payload
 
     def _throttle(self) -> None:
         if self.min_interval_seconds <= 0:
