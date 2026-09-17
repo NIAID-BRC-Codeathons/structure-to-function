@@ -26,6 +26,7 @@ Each module doc carries scope, inputs, outputs, tools, steps, acceptance checks,
 | M2a PDB evidence | [02a-m2-pdb-evidence.md](02a-m2-pdb-evidence.md) | query parameters, scoring weights, weight change log |
 | M2b knowledge graph | [02b-m2-knowledge-graph.md](02b-m2-knowledge-graph.md) | source survey, edge types, caps, the homolog bridge |
 | M2c functional annotation | [02c-m2-functional-annotation.md](02c-m2-functional-annotation.md) | source precedence, flag definitions, external-tool setup |
+| M2d Lambda runbook | [02d-lambda-runbook.md](02d-lambda-runbook.md) | running the annotation providers for real: install, two-pass sequence, what to check |
 | M3 fold | [03-m3-fold.md](03-m3-fold.md) | `structures` |
 | M4 ligands | [04-m4-ligands.md](04-m4-ligands.md) | `ligands`, `docking` |
 | M5 disease | [05-m5-disease.md](05-m5-disease.md) | `disease` |

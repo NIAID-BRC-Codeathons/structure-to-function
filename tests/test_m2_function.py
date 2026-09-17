@@ -34,6 +34,7 @@ from s2f.m2_triage.function import (
     ProviderResult,
     Term,
     annotate,
+    clean_sequence,
     discover_interproscan,
     heuristic_annotation,
     hydrophobic_segments,
@@ -48,6 +49,7 @@ from s2f.m2_triage.function import (
     predict_lipoprotein,
     predict_signal_peptide,
     write_terms_tsv,
+    write_tool_fasta,
 )
 from s2f.m2_triage.report_adapter import functional_annotations, functional_flags
 
@@ -571,6 +573,79 @@ def test_unmatched_provider_rows_are_reported():
     run = annotate([protein("fig|1.peg.1")], psortb=parsed)
     assert run.unmatched[SOURCE_PSORTB] == ["SOMETHING_ELSE"]
     assert run.summary()["unmatched_ids"] == {SOURCE_PSORTB: 1}
+
+
+# ---------------------------------------------------------------------------
+# FASTA for the external tools
+# ---------------------------------------------------------------------------
+
+
+def test_tool_fasta_strips_stop_characters():
+    """InterProScan rejects sequences containing '*', and BV-BRC FASTA sometimes has them."""
+    sequence, stops = clean_sequence("MKV*LA*")
+    assert sequence == "MKVLA"
+    assert stops == 2
+
+
+def test_tool_fasta_deduplicates_and_maps_duplicates_back(tmp_path):
+    proteins = [
+        protein("fig|1.peg.1", TWO_TM),
+        protein("fig|1.peg.2", TWO_TM),      # same sequence as peg.1
+        protein("fig|1.peg.3", HYDROPHILIC),
+    ]
+    written = write_tool_fasta(tmp_path / "tools.faa", proteins)
+    assert written.records == 2
+    assert written.proteins == 3
+    assert written.duplicate_groups == 1
+    text = (tmp_path / "tools.faa").read_text(encoding="utf-8")
+    assert text.count(">") == 2
+    assert ">fig|1.peg.2" not in text           # represented by peg.1
+    assert written.aliases["fig|1.peg.2"] == ["fig|1.peg.1"]
+
+
+def test_a_duplicate_gets_the_representatives_provider_row(tmp_path):
+    """The tool only ever saw one of the two, so the result has to reach both."""
+    proteins = [protein("fig|1.peg.1", TWO_TM), protein("fig|1.peg.2", TWO_TM)]
+    written = write_tool_fasta(tmp_path / "tools.faa", proteins)
+    parsed = {"fig|1.peg.1": ProviderResult(
+        source=SOURCE_DEEPTMHMM,
+        tm_helices=Call(value=4, source=SOURCE_DEEPTMHMM, evidence="4 TM helices"),
+    )}
+    run = annotate(proteins, deeptmhmm=parsed, aliases=written.aliases)
+    assert run.annotations["fig|1.peg.2"].tm_helices == 4
+    assert run.annotations["fig|1.peg.2"].membrane_source == SOURCE_DEEPTMHMM
+    assert run.unmatched[SOURCE_DEEPTMHMM] == []
+
+
+def test_tool_fasta_warns_about_identifiers_tools_truncate(tmp_path):
+    long_id = "fig|123456.789.peg.101112"       # 25 characters
+    assert len(long_id) > 20
+    written = write_tool_fasta(tmp_path / "tools.faa", [protein(long_id, TWO_TM)])
+    assert written.long_ids == [long_id]
+    assert "id_truncation_warning" in written.summary()
+
+
+def test_tool_fasta_skips_empty_and_overlong_sequences(tmp_path):
+    proteins = [protein("f1", ""), protein("f2", TWO_TM), protein("f3", HYDROPHILIC)]
+    written = write_tool_fasta(tmp_path / "tools.faa", proteins, max_length=80)
+    assert written.skipped_empty == 1
+    assert written.skipped_long == 1            # HYDROPHILIC is 97 residues
+    assert written.records == 1
+
+
+def test_annotate_dry_run_writes_both_tool_fastas(tmp_path):
+    run_dir = tmp_path / "fastas"
+    _dry_run(run_dir, "--annotate")
+    all_faa = run_dir / "m2_pdb" / "annotate_all.faa"
+    selected_faa = run_dir / "m2_pdb" / "annotate_selected.faa"
+    assert all_faa.exists() and selected_faa.exists()
+    # The fixture has four proteins, two of which share a sequence.
+    assert all_faa.read_text(encoding="utf-8").count(">") == 3
+    manifest = json.loads((run_dir / "m2_pdb" / "run.json").read_text(encoding="utf-8"))
+    fasta = manifest["functional_annotation"]["tool_fasta"]
+    assert fasta["records"] == 3
+    assert fasta["proteins"] == 4
+    assert fasta["duplicate_groups"] == 1
 
 
 def test_write_terms_tsv_is_long_format(tmp_path):

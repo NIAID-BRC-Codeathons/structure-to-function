@@ -192,7 +192,9 @@ Added to `runs/<run_id>/m2_pdb/`:
 | --- | --- |
 | `proteins.tsv` | 23 new columns: the flags, the terms, and `*_source` / `*_evidence` / `annotation_confidence` for each flag |
 | `function_terms.tsv` | long format, one row per (protein, term, source): GO, EC, KEGG KO, COG, COG category, Pfam, InterPro, gene name |
-| `run.json` | `functional_annotation`: per-provider counts, unmatched provider rows, flag totals, localization histogram, which source set each membrane flag, `heuristic_only`, and the InterProScan install record |
+| `annotate_all.faa` | cleaned, deduplicated FASTA of every protein — the input for the external tools |
+| `annotate_selected.faa` | the same for the selected ~50, for the tools that are slow per sequence |
+| `run.json` | `functional_annotation`: per-provider counts, unmatched provider rows, flag totals, localization histogram, which source set each membrane flag, `heuristic_only`, the FASTA stats and the InterProScan install record |
 
 `run.json`'s `functional_annotation.notes` carries anything that went wrong: a file that did not
 exist, a file that failed to parse, and — the quiet one — a file that parsed without error and
@@ -265,13 +267,12 @@ interproscan.sh -i proteins.faa -f TSV -o interproscan.tsv -goterms --cpu 8
 python -m s2f.m2_triage --run runs/<id> --annotate --interproscan interproscan.tsv
 ```
 
-**Not done yet:** `--interproscan auto` hands InterProScan the whole proteome FASTA, duplicates
-included. InterProScan's cost scales with *unique* sequences, and `bvbrc_input` already groups
-proteins by sequence hash for the PDB search. Deduplicating by MD5 before the scan and
-re-expanding afterwards is the obvious next change — it is how the GenSLM-ESM homology run was
-made affordable across 2,195 genomes.
-
-Notes: strip `*` stop characters from the FASTA first, or InterProScan rejects the sequences.
+`--interproscan auto` scans the cleaned, deduplicated FASTA this module writes rather than
+`m1/proteins.faa`: InterProScan rejects `*` stop characters and its cost scales with *unique*
+sequences. Duplicate groups are collapsed to one record and the result is fanned back out to
+every member (the same reason the GenSLM-ESM homology run deduplicated by MD5 across 2,195
+genomes). The three CGA proteomes currently in `data/` happen to contain no stops and no
+duplicates, so this is insurance for the next genome rather than a fix for these.
 Expect roughly 1–5 s per protein per core with the default analysis set; `-appl Pfam,TIGRFAM`
 cuts that by an order of magnitude when only domain terms are wanted. The EBI web service
 (`https://www.ebi.ac.uk/Tools/services/rest/iprscan5`) is a fallback for a handful of
@@ -352,6 +353,7 @@ for a novel genome that can be most of the proteome or very little of it, and th
 
 - [02-m2-triage.md](02-m2-triage.md) — the module contract
 - [00a-data-contract.md](00a-data-contract.md) — `report.json`, the schema and the section writer
+- [02d-lambda-runbook.md](02d-lambda-runbook.md) — installing and running the providers on Lambda
 - [02a-m2-pdb-evidence.md](02a-m2-pdb-evidence.md) — triage weights and their change log
 - [02b-m2-knowledge-graph.md](02b-m2-knowledge-graph.md) — the knowledge subgraph
 - [pitfalls.md](pitfalls.md) — #3 membrane proteins, #12 triage bias, #19 reproducibility
