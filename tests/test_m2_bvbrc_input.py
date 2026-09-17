@@ -117,3 +117,66 @@ def test_missing_fasta_is_an_error(tmp_path: Path) -> None:
         assert "proteins.faa" in str(exc)
     else:  # pragma: no cover - guard
         raise AssertionError("expected FileNotFoundError")
+
+
+TABLE = (
+    "patric_id,refseq_locus_tag,gene,product,pgfam_id\n"
+    "fig|1125630.4.peg.1,KPHS_00010,mioC,Flavoprotein MioC,PGF_1\n"
+    "fig|1125630.4.peg.2,KPHS_00020,asnC,Transcriptional regulator AsnC,PGF_2\n"
+    "fig|1125630.4.peg.3,KPHS_00030,,hypothetical protein,PGF_3\n"
+)
+
+
+def test_organism_is_read_from_bracketed_headers(tmp_path: Path) -> None:
+    fasta = (
+        ">fig|1125630.4.peg.1  Flavoprotein MioC [Klebsiella pneumoniae HS11286 | 1125630.4]\n"
+        "MKALIV\n"
+        ">fig|1125630.4.peg.2  Regulator AsnC [Klebsiella pneumoniae HS11286 | 1125630.4]\n"
+        "MSTKNK\n"
+        ">fig|1125630.4.peg.3  hypothetical protein [Klebsiella pneumoniae HS11286 | 1125630.4]\n"
+        "MKALIV\n"
+    )
+    m1 = _write(tmp_path, TABLE)
+    (m1 / "proteins.faa").write_text(fasta)
+
+    assert load_input(m1).organism == "Klebsiella pneumoniae HS11286"
+
+
+def test_ec_name_brackets_are_not_organisms(tmp_path: Path) -> None:
+    """The p3-CLI export has no organism, but its product names still end in brackets.
+
+    On HS11286 exactly 3 of 5,523 headers carry one and all three are EC-name qualifiers, so
+    taking the commonest bracket made "decarboxylating" the organism of the whole genome.
+    """
+    fasta = (
+        ">fig|1125630.4.peg.1  D-threonate 4-phosphate dehydrogenase [decarboxylating]\n"
+        "MKALIV\n"
+        ">fig|1125630.4.peg.2  Propanol dehydrogenase [NAD+]\n"
+        "MSTKNK\n"
+        ">fig|1125630.4.peg.3  Thiamine enzymes [acetolactate synthase, glyoxylate carboligase]\n"
+        "MKALIV\n"
+    )
+    m1 = _write(tmp_path, TABLE)
+    (m1 / "proteins.faa").write_text(fasta)
+
+    assert load_input(m1).organism == ""
+
+
+def test_a_few_stray_brackets_do_not_outvote_a_silent_genome(tmp_path: Path) -> None:
+    """One organism-shaped bracket among many bare headers is not the genome's organism."""
+    fasta = (
+        ">fig|1125630.4.peg.1  Flavoprotein MioC\n"
+        "MKALIV\n"
+        ">fig|1125630.4.peg.2  Transcriptional regulator AsnC\n"
+        "MSTKNK\n"
+        ">fig|1125630.4.peg.3  hypothetical protein [Escherichia coli]\n"
+        "MKALIV\n"
+    )
+    m1 = _write(tmp_path, TABLE)
+    (m1 / "proteins.faa").write_text(fasta)
+
+    assert load_input(m1).organism == ""
+
+
+def test_headers_without_brackets_leave_the_organism_unknown(tmp_path: Path) -> None:
+    assert load_input(_write(tmp_path, TABLE)).organism == ""

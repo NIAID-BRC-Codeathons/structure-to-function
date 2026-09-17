@@ -293,6 +293,28 @@ score is unchanged; what changes is what the report is allowed to claim. The ope
 that follows: **do not calibrate `WEIGHTS` against this genome**, because the identity
 distribution that produced them does not exist elsewhere.
 
+### Knowing which organism we are
+
+Both flags need the query organism, and it is only sometimes in the input. Two BV-BRC FASTA
+layouts are in circulation: the G37 fixture carries `[Mycoplasma genitalium G37 | 243273.25]` on
+every header, while the p3-CLI/web export used for HS11286 carries no organism at all. A
+bracketed suffix is therefore accepted only when it reads like a binomial and covers at least
+half the records — otherwise EC-name qualifiers become the answer, and on HS11286 exactly three
+of 5,523 headers end in a bracket, all of them qualifiers such as `[decarboxylating]`.
+
+When nothing qualifies, the run warns and records `query_organism_source: "undetermined"` with
+`same_organism_hits.measured: false`. This matters because the flags fail *silently and in the
+wrong direction*: an unknown query organism makes every hit compare as foreign, which is the
+self-match artifact reported backwards. Pass `--organism` to settle it.
+
+Genus comparison has to tolerate a rename — BV-BRC writes *Mycoplasma genitalium* where the PDB
+and UniProt now say *Mycoplasmoides genitalium* — without merging distinct genera that share a
+Greek root. Two names count as one genus when their shared prefix is at least 75% of the shorter
+name: *Mycoplasma*/*Mycoplasmoides* is 0.90 and *Chlamydia*/*Chlamydophila* 0.78, while
+*Streptococcus*/*Streptomyces* is 0.58 and *Enterococcus*/*Enterobacter* 0.50. A fixed-length
+prefix does not separate these — seven characters is both *Chlamydia*/*Chlamydophila* and
+*Streptococcus*/*Streptomyces*.
+
 ## Genome sensitivity of the weights
 
 The weights were tuned on HS11286. They are **not automatically portable**, because the
