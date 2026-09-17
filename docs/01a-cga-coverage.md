@@ -108,3 +108,57 @@ The known taxon was passed directly, so this run is not blinded.
 
 Do not parse `genome_sequence.json` or `feature_sequence.json` into
 `report.json`: sequences belong in `proteins.faa`.
+
+## Taxon resolution experiment (2026-09-17)
+
+Same contigs, submitted twice: once with the exact taxon and genetic code, once
+as a blinded unknown where the only fact available is "it is a bacterium". The
+floor run used taxon 2 (Bacteria) and genetic code 11, which is what BV-BRC's
+own taxonomy record for taxon 2 returns.
+
+| | Exact: taxon 243273, code 4 | Floor: taxon 2, code 11 |
+| --- | --- | --- |
+| Genome ID | 243273.147 | 2.119822 |
+| Runtime | 164.5 s | 156.4 s |
+| CDS | 530 | **1070** |
+| Mean protein length | 346.5 aa | **142.2 aa** |
+| Median protein length | 284 aa | 103 aa |
+| Total coding aa | 183,623 | **152,170** |
+| Proteins under 100 aa | 44 (8%) | **517 (48%)** |
+| Hypothetical | 139 (34.2%) | 333 (41.1%) |
+| Genome quality | Good | **Poor** |
+| Quality flags | none | **Abnormal CDS ratio** |
+| Fine consistency | 99.7 | 92.1 |
+| PLFAM assignments | 521 | **none** |
+| PGFAM assignments | 524 | 1007 |
+| Specialty genes | 17 | 38 |
+| Subsystem rows / distinct | 341 / 85 | 571 / 84 |
+| Pathway rows / distinct | 226 / 42 | 452 / 41 |
+| Tree ingroup | same 10 genomes | same 10 genomes |
+
+The mechanism is UGA read as a stop instead of tryptophan, so genes fragment:
+
+- `rpoB` is one 1390 aa protein in the exact run; in the floor run it is three
+  pieces (89, 358, 898 aa).
+- `ileS` is one 895 aa protein; in the floor run, five pieces (71, 45, 81, 90,
+  121 aa and more).
+- `gyrA` survives intact at 836 aa in both, so the damage is uneven.
+
+Downstream consequences:
+
+1. **Fragment inflation looks like more data, not less.** Specialty genes go
+   from 17 to 38 because one gene is counted several times: gyrB appears 5
+   times, Iso-tRNA 5, EF-G, GdpD, rpoB and rpoC 3 each. Subsystem and pathway
+   row counts roughly double while distinct counts stay flat. Any triage score
+   that counts hits rather than distinct genes will be badly skewed.
+2. **PLFAM assignment disappears entirely**, since local families are defined
+   per genus and there is no genus. PGFAM assignment still works.
+3. **CGA does flag it**: quality Poor, `Abnormal CDS ratio`, fine consistency
+   92.1. M1 should treat those as a hard gate, not a note.
+4. **The codon tree ingroup is unaffected** - the same 10 genomes, including
+   243273.25, in both runs. Ingroup selection is sequence-based, not taxon-based,
+   so it is a usable relative-finder even when the taxon is wrong.
+
+Conclusion: taxon and genetic code must come from Minhash before CGA runs, and
+the M1 parser should refuse a run whose genome quality is Poor or whose quality
+flags are non-empty.

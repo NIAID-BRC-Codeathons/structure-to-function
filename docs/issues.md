@@ -517,3 +517,37 @@ and M5 assumes AMR phenotype data exists.
 - [ ] A table of analysis to populated/empty for USA300, posted in this issue
 - [ ] `pipeline.md` corrected wherever it assumes data CGA does not produce
 - [ ] M5 told whether AMR phenotype data will exist for the real genome
+
+## M1: define behaviour when Similar Genome Finder returns no usable hit
+labels: module:m1, priority:p2, type:code
+**Goal:** decide what M1 does when Minhash finds nothing close enough to give a
+taxon, instead of falling through to a domain-level guess.
+
+**Docs:** `docs/01a-cga-coverage.md`, `docs/01-m1-genome.md`
+
+Deferred on purpose: the current test genome always resolves, so this does not
+block the pipeline. It matters for a genuinely novel organism.
+
+Our test resolved only because G37 is itself a BV-BRC reference genome: with
+scope limited to reference and representative sketches and `max_distance` 0.2,
+Minhash returned exactly one hit, 243273.25 at distance 0 with 1000/1000 shared
+k-mers. A novel organism in that configuration returns an empty list, and the
+floor run shows what annotating without a taxon costs: CDS count doubles, mean
+protein length falls from 347 to 142 aa, quality drops to Poor.
+
+**Scope**
+- Retry policy when the list is empty: widen `max_distance`, then drop to
+  full-scope search (`include_reference` and `include_representative` both 0).
+- Decide the fallback taxon and genetic code when still empty, and record that
+  the taxon was a guess.
+- Refuse to proceed, or mark the whole run low confidence, rather than emitting
+  a Poor-quality annotation that looks normal downstream.
+
+**Definition of done**
+- [ ] Documented ladder of retries and the final fallback
+- [ ] `run` manifest records predicted taxon, its Mash distance and whether a
+      fallback was used
+- [ ] A synthetic no-hit case is tested (e.g. an absurd `max_distance`)
+
+**Watch out for:** an empty result and a self-match look equally "successful" to
+a caller that only checks for errors.
