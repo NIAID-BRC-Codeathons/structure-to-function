@@ -1,0 +1,6 @@
+property,gene,product,source,classification,antibiotics_class,identity,query_coverage,patric_id
+Virulence Factor,,"Spike protein S1 receptor-binding domain",VFDB,[],,84,91,fig|999999.1.peg.1
+Drug Target,,"Lysozyme C",DrugBank,[],,87,97,fig|999999.1.peg.2
+Essential Gene,,"Lysozyme C",PATRIC,[],,,,fig|999999.1.peg.2
+Human Homolog,,"Lysozyme C",Human,[],,60,95,fig|999999.1.peg.2
+Antibiotic Resistance,,"orphan row, no matching protein",CARD,[],,,,fig|999999.1.peg.99

@@ -11,6 +11,7 @@ NIAID-BRCs AI Codeathon 2.0 · Argonne National Laboratory · Sept 16–18, 2026
 | [00-architecture.md](00-architecture.md) | Always, before writing code. Data contract, repo layout, ID and provenance rules. |
 | [pipeline.md](pipeline.md) | Choosing a tool or database for a step. |
 | [pitfalls.md](pitfalls.md) | Before trusting any result, and before designing a scoring or docking step. |
+| [common-ids.md](common-ids.md) | Mapping any identifier — feature_id, UniProt, PDB, ChEMBL. Never write your own mapping. |
 | [07-decisions-and-risks.md](07-decisions-and-risks.md) | Open decisions, thread dependencies, non-negotiables. |
 
 ## Modules
@@ -21,6 +22,8 @@ Each module doc carries scope, inputs, outputs, tools, steps, acceptance checks,
 | --- | --- | --- |
 | M1 genome | [01-m1-genome.md](01-m1-genome.md) | `run`, `genome`, `proteins` (list) |
 | M2 triage | [02-m2-triage.md](02-m2-triage.md) | `proteins.*` enrichment, `kg` |
+| M2a PDB evidence | [02a-m2-pdb-evidence.md](02a-m2-pdb-evidence.md) | query parameters, scoring weights, weight change log |
+| M2b knowledge graph | [02b-m2-knowledge-graph.md](02b-m2-knowledge-graph.md) | source survey, edge types, caps, the homolog bridge |
 | M3 fold | [03-m3-fold.md](03-m3-fold.md) | `structures` |
 | M4 ligands | [04-m4-ligands.md](04-m4-ligands.md) | `ligands`, `docking` |
 | M5 disease | [05-m5-disease.md](05-m5-disease.md) | `disease` |
