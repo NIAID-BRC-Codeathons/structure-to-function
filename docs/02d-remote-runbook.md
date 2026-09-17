@@ -23,31 +23,70 @@ steps below do.
 
 ## What has and has not been verified
 
+Everything below ran on a real CGA directory (*M. genitalium*, 530 proteins) on a V100 node.
+
 | | |
 | --- | --- |
-| M1 on a real CGA directory (530 proteins) | **verified**, 0.2 s |
-| M2 `--annotate --report` on that M1 output | **verified** offline, 0.6 s, `proteins` section validates |
-| Flags set for every protein | **verified** — 530/530, all `heuristic` |
+| M1 on a real CGA directory | **verified**, 0.2 s |
+| M2 `--annotate --report` on that M1 output | **verified**, `proteins` section validates |
+| Flags set for every protein | **verified** — 530/530 |
 | Tool-ready FASTA emission | **verified** — `annotate_all.faa` 530 records, `annotate_selected.faa` 50 |
-| Two-pass ingest on real feature IDs | **verified with stand-in outputs** (see below) |
-| Any external provider actually run | **not done** |
-| Any provider's runtime on a real proteome | **not measured** |
+| Pass one against the network | **verified** — 337/530 proteins have a PDB hit, id mapping ran |
+| InterProScan via `--interproscan auto` | **verified** — 435/530 proteins got Pfam/InterPro terms |
+| DeepTMHMM, BioLib cloud | **verified** — 50 sequences in 76 s (1.32 seq/s) |
+| DeepTMHMM, local install | **verified** on a V100 with `torch==1.5.0+cu101` — 530 sequences in **6m45s** |
+| Two-pass ingest, real provider output | **verified** — see below |
+| Provider runtime on a full proteome | **measured** — see below |
+| eggNOG-mapper, PSORTb, SignalP 6 | **not run** |
 
-The two-pass ingest was exercised by generating DeepTMHMM `TMRs.gff3` and SignalP 6
-`prediction_results.txt` in their real formats, carrying the 50 real `fig|...` identifiers from
-`annotate_selected.faa`, and running pass two over them. Result:
+Pass two over real DeepTMHMM and InterProScan output:
 
 ```
-providers              {'deeptmhmm': 50, 'signalp6': 50, 'heuristic': 530}
+providers              {'deeptmhmm': 50, 'interproscan': 435, 'heuristic': 530}
 unmatched_ids          {}
 membrane_flag_source   {'deeptmhmm': 50, 'heuristic': 480}
 confidence             {'heuristic': 480, 'predicted': 50}
 heuristic_only         480
 ```
 
-All 50 selected proteins moved from `heuristic` to `predicted`, nothing went unmatched, and the
-other 480 kept their heuristic flags. **Those were synthetic files, not predictions** — the
-numbers say the plumbing joins up on real identifiers, and say nothing about any protein.
+Every selected protein has a DeepTMHMM-backed membrane flag, 435 carry real function terms, and
+nothing went unmatched — the identifier round-trip through the tools holds.
+
+Two things learned from that run worth carrying forward. **DeepTMHMM found transmembrane helices
+in only 2 of the 50 selected proteins**, which is low for a membrane-rich organism and is the
+triage criteria showing through: selecting for PDB evidence, essentiality and drug-target status
+selects against membrane proteins, because they rarely crystallize. A membrane penalty in the
+triage score would therefore have very little to do among the selected set. And on those same
+50, the built-in heuristic **agreed with DeepTMHMM on all 50**, with no false positives and no
+false negatives — but 48 of the 50 are negatives, so a classifier that always said "not
+membrane" would score 48/50. Concordant, on a set too easy to prove much.
+
+### Measured runtimes
+
+DeepTMHMM over the full 530-protein proteome, locally on one V100-SXM2-32GB:
+
+| Step | Time | Rate |
+| --- | --- | --- |
+| 1. Load transformer model | — | one-off |
+| 2. Generate ESM embeddings | 36 s | 14.5 seq/s |
+| 3. Predict topologies | 5 m 45 s | 1.53 seq/s |
+| **Total** | **6 m 45 s** | |
+
+Step 3 is four-fifths of the cost. `predict.py` hardcodes `chunk_size = 1` at module level, so
+topologies are predicted one sequence at a time even though the batching machinery is there —
+`chunk_with_constraints` exists to isolate sequences longer than `max_length_for_batching = 5000`
+from a batch, and the input is pre-sorted longest-first, which is how you prepare for batching.
+Raising that constant is an operator-side change to third-party code, and the package is licensed
+CC BY-NC-SA 4.0, so shipping an adapted copy would put a NonCommercial ShareAlike obligation on
+this repository. Not worth it for a single genome: seven minutes is not the bottleneck. If you
+are scanning many proteomes, ask BioLib to expose a `--batch-size` flag rather than forking.
+
+For scale: the same 50-protein subset took 76 s through the BioLib cloud (1.32 seq/s), so a local
+V100 is roughly at parity on topology and about 3x faster on embeddings.
+
+**InterProScan finished far faster than its own benchmarks suggest** because *M. genitalium* is a
+model organism: most of its proteins are already in EBI's pre-calculated match lookup, so the
+scan is a lookup rather than an HMM run. A novel genome will not be.
 
 The CGA proteomes tested so far contain **no `*` stop characters and no duplicate sequences**,
 so the cleaning and deduplication in `write_tool_fasta` is insurance for the next genome rather
@@ -204,11 +243,24 @@ flags from `heuristic` to `predicted`.
 These are what make `flags.membrane` and `flags.secreted` mean something. Run them over
 `annotate_selected.faa` (50 proteins) first; the proteome can wait.
 
+**Cloud (quickest to a first result).** Runs on BioLib's compute:
+
 ```bash
 pip install pybiolib
-biolib run DTU/DeepTMHMM --fasta runs/$RUN/m2_pdb/annotate_selected.faa
+cp runs/$RUN/m2_pdb/annotate_selected.faa selected.faa   # see note below
+biolib run DTU/DeepTMHMM --fasta selected.faa
 # writes biolib_results/TMRs.gff3
 ```
+
+Copy the FASTA into the working directory first: passing a nested relative path fails in the
+cloud job with `FileNotFoundError` on a file that plainly exists locally.
+
+Note that this sends your sequences to a third party. For a published genome that is harmless;
+for a blinded or embargoed one it is a decision somebody should make deliberately. The local
+install below avoids the question entirely.
+
+**Local.** See [Installing DeepTMHMM locally](#installing-deeptmhmm-locally) — the output is the
+same `TMRs.gff3`, so nothing downstream changes.
 
 SignalP 6 needs a one-time download after accepting the academic licence at
 <https://services.healthtech.dtu.dk/services/SignalP-6.0/> (take the "fast" model):
@@ -264,6 +316,83 @@ default:** running the Gram-negative model on a Gram-positive genome invents a p
 *M. genitalium* has no outer membrane at all, so for the current test genomes PSORTb is the
 least informative of the four.
 
+## Installing DeepTMHMM locally
+
+Worth doing: it removes the cloud round-trip, has no sequence limit, and lets the whole pipeline
+run without sending anything to a third party.
+
+The package is **request-only** — the app page at <https://dtu.biolib.com/DeepTMHMM> links a
+short form under "Running DeepTMHMM Locally", and access has been granted immediately in
+practice. Free for academic use; commercial users running it on their own servers need a licence
+from BioLib. Roughly 1.7 GB zipped, 2.8 GB unpacked: `predict.py`, five cross-validation models,
+and an embedded ESM-1b state dict. Keep it outside the repo.
+
+```bash
+cd <software dir>
+unzip -q DeepTMHMM-Academic-License-v1.0.zip
+cd DeepTMHMM-Academic-License-v1.0
+```
+
+### It needs its own Python 3.8 environment
+
+The pinned dependencies are from 2022 and will not resolve on a modern Python. Build a separate
+environment and keep it separate — the pipeline venv stays as `setup_env.sh` made it.
+
+```bash
+conda create -y -n deeptmhmm python=3.8
+deactivate                     # LEAVE THE PIPELINE VENV FIRST
+conda activate deeptmhmm
+python -V                      # must say 3.8.x
+which python                   # must be under .../envs/deeptmhmm/bin
+```
+
+**An active venv shadows a conda environment.** `conda activate` sets `CONDA_PREFIX` but the
+venv's `bin` still wins on `PATH`, so `pip` silently installs into the venv instead. The symptom
+is `cp311` wheels in the pip output and a torch resolution failure; the damage is packages in
+the wrong environment. Check `which python` before installing anything.
+
+### Installing, around the torch pin
+
+```bash
+python -m pip install wheel Cython==0.29.37 pkgconfig==1.5.5
+python -m pip install torch==<build> -f https://download.pytorch.org/whl/torch_stable.html
+grep -v '^torch==' requirements.txt > requirements-notorch.txt
+python -m pip install -r requirements-notorch.txt
+python -c "import torch, esm, h5py, Bio; print(torch.__version__, torch.cuda.is_available())"
+```
+
+`requirements.txt` pins `torch==1.5.0+cu92`, a local version that exists only on PyTorch's own
+index and not on PyPI, so installing the requirements file as-is always fails. Install torch
+first from the PyTorch index, then the rest with that line stripped.
+
+**Choosing `<build>` decides whether you get the GPU.** torch 1.5.0 ships exactly three:
+`1.5.0+cpu`, `1.5.0+cu92`, `1.5.0+cu101` — there is no cu102 at this version.
+
+| Your GPU | Build | Why |
+| --- | --- | --- |
+| Volta (V100, sm_70) or older | `1.5.0+cu101` | CUDA 10.1 supports up to sm_70; needs driver ≥ 418.39 (`+cu92` needs only ≥ 396) |
+| Ampere (A100, sm_80) or newer | `1.5.0+cpu` | no CUDA build at this version reaches sm_80. A newer torch (≤ 2.4.1 on Python 3.8) might work, but is untested against this package's 2022-era code |
+| None | `1.5.0+cpu` | `predict.py` branches on `torch.cuda.is_available()`, so the CPU build makes that deterministic |
+
+Confirm with `nvidia-smi --query-gpu=name,driver_version --format=csv` before choosing.
+
+### Running it
+
+```bash
+time python3 predict.py --fasta sample.fasta --output-dir result1        # their sample first
+time python3 predict.py --fasta <project>/runs/$RUN/m2_pdb/annotate_all.faa \
+                        --output-dir <project>/runs/$RUN/deeptmhmm_local
+```
+
+**`--output-dir` must not already exist** — `predict.py` errors rather than overwriting, so use a
+fresh name per run. Output is `TMRs.gff3`, `predicted_topologies.3line` and
+`deeptmhmm_results.md`; the gff3 is identical in format to the cloud's, so `--deeptmhmm` ingests
+it unchanged.
+
+The two environments meet only through that file: conda `deeptmhmm` runs the predictor, the
+pipeline venv runs the pipeline. Do not merge them — torch 1.5 and its 2022 pins in the pipeline
+venv would be much harder to undo than to keep apart.
+
 ## 4. Pass two — ingest what the tools produced  *(on the remote node)*
 
 ```bash
@@ -306,10 +435,19 @@ What each line tells you:
 
 ## 5. Record it
 
-Definition of done on issue #10 asks for a measured full-proteome runtime, which is still
-outstanding. When a provider run completes, put its wall-clock time and the
-`membrane_flag_source` histogram in the follow-up issue and in
-[02c](02c-m2-functional-annotation.md#measured-behaviour), next to the heuristic's numbers.
+For each run, four things belong in the run notes, because none of them can be reconstructed
+afterwards from the outputs alone:
+
+- **Wall-clock per provider**, and which hardware. "DeepTMHMM 6m45s" means nothing without
+  "530 sequences, one V100".
+- **Tool and database versions.** `run.json` captures the InterProScan path and version
+  automatically; the member database versions and the DeepTMHMM package version do not capture
+  themselves.
+- **The `confidence` and `membrane_flag_source` histograms.** These are what let the report say
+  how much of the annotation is a real prediction and how much is the fallback heuristic.
+- **Whether any sequences left the building.** The BioLib cloud path sends them to a third
+  party; the local install does not. For a blinded or embargoed genome that distinction belongs
+  in the methods section, not in someone's memory.
 
 ## Failure modes worth knowing before you start
 
