@@ -19,6 +19,9 @@ from .pdb_evidence import SequenceHit
 MIN_EVALUE = 1e-5
 MIN_QUERY_COVERAGE = 0.5
 
+#: Bump with any weight change, alongside a dated row in docs/02a-m2-pdb-evidence.md.
+WEIGHTS_VERSION = "2026-09-16"
+
 WEIGHTS = {
     "pdb_evidence": 0.40,
     "virulence_amr": 0.20,

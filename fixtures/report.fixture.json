@@ -1,0 +1,748 @@
+{
+  "schema_version": "0.1.0",
+  "run": {
+    "run_id": "fixture-mgen-g37",
+    "created_at": "2026-09-17T14:00:00Z",
+    "schema_version": "0.1.0",
+    "input_file": "fixtures/genomes/mgen_G37/mgen_G37.faa",
+    "tool_versions": {
+      "s2f": "0.1.0",
+      "rcsb_search": "v2",
+      "string": "12.0",
+      "alphafold_db": "v6"
+    },
+    "seeds": {},
+    "caps": {
+      "triage_top_n": 50
+    },
+    "modules": {
+      "m1": {
+        "status": "fixture"
+      },
+      "m2": {
+        "status": "real",
+        "elapsed_seconds": 63.0
+      }
+    },
+    "note": "M1/M2 sections are trimmed from a real G37 run; M3-M6 sections are illustrative."
+  },
+  "genome": {
+    "taxonomy": "Mycoplasmoides genitalium G37",
+    "taxon_id": 243273,
+    "genome_id": "243273.25",
+    "closest_genomes": [],
+    "tree_newick": null,
+    "cga_job_id": null
+  },
+  "proteins": [
+    {
+      "feature_id": "fig|243273.25.peg.503",
+      "locus_tag": "MG_438",
+      "product": "hypothetical protein",
+      "aa_length": null,
+      "xrefs": {
+        "uniprot": "Q49434",
+        "uniparc": null,
+        "route": "proteome_checksum",
+        "afdb": "AF-Q49434-F1",
+        "pdb": [
+          "1YDX"
+        ],
+        "chembl_target": [],
+        "refseq": [],
+        "gene_name": null,
+        "related_uniprot": []
+      },
+      "annotations": [
+        {
+          "source": "rcsb_sequence",
+          "hit": "1YDX_1",
+          "description": "type I restriction enzyme specificity protein MG438",
+          "identity": 1.0,
+          "coverage": 1.0,
+          "evalue": 1.968e-253,
+          "retrieved_at": "2026-09-17T14:20:00Z"
+        },
+        {
+          "source": "uniprot",
+          "hit": "Q49434",
+          "description": null,
+          "retrieved_at": "2026-09-17T14:20:00Z"
+        }
+      ],
+      "flags": {
+        "virulence": false,
+        "amr": false,
+        "essential_ortholog": false,
+        "human_homolog": false,
+        "human_homolog_identity": null,
+        "secreted": null,
+        "membrane": null,
+        "experimental_homolog": {
+          "pdb_entity": "1YDX_1",
+          "identity": 1.0,
+          "coverage": 1.0,
+          "resolution": 2.3,
+          "method": "X-ray",
+          "holo": false,
+          "ligands": []
+        },
+        "predicted_model": {
+          "source": "afdb",
+          "entry_id": "AF-Q49434-F1",
+          "mean_plddt": 94.0,
+          "confidence_band": "very high",
+          "coverage": 1.0,
+          "usable_for_docking": true,
+          "reason": "mean pLDDT 94.0 (very high)",
+          "url": "https://alphafold.ebi.ac.uk/files/AF-Q49434-F1-model_v6.cif"
+        }
+      },
+      "triage": {
+        "score": 0.65,
+        "components": {
+          "pdb_evidence": 0.875,
+          "virulence_amr": 0.0,
+          "essential": 0.0,
+          "drug_target": 0.0,
+          "annotation_gap": 1.0,
+          "human_homolog_penalty": 0.0
+        },
+        "weights_version": "2026-09-16",
+        "rank": 1,
+        "selected": true,
+        "reason": "PDB 1YDX_1 identity 100%, coverage 100%, 2.30 A; uncharacterized product"
+      }
+    },
+    {
+      "feature_id": "fig|243273.25.peg.172",
+      "locus_tag": "MG_150",
+      "product": "SSU ribosomal protein S10p (S20e)",
+      "aa_length": null,
+      "xrefs": {
+        "uniprot": "P47396",
+        "uniparc": null,
+        "route": "proteome_checksum",
+        "afdb": "AF-P47396-F1",
+        "pdb": [
+          "7P6Z"
+        ],
+        "chembl_target": [],
+        "refseq": [],
+        "gene_name": "rpsJ",
+        "related_uniprot": []
+      },
+      "annotations": [
+        {
+          "source": "rcsb_sequence",
+          "hit": "7P6Z_40",
+          "description": "30S ribosomal protein S10",
+          "identity": 0.932,
+          "coverage": 0.9811,
+          "evalue": 3.167e-57,
+          "retrieved_at": "2026-09-17T14:20:00Z"
+        },
+        {
+          "source": "uniprot",
+          "hit": "P47396",
+          "description": "rpsJ",
+          "retrieved_at": "2026-09-17T14:20:00Z"
+        }
+      ],
+      "flags": {
+        "virulence": true,
+        "amr": true,
+        "essential_ortholog": true,
+        "human_homolog": false,
+        "human_homolog_identity": null,
+        "secreted": null,
+        "membrane": null,
+        "experimental_homolog": {
+          "pdb_entity": "7P6Z_40",
+          "identity": 0.932,
+          "coverage": 0.9811,
+          "resolution": 3.5,
+          "method": "EM",
+          "holo": false,
+          "ligands": []
+        },
+        "predicted_model": {
+          "source": "afdb",
+          "entry_id": "AF-P47396-F1",
+          "mean_plddt": 89.88,
+          "confidence_band": "confident",
+          "coverage": 1.0,
+          "usable_for_docking": true,
+          "reason": "mean pLDDT 89.88 (confident)",
+          "url": "https://alphafold.ebi.ac.uk/files/AF-P47396-F1-model_v6.cif"
+        }
+      },
+      "triage": {
+        "score": 0.627177,
+        "components": {
+          "pdb_evidence": 0.692943,
+          "virulence_amr": 1.0,
+          "essential": 1.0,
+          "drug_target": 0.0,
+          "annotation_gap": 0.0,
+          "human_homolog_penalty": 0.0
+        },
+        "weights_version": "2026-09-16",
+        "rank": 3,
+        "selected": true,
+        "reason": "PDB 7P6Z_40 identity 93%, coverage 98%, 3.50 A; virulence/AMR; essential-gene ortholog"
+      }
+    },
+    {
+      "feature_id": "fig|243273.25.peg.97",
+      "locus_tag": "MG_087",
+      "product": "SSU ribosomal protein S12p (S23e)",
+      "aa_length": null,
+      "xrefs": {
+        "uniprot": "P47333",
+        "uniparc": null,
+        "route": "proteome_checksum",
+        "afdb": "AF-P47333-F1",
+        "pdb": [
+          "7P6Z"
+        ],
+        "chembl_target": [],
+        "refseq": [],
+        "gene_name": "rpsL",
+        "related_uniprot": []
+      },
+      "annotations": [
+        {
+          "source": "rcsb_sequence",
+          "hit": "7P6Z_38",
+          "description": "30S ribosomal protein S12",
+          "identity": 0.956,
+          "coverage": 1.0,
+          "evalue": 6.449e-82,
+          "retrieved_at": "2026-09-17T14:20:00Z"
+        },
+        {
+          "source": "uniprot",
+          "hit": "P47333",
+          "description": "rpsL",
+          "retrieved_at": "2026-09-17T14:20:00Z"
+        }
+      ],
+      "flags": {
+        "virulence": true,
+        "amr": true,
+        "essential_ortholog": true,
+        "human_homolog": true,
+        "human_homolog_identity": 50.0,
+        "secreted": null,
+        "membrane": null,
+        "experimental_homolog": {
+          "pdb_entity": "7P6Z_38",
+          "identity": 0.956,
+          "coverage": 1.0,
+          "resolution": 3.5,
+          "method": "EM",
+          "holo": false,
+          "ligands": []
+        },
+        "predicted_model": {
+          "source": "afdb",
+          "entry_id": "AF-P47333-F1",
+          "mean_plddt": 94.56,
+          "confidence_band": "very high",
+          "coverage": 1.0,
+          "usable_for_docking": true,
+          "reason": "mean pLDDT 94.56 (very high)",
+          "url": "https://alphafold.ebi.ac.uk/files/AF-P47333-F1-model_v6.cif"
+        }
+      },
+      "triage": {
+        "score": 0.513267,
+        "components": {
+          "pdb_evidence": 0.720667,
+          "virulence_amr": 1.0,
+          "essential": 1.0,
+          "drug_target": 0.0,
+          "annotation_gap": 0.0,
+          "human_homolog_penalty": 0.5
+        },
+        "weights_version": "2026-09-16",
+        "rank": 39,
+        "selected": true,
+        "reason": "PDB 7P6Z_38 identity 96%, coverage 100%, 3.50 A; virulence/AMR; essential-gene ortholog; human homolog 50% identity (penalty)"
+      }
+    },
+    {
+      "feature_id": "fig|243273.25.peg.106",
+      "locus_tag": "MG_096",
+      "product": "hypothetical protein",
+      "aa_length": null,
+      "xrefs": {
+        "uniprot": "P47342",
+        "uniparc": null,
+        "route": "proteome_checksum",
+        "afdb": "AF-P47342-F1",
+        "pdb": [],
+        "chembl_target": [],
+        "refseq": [],
+        "gene_name": null,
+        "related_uniprot": []
+      },
+      "annotations": [
+        {
+          "source": "uniprot",
+          "hit": "P47342",
+          "description": null,
+          "retrieved_at": "2026-09-17T14:20:00Z"
+        }
+      ],
+      "flags": {
+        "virulence": false,
+        "amr": false,
+        "essential_ortholog": false,
+        "human_homolog": false,
+        "human_homolog_identity": null,
+        "secreted": null,
+        "membrane": null,
+        "experimental_homolog": null,
+        "predicted_model": {
+          "source": "afdb",
+          "entry_id": "AF-P47342-F1",
+          "mean_plddt": 80.25,
+          "confidence_band": "confident",
+          "coverage": 1.0,
+          "usable_for_docking": true,
+          "reason": "mean pLDDT 80.25 (confident)",
+          "url": "https://alphafold.ebi.ac.uk/files/AF-P47342-F1-model_v6.cif"
+        }
+      },
+      "triage": {
+        "score": 0.3,
+        "components": {
+          "pdb_evidence": 0.0,
+          "virulence_amr": 0.0,
+          "essential": 0.0,
+          "drug_target": 0.0,
+          "annotation_gap": 1.0,
+          "human_homolog_penalty": 0.0
+        },
+        "weights_version": "2026-09-16",
+        "rank": 170,
+        "selected": false,
+        "reason": "no qualifying PDB hit; uncharacterized product"
+      }
+    },
+    {
+      "feature_id": "fig|243273.25.peg.105",
+      "locus_tag": "MG_095",
+      "product": "putative lipoprotein",
+      "aa_length": null,
+      "xrefs": {
+        "uniprot": "P47341",
+        "uniparc": null,
+        "route": "proteome_checksum",
+        "afdb": "AF-P47341-F1",
+        "pdb": [],
+        "chembl_target": [],
+        "refseq": [],
+        "gene_name": null,
+        "related_uniprot": []
+      },
+      "annotations": [
+        {
+          "source": "uniprot",
+          "hit": "P47341",
+          "description": null,
+          "retrieved_at": "2026-09-17T14:20:00Z"
+        }
+      ],
+      "flags": {
+        "virulence": false,
+        "amr": false,
+        "essential_ortholog": false,
+        "human_homolog": false,
+        "human_homolog_identity": null,
+        "secreted": null,
+        "membrane": null,
+        "experimental_homolog": null,
+        "predicted_model": {
+          "source": "afdb",
+          "entry_id": "AF-P47341-F1",
+          "mean_plddt": 52.56,
+          "confidence_band": "low",
+          "coverage": 1.0,
+          "usable_for_docking": false,
+          "reason": "mean pLDDT 52.56 is low, below 70.0",
+          "url": "https://alphafold.ebi.ac.uk/files/AF-P47341-F1-model_v6.cif"
+        }
+      },
+      "triage": {
+        "score": 0.3,
+        "components": {
+          "pdb_evidence": 0.0,
+          "virulence_amr": 0.0,
+          "essential": 0.0,
+          "drug_target": 0.0,
+          "annotation_gap": 1.0,
+          "human_homolog_penalty": 0.0
+        },
+        "weights_version": "2026-09-16",
+        "rank": 169,
+        "selected": false,
+        "reason": "no qualifying PDB hit; uncharacterized product"
+      }
+    }
+  ],
+  "kg": {
+    "nodes": [
+      {
+        "id": "brc:fig|243273.25.peg.503",
+        "type": "protein",
+        "name": "hypothetical protein",
+        "source": "BV-BRC",
+        "attributes": {
+          "locus_tag": "MG_438",
+          "organism_taxon_id": 243273
+        }
+      },
+      {
+        "id": "string:243273.MG_218",
+        "type": "protein",
+        "name": "hmw2",
+        "source": "STRING"
+      },
+      {
+        "id": "string:243273.MG_184",
+        "type": "protein",
+        "name": "MG_184",
+        "source": "STRING"
+      },
+      {
+        "id": "string:243273.MG_468",
+        "type": "protein",
+        "name": "MG_468",
+        "source": "STRING"
+      },
+      {
+        "id": "string:243273.MG_123",
+        "type": "protein",
+        "name": "MG_123",
+        "source": "STRING"
+      },
+      {
+        "id": "string:243273.MG_316",
+        "type": "protein",
+        "name": "MG_316",
+        "source": "STRING"
+      },
+      {
+        "id": "string:243273.MG_386",
+        "type": "protein",
+        "name": "p200",
+        "source": "STRING"
+      }
+    ],
+    "edges": [
+      {
+        "source_id": "brc:fig|243273.25.peg.503",
+        "target_id": "string:243273.MG_218",
+        "type": "interacts_with",
+        "evidence": {
+          "combined_score": 0.782,
+          "experimental_score": 0,
+          "database_score": 0,
+          "textmining_score": 0,
+          "note": "STRING score is aggregated evidence, not a measured interaction"
+        },
+        "provenance": {
+          "source": "STRING",
+          "source_version": "12.0",
+          "retrieved_at": "2026-09-17T13:25:03.818942+00:00",
+          "method": "interaction_partners",
+          "params": {
+            "identifiers": "MG_438",
+            "species": 243273,
+            "limit": 10,
+            "required_score": 700,
+            "caller_identity": "s2f-m2-kg"
+          }
+        }
+      },
+      {
+        "source_id": "brc:fig|243273.25.peg.503",
+        "target_id": "string:243273.MG_184",
+        "type": "interacts_with",
+        "evidence": {
+          "combined_score": 0.775,
+          "experimental_score": 0,
+          "database_score": 0,
+          "textmining_score": 0.769,
+          "note": "STRING score is aggregated evidence, not a measured interaction"
+        },
+        "provenance": {
+          "source": "STRING",
+          "source_version": "12.0",
+          "retrieved_at": "2026-09-17T13:25:03.818958+00:00",
+          "method": "interaction_partners",
+          "params": {
+            "identifiers": "MG_438",
+            "species": 243273,
+            "limit": 10,
+            "required_score": 700,
+            "caller_identity": "s2f-m2-kg"
+          }
+        }
+      },
+      {
+        "source_id": "brc:fig|243273.25.peg.503",
+        "target_id": "string:243273.MG_468",
+        "type": "interacts_with",
+        "evidence": {
+          "combined_score": 0.773,
+          "experimental_score": 0,
+          "database_score": 0,
+          "textmining_score": 0,
+          "note": "STRING score is aggregated evidence, not a measured interaction"
+        },
+        "provenance": {
+          "source": "STRING",
+          "source_version": "12.0",
+          "retrieved_at": "2026-09-17T13:25:03.818964+00:00",
+          "method": "interaction_partners",
+          "params": {
+            "identifiers": "MG_438",
+            "species": 243273,
+            "limit": 10,
+            "required_score": 700,
+            "caller_identity": "s2f-m2-kg"
+          }
+        }
+      },
+      {
+        "source_id": "brc:fig|243273.25.peg.503",
+        "target_id": "string:243273.MG_123",
+        "type": "interacts_with",
+        "evidence": {
+          "combined_score": 0.773,
+          "experimental_score": 0.198,
+          "database_score": 0,
+          "textmining_score": 0,
+          "note": "STRING score is aggregated evidence, not a measured interaction"
+        },
+        "provenance": {
+          "source": "STRING",
+          "source_version": "12.0",
+          "retrieved_at": "2026-09-17T13:25:03.818968+00:00",
+          "method": "interaction_partners",
+          "params": {
+            "identifiers": "MG_438",
+            "species": 243273,
+            "limit": 10,
+            "required_score": 700,
+            "caller_identity": "s2f-m2-kg"
+          }
+        }
+      },
+      {
+        "source_id": "brc:fig|243273.25.peg.503",
+        "target_id": "string:243273.MG_316",
+        "type": "interacts_with",
+        "evidence": {
+          "combined_score": 0.737,
+          "experimental_score": 0,
+          "database_score": 0,
+          "textmining_score": 0,
+          "note": "STRING score is aggregated evidence, not a measured interaction"
+        },
+        "provenance": {
+          "source": "STRING",
+          "source_version": "12.0",
+          "retrieved_at": "2026-09-17T13:25:03.818972+00:00",
+          "method": "interaction_partners",
+          "params": {
+            "identifiers": "MG_438",
+            "species": 243273,
+            "limit": 10,
+            "required_score": 700,
+            "caller_identity": "s2f-m2-kg"
+          }
+        }
+      },
+      {
+        "source_id": "brc:fig|243273.25.peg.503",
+        "target_id": "string:243273.MG_386",
+        "type": "interacts_with",
+        "evidence": {
+          "combined_score": 0.736,
+          "experimental_score": 0,
+          "database_score": 0,
+          "textmining_score": 0,
+          "note": "STRING score is aggregated evidence, not a measured interaction"
+        },
+        "provenance": {
+          "source": "STRING",
+          "source_version": "12.0",
+          "retrieved_at": "2026-09-17T13:25:03.818978+00:00",
+          "method": "interaction_partners",
+          "params": {
+            "identifiers": "MG_438",
+            "species": 243273,
+            "limit": 10,
+            "required_score": 700,
+            "caller_identity": "s2f-m2-kg"
+          }
+        }
+      }
+    ],
+    "caps": {
+      "max_string_partners_per_protein": 10,
+      "min_string_score": 700,
+      "max_chembl_targets_per_accession": 5,
+      "max_chembl_compounds_per_target": 10
+    }
+  },
+  "structures": [
+    {
+      "feature_id": "fig|243273.25.peg.503",
+      "source": "afdb",
+      "accession": "AF-Q49434-F1",
+      "path": "structures/fig_243273.25.peg.503.cif",
+      "confidence": 94.0,
+      "holo_template": null,
+      "pockets": [
+        {
+          "id": "p1",
+          "residues": [
+            12,
+            15,
+            16,
+            43,
+            47
+          ],
+          "score": 0.81,
+          "method": "p2rank",
+          "aligned_to_known_site": false
+        }
+      ],
+      "usable_for_docking": true,
+      "reason": "mean pLDDT 94.0 (very high)"
+    }
+  ],
+  "ligands": [
+    {
+      "ligand_id": "CHEMBL25",
+      "feature_id": "fig|243273.25.peg.503",
+      "smiles": "CC(=O)Oc1ccccc1C(=O)O",
+      "inchikey": "BSYNRYMUTXBXSQ-UHFFFAOYSA-N",
+      "score": 0.42,
+      "components": {
+        "homolog_identity": 0.38,
+        "potency": 0.6,
+        "approval": 1.0
+      },
+      "provenance": {
+        "source": "ChEMBL",
+        "source_version": "34",
+        "retrieved_at": "2026-09-17T14:20:00Z",
+        "method": "activity",
+        "params": {
+          "pchembl_value__isnull": "false"
+        }
+      }
+    },
+    {
+      "ligand_id": "CHEMBL538163",
+      "feature_id": "fig|243273.25.peg.172",
+      "smiles": null,
+      "inchikey": null,
+      "score": 0.55,
+      "components": {
+        "homolog_identity": 0.376,
+        "potency": 0.65
+      },
+      "provenance": {
+        "source": "ChEMBL",
+        "source_version": "34",
+        "retrieved_at": "2026-09-17T14:20:00Z",
+        "method": "activity",
+        "params": {}
+      }
+    },
+    {
+      "ligand_id": "DECOY-001",
+      "feature_id": "fig|243273.25.peg.503",
+      "smiles": "CCCCCCCC",
+      "inchikey": null,
+      "score": 0.0,
+      "components": {},
+      "control": "decoy",
+      "provenance": {
+        "source": "generated",
+        "source_version": null,
+        "retrieved_at": "2026-09-17T14:20:00Z",
+        "method": "property-matched decoy",
+        "params": {}
+      }
+    }
+  ],
+  "docking": [
+    {
+      "feature_id": "fig|243273.25.peg.503",
+      "ligand_id": "CHEMBL25",
+      "score": -7.2,
+      "engine": "vina",
+      "seed": 42,
+      "exhaustiveness": 8,
+      "pose_path": "docking/peg503_CHEMBL25.pdbqt",
+      "control": null,
+      "note": "ranking within this protein only; not an affinity"
+    },
+    {
+      "feature_id": "fig|243273.25.peg.503",
+      "ligand_id": "DECOY-001",
+      "score": -4.1,
+      "engine": "vina",
+      "seed": 42,
+      "exhaustiveness": 8,
+      "pose_path": "docking/peg503_DECOY-001.pdbqt",
+      "control": "decoy"
+    }
+  ],
+  "analyses": [
+    {
+      "feature_id": "fig|243273.25.peg.503",
+      "method": "p2rank",
+      "parameters": {
+        "version": "2.4"
+      },
+      "result": {
+        "pockets": 1
+      },
+      "confidence": null
+    }
+  ],
+  "disease": {
+    "claims": [
+      {
+        "claim": "Adhesion to host epithelium is mediated by the MgPa adhesin complex.",
+        "evidence_feature_ids": [
+          "fig|243273.25.peg.97"
+        ],
+        "evidence_pmcids": [
+          "PMC0000000"
+        ],
+        "source_type": "genomic inference",
+        "verified": true
+      }
+    ],
+    "strategies": [],
+    "dropped_claims": 0
+  },
+  "report": {
+    "rendered_path": null,
+    "rendered_at": null,
+    "counts": {
+      "proteins": 5
+    }
+  }
+}

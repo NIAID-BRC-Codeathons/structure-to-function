@@ -17,6 +17,8 @@ from pathlib import Path
 
 from ..common.http import CachedJsonClient, JsonCache
 from ..common.ids import IdMapper
+from ..common.io import init_report, read_report, update_proteins, update_section
+from .report_adapter import kg_section, protein_enrichment, seed_proteins
 from .afdb import AlphaFoldClient
 from .kg import KnowledgeGraphBuilder
 from .bvbrc_input import load_input
@@ -31,6 +33,7 @@ from .pdb_evidence import (
 )
 from .score import (
     ANNOTATION_BONUS,
+    WEIGHTS_VERSION,
     LIGAND_BONUS,
     MIN_EVALUE,
     MIN_QUERY_COVERAGE,
@@ -297,6 +300,36 @@ def run(args: argparse.Namespace) -> int:
         for score in ranked:
             status_counts[score.retrieval_status] = status_counts.get(score.retrieval_status, 0) + 1
 
+        if args.report:
+            # The shared contract (00-architecture.md). M1 owns proteins[]; M2 only enriches it,
+            # so seed the list when M1 has not run for this run directory yet.
+            init_report(run_dir, run_dir.name, input_file=str(m1_dir))
+            existing = read_report(run_dir).get("proteins") or []
+            if not existing:
+                update_section(run_dir, "proteins", seed_proteins(proteins))
+            update_proteins(
+                run_dir,
+                {
+                    score.feature_id: protein_enrichment(
+                        score,
+                        xrefs=xrefs_by_id.get(score.feature_id) if args.map_ids else None,
+                        model=(
+                            afdb_by_accession.get(xrefs_by_id[score.feature_id].uniprot)
+                            if args.map_ids
+                            and xrefs_by_id.get(score.feature_id)
+                            and xrefs_by_id[score.feature_id].uniprot
+                            else None
+                        ),
+                        weights_version=WEIGHTS_VERSION,
+                    )
+                    for score in ranked
+                },
+            )
+            if args.kg and kg_summary.get("enabled"):
+                update_section(
+                    run_dir, "kg", kg_section(graph.to_dict(caps=builder.caps()), path=str(kg_path))
+                )
+
         manifest = {
             "module": "m2_pdb_evidence",
             "docs": "docs/02a-m2-pdb-evidence.md",
@@ -409,6 +442,11 @@ def build_parser() -> argparse.ArgumentParser:
         help="resolve UniProt/UniParc/ChEMBL xrefs via s2f.common.ids (issue #3)",
     )
     parser.add_argument("--taxon", type=int, default=0, help="NCBI taxon ID of the genome, for id mapping and STRING")
+    parser.add_argument(
+        "--report",
+        action="store_true",
+        help="also write into runs/<id>/report.json through the shared contract (issue #2)",
+    )
     parser.add_argument(
         "--kg",
         action="store_true",

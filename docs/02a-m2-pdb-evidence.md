@@ -156,7 +156,10 @@ predicted model**, leaving 93 with no structure from either source. Of the 147 u
 proteins with no PDB hit, 58 are covered this way.
 
 A predicted model has no cofactors, metals or ligands (pitfall #2), so `holo_homolog` from the
-PDB side remains the stronger signal for docking.
+PDB side remains the stronger signal for docking. **Experimental evidence outranks a prediction**
+wherever both exist — the precedence order is in
+[00a-data-contract.md](00a-data-contract.md). This is why AlphaFold contributes nothing to the
+triage score: it records what M3 will have to work with, not how good a candidate the protein is.
 
 ## Genome sensitivity of the weights
 
