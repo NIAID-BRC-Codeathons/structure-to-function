@@ -72,6 +72,27 @@ A single `structure_available` boolean would erase the distinction M3 gates on. 
 422 usable predicted models, but only 14 of the top 50 have a ligand-bound experimental homolog —
 and a predicted model has no cofactors or ligands at all (pitfall #2).
 
+**The two axes are not equal, and the order is deliberate: experimental evidence outranks a
+prediction.** Where both exist, use `experimental_homolog`; fall back to `predicted_model` only
+when there is no usable experimental one. Consumers should follow this order rather than deciding
+per module:
+
+1. **Experimental homolog, holo** (`experimental_homolog.holo == true`) — real coordinates with a
+   real ligand in the site. Best available: the site is observed, not inferred, and M3 can
+   transfer it by superposition.
+2. **Experimental homolog, apo** — real coordinates, no ligand. The fold and the pocket geometry
+   are observed; what binds there is not.
+3. **Predicted model, usable** (`predicted_model.usable_for_docking == true`) — a plausible fold
+   with **no cofactors, metals or ligands** (pitfall #2). Docking into it is the weakest link in
+   the whole pipeline, so pair it with a holo template where one exists and flag it where none
+   does.
+4. **Nothing usable** — say so, and let it fail the `usable_for_docking` gate with a reason rather
+   than docking into something unusable.
+
+The triage score already reflects this: `pdb_evidence` carries weight 0.40 while the AlphaFold
+result carries **none**. A protein does not rank higher for having a prediction; the prediction
+only tells M3 whether there is something to work with once the protein is already selected.
+
 ## The fixture
 
 `fixtures/report.fixture.json` — 5 proteins, 1 structure, 3 ligands, 2 docking rows, 1 disease
