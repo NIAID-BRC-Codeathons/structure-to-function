@@ -287,6 +287,11 @@ def genome_section(run: CgaRun, taxon_call: dict[str, Any] | None = None) -> dic
     `closest_genomes` comes from the Minhash call when one was made; CGA's own
     `close_genomes` is empty in practice (docs/01a-cga-coverage.md). The codon-tree
     ingroup is reported separately because it is chosen from sequence, not taxonomy.
+
+    `annotation_route` is `"cga"`: these features describe the *submitted assembly*.
+    The API route writes `"api"` for the same key, where they describe a reference
+    genome for the same organism instead, and gene presence or absence is not a
+    property of the isolate.
     """
     quality = run.annotated.get("quality") or {}
     closest = []
@@ -318,6 +323,12 @@ def genome_section(run: CgaRun, taxon_call: dict[str, Any] | None = None) -> dic
         "tree_ingroup": run.ingroup,
         "tree_newick": run.tree_newick,
         "cga_job_id": str(run.job.get("id")) if run.job.get("id") else None,
+        # Stated, not inferred. The API route sets this to "api"; a consumer asking
+        # `annotation_route == "cga"` used to match nothing at all, because only the
+        # other route declared itself. The renderers' `or ("cga" if cga_job_id ...)`
+        # fallback stays for runs written before this, but it is no longer the only way
+        # to identify a CGA run.
+        "annotation_route": "cga",
         "quality": {
             "genome_quality": run.quality,
             "genome_quality_flags": run.quality_flags,

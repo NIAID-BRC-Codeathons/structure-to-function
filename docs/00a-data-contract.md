@@ -86,6 +86,13 @@ M1's, and so a reader can audit a ranking rather than trusting a number. Code:
 **`annotations[]` requires `source`.** M2 sequence hits, Foldseek (#9) and eggNOG (#10) all write
 here. Without `source`, a TM-score row and a sequence-identity row are indistinguishable.
 
+**`genome.annotation_route` is stated by both M1 routes, never inferred.** `"cga"` means the
+features describe the *submitted assembly*. `"api"` means they describe an already-annotated
+reference genome for the same organism, so gene presence or absence is a property of that
+reference and not of the isolate ([01b-m1-api-mode.md](01b-m1-api-mode.md)). Read the field;
+do not infer the route from `cga_job_id` being present. That inference survives in the two
+report renderers only so that runs written before both routes declared themselves still render.
+
 **Structure evidence has two independent axes**, kept apart in `flags`:
 
 - `experimental_homolog` — PDB hit: identity, coverage, resolution, `holo` (has a real ligand).

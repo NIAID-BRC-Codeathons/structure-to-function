@@ -412,3 +412,34 @@ def test_the_taxonomy_query_actually_selects_genetic_code(
         "real server returns the row without it and the field silently becomes null."
     )
     assert taxonomy["lineage"], "the select-honouring double broke the lineage as well"
+
+
+def test_both_m1_routes_declare_their_own_annotation_route(api_bundle, kp_payload) -> None:
+    """The field that distinguishes the two routes has to be set by *both* of them.
+
+    It was set only by the API route, so `annotation_route == "cga"` matched nothing and
+    anything reading `genome` had to know to fall back to `cga_job_id`. Both report
+    renderers do exactly that (`report_md.py`, `report_html.py`), which is why the
+    asymmetry went unnoticed: the fallback made the output look right. That fallback is
+    kept for runs written before this, but a new run on either route now states its own
+    route rather than leaving it to be inferred.
+    """
+    from pathlib import Path
+
+    from s2f.m1_genome import parse
+    from s2f.m1_genome.collect import genome_section as api_genome_section
+
+    api = api_genome_section(kp_payload["genome"], api_bundle, "explicit genome_id")
+    assert api["annotation_route"] == "api"
+
+    cga_sample = Path(__file__).resolve().parents[1] / "fixtures/m1/cga_sample"
+    cga = parse.genome_section(parse.load_cga(cga_sample))
+    assert cga.get("annotation_route") == "cga", (
+        "the CGA route does not declare `annotation_route`, so nothing reading `genome` "
+        "can positively identify a CGA run -- only infer one from `cga_job_id` being "
+        "present. Both routes must state their own route."
+    )
+    assert api["annotation_route"] != cga["annotation_route"], (
+        "both routes report the same annotation_route, which defeats the point of the "
+        "field: a consumer cannot tell a submitted assembly from a reference genome."
+    )
