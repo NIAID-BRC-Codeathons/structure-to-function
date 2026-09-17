@@ -14,9 +14,12 @@ from __future__ import annotations
 
 import hashlib
 import json
+import os
 import sqlite3
+import tempfile
 import threading
 import time
+from dataclasses import dataclass
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
 from typing import Any
@@ -37,6 +40,15 @@ class HttpError(RuntimeError):
 
 class OfflineCacheMiss(HttpError):
     """Raised when offline mode cannot satisfy a request from the cache."""
+
+
+@dataclass(frozen=True)
+class DownloadedFile:
+    """A downloaded file plus enough metadata to report its provenance."""
+
+    content: bytes
+    retrieved_at: datetime
+    from_cache: bool
 
 
 class JsonCache:
@@ -180,6 +192,44 @@ class CachedJsonClient:
             self.cache.set(namespace, key, body)
         return body
 
+    def get_file(self, namespace: str, url: str, *, cache_dir: str | Path) -> DownloadedFile:
+        """Download a binary file and preserve its original retrieval time.
+
+        Binary files use a small on-disk cache while sharing this client's retry, rate-limit,
+        offline, and user-agent behavior.
+        """
+        key = self.cache_key({"url": url})
+        path = Path(cache_dir) / namespace / key
+        metadata_path = path.with_name(path.name + ".json")
+        if path.exists():
+            retrieved_at = _file_retrieved_at(path, metadata_path)
+            if not metadata_path.exists():
+                _atomic_write_json(
+                    metadata_path,
+                    {"url": url, "retrieved_at": retrieved_at.isoformat()},
+                )
+            return DownloadedFile(path.read_bytes(), retrieved_at, from_cache=True)
+        if self.offline:
+            raise OfflineCacheMiss(f"no cached file for {namespace}:{key[:12]} ({url})")
+
+        response = self._request_with_retry("GET", url)
+        payload = response.content
+        retrieved_at = datetime.now(timezone.utc)
+        _atomic_write_bytes(path, payload)
+        _atomic_write_json(
+            metadata_path,
+            {
+                "url": url,
+                "retrieved_at": retrieved_at.isoformat(),
+                "sha256": hashlib.sha256(payload).hexdigest(),
+            },
+        )
+        return DownloadedFile(payload, retrieved_at, from_cache=False)
+
+    def get_bytes(self, namespace: str, url: str, *, cache_dir: str | Path) -> bytes:
+        """Compatibility wrapper for callers that only need file contents."""
+        return self.get_file(namespace, url, cache_dir=cache_dir).content
+
     def get_envelope(
         self,
         namespace: str,
@@ -295,3 +345,37 @@ def _retry_after_seconds(response: requests.Response) -> float | None:
         return max(0.0, min(float(raw), 60.0))
     except ValueError:
         return None
+
+
+def _file_retrieved_at(path: Path, metadata_path: Path) -> datetime:
+    if metadata_path.exists():
+        try:
+            metadata = json.loads(metadata_path.read_text(encoding="utf-8"))
+            retrieved_at = datetime.fromisoformat(str(metadata["retrieved_at"]))
+            return (
+                retrieved_at
+                if retrieved_at.tzinfo is not None
+                else retrieved_at.replace(tzinfo=timezone.utc)
+            )
+        except (KeyError, TypeError, ValueError, json.JSONDecodeError):
+            pass
+    return datetime.fromtimestamp(path.stat().st_mtime, timezone.utc)
+
+
+def _atomic_write_bytes(path: Path, payload: bytes) -> None:
+    path.parent.mkdir(parents=True, exist_ok=True)
+    handle = tempfile.NamedTemporaryFile("wb", dir=path.parent, prefix=".download-", delete=False)
+    try:
+        with handle:
+            handle.write(payload)
+            handle.flush()
+            os.fsync(handle.fileno())
+        os.replace(handle.name, path)
+    except BaseException:
+        Path(handle.name).unlink(missing_ok=True)
+        raise
+
+
+def _atomic_write_json(path: Path, payload: dict[str, Any]) -> None:
+    data = (json.dumps(payload, sort_keys=True) + "\n").encode("utf-8")
+    _atomic_write_bytes(path, data)
