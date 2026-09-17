@@ -1,4 +1,6 @@
-from s2f.m2_triage.bvbrc_input import Protein, SpecialtyHit
+import pytest
+
+from s2f.m2_triage.bvbrc_input import Protein, SpecialtyHit, same_genus, same_species
 from s2f.m2_triage.pdb_evidence import SequenceHit
 from s2f.m2_triage.score import (
     MAX_HIT_SCORE,
@@ -276,3 +278,64 @@ def test_score_is_still_reproducible_from_the_recorded_components() -> None:
         annotation=FakeAnnotation(membrane=True, membrane_source="deeptmhmm"),
     )
     assert triage_score_from_components(TriageComponents(**scored.components.as_dict())) == scored.score
+
+
+# --- the self-match artifact (@cmmann21 on #12) ----------------------------------------
+
+
+@pytest.mark.parametrize(
+    ("query", "hit", "species", "genus"),
+    [
+        # The genus was renamed: BV-BRC says Mycoplasma, the PDB says Mycoplasmoides.
+        ("Mycoplasma genitalium G37", "Mycoplasmoides genitalium G37", True, True),
+        ("Mycoplasma genitalium G37", "Mycoplasmoides pneumoniae M129", False, True),
+        ("Mycoplasma genitalium G37", "Escherichia coli", False, False),
+        ("Klebsiella pneumoniae HS11286", "Klebsiella pneumoniae", True, True),
+        ("Klebsiella pneumoniae HS11286", "Klebsiella oxytoca", False, True),
+        ("Mycoplasma genitalium G37", "", False, False),
+        ("", "Escherichia coli", False, False),
+    ],
+)
+def test_organism_comparison(query, hit, species, genus) -> None:
+    assert same_species(query, hit) is species
+    assert same_genus(query, hit) is genus
+
+
+def test_a_self_match_is_flagged_not_rescored() -> None:
+    """Our test organism has its own structures in the PDB; a 100% hit can be a self-match."""
+    self_match = score_protein(
+        make_protein(), [make_hit(identity=1.0, organism="Mycoplasmoides genitalium G37")],
+        "found", query_organism="Mycoplasma genitalium G37",
+    )
+    foreign = score_protein(
+        make_protein(), [make_hit(identity=1.0, organism="Escherichia coli")],
+        "found", query_organism="Mycoplasma genitalium G37",
+    )
+
+    assert self_match.flags["same_species_hit"] is True
+    assert foreign.flags["same_species_hit"] is False
+    # The evidence is genuinely the strongest available, so the score is identical: this is a
+    # label for the report, not a penalty.
+    assert self_match.score == foreign.score
+
+    ranked = rank_and_select([self_match], top_n=1)
+    assert "same species" in ranked[0].reason
+    assert "not a cross-organism transfer" in ranked[0].reason
+
+
+def test_same_genus_is_reported_when_species_differs() -> None:
+    relative = score_protein(
+        make_protein(), [make_hit(organism="Mycoplasmoides pneumoniae M129")],
+        "found", query_organism="Mycoplasma genitalium G37",
+    )
+
+    assert relative.flags["same_species_hit"] is False
+    assert relative.flags["same_genus_hit"] is True
+    assert "same genus" in rank_and_select([relative], top_n=1)[0].reason
+
+
+def test_without_a_query_organism_nothing_is_claimed() -> None:
+    scored = score_protein(make_protein(), [make_hit(organism="Escherichia coli")], "found")
+
+    assert scored.flags["same_species_hit"] is False
+    assert scored.flags["same_genus_hit"] is False

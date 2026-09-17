@@ -265,6 +265,34 @@ Without this, a run where DeepTMHMM never ran looks exactly like a genome with n
 proteins. This is the same distinction #10 makes in its own flags, and the same class of bug
 @Ashita2619 found in `no_pdb_hit`.
 
+## The smoke-test genome matches itself
+
+Raised by @cmmann21 on #12, and it changes how the G37 numbers should be read: *M. genitalium*
+**has its own structures in the PDB**, so a 100%-identity "discovery" can be the organism
+matching itself. That is not a cross-organism transfer, and nothing about it will reproduce on a
+novel genome.
+
+Measured on the full G37 run:
+
+| | Top 50 | Whole genome |
+| --- | --- | --- |
+| Best hit is the **same species** | **30** | 34 |
+| Best hit is the **same genus** (mostly *M. pneumoniae*) | **47** | 108 |
+
+So 47 of the 50 selected proteins rest on a hit from the same genus, and 88% of every
+same-species hit in the genome landed in the top 50. The ranking is not wrong — a 100% identity
+hit is the strongest evidence there is — but it is **easy** in a way a blinded or novel genome
+will not be.
+
+`same_species_hit` and `same_genus_hit` are recorded per protein and summarised in `run.json`;
+the protein's `reason` says "not a cross-organism transfer" in words, so M6 can explain why an
+annotation was easy instead of presenting it as a discovery.
+
+**They are flags, not penalties.** The evidence genuinely is the strongest available, so the
+score is unchanged; what changes is what the report is allowed to claim. The operational rule
+that follows: **do not calibrate `WEIGHTS` against this genome**, because the identity
+distribution that produced them does not exist elsewhere.
+
 ## Genome sensitivity of the weights
 
 The weights were tuned on HS11286. They are **not automatically portable**, because the

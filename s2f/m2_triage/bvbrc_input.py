@@ -11,7 +11,7 @@ import csv
 import hashlib
 import json
 import re
-from collections import defaultdict
+from collections import Counter, defaultdict
 from dataclasses import dataclass, field
 from pathlib import Path
 
@@ -167,6 +167,9 @@ class InputBundle:
     """Loaded proteins plus what could not be joined, for the run manifest."""
 
     proteins: list[Protein]
+    #: The query genome's organism, read from the FASTA headers. Used to tell a structural hit
+    #: against our own organism from a genuine cross-organism transfer.
+    organism: str = ""
     specialty_without_protein: list[str] = field(default_factory=list)
     table_rows_without_sequence: list[str] = field(default_factory=list)
     sequences_without_table_row: list[str] = field(default_factory=list)
@@ -265,6 +268,52 @@ FIG_ID = re.compile(r"^(fig\|[^|\s]+)")
 ORGANISM_SUFFIX = re.compile(r"\s*\[[^\]]*\]\s*$")
 
 
+def organism_key(name: str) -> tuple[str, str]:
+    """(genus, species) from an organism name, lowercased and stripped of strain detail.
+
+    Genus names get renamed — BV-BRC writes "Mycoplasma genitalium" where the PDB and UniProt
+    now say "Mycoplasmoides genitalium" — so comparison falls back to the species epithet when
+    the genus disagrees.
+    """
+    tokens = [t for t in re.split(r"[\s_]+", (name or "").strip()) if t]
+    if not tokens:
+        return "", ""
+    genus = tokens[0].lower().rstrip(".,")
+    species = tokens[1].lower().rstrip(".,") if len(tokens) > 1 else ""
+    if species in {"sp", "sp.", "subsp", "subsp."} and len(tokens) > 2:
+        species = tokens[2].lower().rstrip(".,")
+    return genus, species
+
+
+def same_species(query: str, hit: str) -> bool:
+    """Both names denote the same species. Tolerates the genus renaming above."""
+    q_genus, q_species = organism_key(query)
+    h_genus, h_species = organism_key(hit)
+    if not q_species or not h_species:
+        return False
+    if q_species != h_species:
+        return False
+    # Same species epithet: accept when the genus matches, or when one genus name is a
+    # lengthened form of the other (Mycoplasma -> Mycoplasmoides).
+    return q_genus == h_genus or q_genus.startswith(h_genus[:6]) or h_genus.startswith(q_genus[:6])
+
+
+def same_genus(query: str, hit: str) -> bool:
+    q_genus, _ = organism_key(query)
+    h_genus, _ = organism_key(hit)
+    if not q_genus or not h_genus:
+        return False
+    return q_genus == h_genus or q_genus.startswith(h_genus[:6]) or h_genus.startswith(q_genus[:6])
+
+
+def _organism_from_header(header: str) -> str:
+    """`... product [Mycoplasma genitalium G37 | 243273.25]` -> the organism name."""
+    match = re.search(r"\[([^\]]+)\]\s*$", header or "")
+    if not match:
+        return ""
+    return match.group(1).split("|")[0].strip()
+
+
 def _feature_id_from_header(header: str) -> tuple[str, str]:
     """Split a BV-BRC FASTA header into feature ID and product.
 
@@ -313,8 +362,12 @@ def load_input(m1_dir: Path) -> InputBundle:
     proteins: list[Protein] = []
     sequences_without_row: list[str] = []
     seen_ids: set[str] = set()
+    organisms: list[str] = []
     for header, sequence in _read_fasta(fasta_path):
         feature_id, header_product = _feature_id_from_header(header)
+        organism = _organism_from_header(header)
+        if organism:
+            organisms.append(organism)
         if not feature_id or not sequence:
             continue
         if feature_id in seen_ids:
@@ -365,6 +418,7 @@ def load_input(m1_dir: Path) -> InputBundle:
 
     return InputBundle(
         proteins=proteins,
+        organism=(Counter(organisms).most_common(1)[0][0] if organisms else ""),
         specialty_without_protein=specialty_orphans,
         table_rows_without_sequence=sorted(set(by_id) - seen_ids),
         sequences_without_table_row=sequences_without_row,
