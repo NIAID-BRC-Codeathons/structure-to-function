@@ -1,0 +1,6 @@
+## emapper-2.1.12
+## Fixture, not a real eggNOG-mapper run. Column set matches eggNOG-mapper v2.1 output.
+#query	seed_ortholog	evalue	score	eggNOG_OGs	max_annot_lvl	COG_category	Description	Preferred_name	GOs	EC	KEGG_ko	KEGG_Pathway	KEGG_Module	KEGG_Reaction	KEGG_rclass	BRITE	KEGG_TC	CAZy	BiGG_Reaction	PFAMs
+fig|999999.1.peg.1	694009.QHD43416.1	1.2e-90	310.5	COG0000@1|root,COG0000@2|Bacteria	2	S	Spike receptor-binding domain	spike	GO:0019062,GO:0046813	-	-	-	-	-	-	-	-	-	-	bCoV_S1_RBD
+fig|999999.1.peg.2	9606.ENSP00000000001	3.0e-45	160.2	COG3757@1|root	1	M	Lysozyme C, hydrolyses peptidoglycan	LYZ	GO:0003796,GO:0009253	3.2.1.17	ko:K01185	ko00520	-	-	-	-	-	-	-	Lys
+fig|999999.1.peg.3	243273.MG_045	8.0e-12	60.1	COG1234@1|root,COG1234@2|Bacteria	2	U	Putative membrane permease	-	GO:0016020,GO:0055085	-	ko:K02003	-	-	-	-	-	-	-	-	ABC_membrane

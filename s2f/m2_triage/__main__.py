@@ -22,6 +22,20 @@ from .report_adapter import kg_section, protein_enrichment, seed_proteins
 from .afdb import AlphaFoldClient
 from .kg import KnowledgeGraphBuilder
 from .bvbrc_input import load_input
+from .function import (
+    FLAG_COLUMNS,
+    InterProScanInstall,
+    UniProtFunctionClient,
+    annotate,
+    discover_interproscan,
+    parse_deeptmhmm,
+    parse_eggnog,
+    parse_interproscan,
+    parse_psortb,
+    parse_signalp6,
+    run_interproscan,
+    write_terms_tsv,
+)
 from .pdb_evidence import (
     EVALUE_CUTOFF,
     GRAPHQL_URL,
@@ -136,6 +150,105 @@ def _hit_rows(feature_id: str, hits, scorer) -> list[dict[str, object]]:
     return rows
 
 
+# Provider outputs the dry run reads, so --dry-run exercises the parsers and not only the
+# built-in heuristic. Real runs pass explicit paths.
+FIXTURE_ANNOTATION = {
+    "eggnog": "eggnog.emapper.annotations",
+    "deeptmhmm": "deeptmhmm.TMRs.gff3",
+    "signalp": "signalp6_prediction_results.txt",
+    "psortb": "psortb_terse.txt",
+    "interproscan": "interproscan.tsv",
+}
+
+ANNOTATION_PARSERS = {
+    "eggnog": parse_eggnog,
+    "deeptmhmm": parse_deeptmhmm,
+    "signalp": parse_signalp6,
+    "psortb": parse_psortb,
+    "interproscan": parse_interproscan,
+}
+
+
+def _protein_fasta(m1_dir: Path) -> Path | None:
+    candidate = m1_dir / "proteins.faa"
+    if candidate.exists():
+        return candidate
+    matches = sorted(m1_dir.glob("*.faa"))
+    return matches[0] if matches else None
+
+
+def _load_annotation_providers(
+    args: argparse.Namespace, m1_dir: Path, out_dir: Path
+) -> tuple[dict[str, dict], object, list[str]]:
+    """Resolve each provider's output file, parsing what exists and saying what did not.
+
+    ``--interproscan auto`` looks for an installation (PATH, $INTERPROSCAN_HOME, the usual
+    install directories) and runs it over the proteome when one is there; without one the
+    module carries on with the other providers rather than failing.
+    """
+    notes: list[str] = []
+    paths = {
+        "eggnog": args.eggnog,
+        "deeptmhmm": args.deeptmhmm,
+        "signalp": args.signalp,
+        "psortb": args.psortb,
+        "interproscan": args.interproscan,
+    }
+    # Discovery executes `interproscan.sh --version`, so only look when asked to.
+    install = (
+        discover_interproscan([args.interproscan_path] if args.interproscan_path else [])
+        if (paths["interproscan"] == "auto" or args.interproscan_path)
+        else InterProScanInstall(error="not requested")
+    )
+
+    if paths["interproscan"] == "auto":
+        fasta = _protein_fasta(m1_dir)
+        if fasta is None:
+            notes.append("interproscan auto: no protein FASTA to scan")
+            paths["interproscan"] = ""
+        elif install.available:
+            notes.append(f"interproscan {install.version or 'unknown version'} at {install.path} ({install.found_via})")
+            produced, error = run_interproscan(
+                install,
+                fasta,
+                out_dir / "interproscan.tsv",
+                applications=args.interproscan_appl,
+                cpus=args.workers,
+            )
+            paths["interproscan"] = str(produced) if produced else ""
+            if error:
+                notes.append(f"interproscan run failed: {error}")
+        else:
+            notes.append(f"interproscan auto: {install.error}")
+            paths["interproscan"] = ""
+
+    if args.dry_run:
+        for key, name in FIXTURE_ANNOTATION.items():
+            if not paths[key]:
+                candidate = FIXTURE_DIR / "annotation" / name
+                if candidate.exists():
+                    paths[key] = str(candidate)
+
+    parsed: dict[str, dict] = {}
+    for key, value in paths.items():
+        if not value:
+            continue
+        path = Path(value)
+        if not path.exists():
+            notes.append(f"{key}: {path} does not exist, skipped")
+            continue
+        try:
+            parsed[key] = ANNOTATION_PARSERS[key](path)
+        except Exception as exc:  # noqa: BLE001 - an add-on must never lose the triage output
+            notes.append(f"{key}: failed to parse {path} — {type(exc).__name__}: {exc}")
+            continue
+        if not parsed[key]:
+            # Parsed without error and produced nothing: almost always a format the parser did
+            # not recognise. Silence here would look like "the tool found nothing".
+            notes.append(f"{key}: {path} parsed to zero records — check the file format")
+    return parsed, install, notes
+
+
 def run(args: argparse.Namespace) -> int:
     from .score import hit_score  # local import keeps the module import list readable
 
@@ -215,6 +328,38 @@ def run(args: argparse.Namespace) -> int:
                 (x.uniprot for x in xrefs_by_id.values() if x.uniprot), workers=args.workers
             )
 
+        # Functional annotation (issue #10). Flags only: the score components stay exactly as
+        # they were, so this cannot move the selection (pitfall #12). Wiring surface/membrane
+        # into the weights belongs to issue #12 with its own change-log row.
+        annotation_run = None
+        if args.annotate:
+            parsed, ipr_install, annotation_notes = _load_annotation_providers(args, m1_dir, out_dir)
+            uniprot_results: dict[str, object] = {}
+            uniprot_client: UniProtFunctionClient | None = None
+            if args.uniprot_function:
+                if not args.map_ids:
+                    annotation_notes.append("--uniprot-function needs --map-ids for accessions; skipped")
+                else:
+                    uniprot_client = UniProtFunctionClient(client)
+                    uniprot_results = uniprot_client.lookup_many(
+                        [(fid, x.uniprot) for fid, x in xrefs_by_id.items() if x.uniprot],
+                        workers=args.workers,
+                    )
+            annotation_run = annotate(
+                proteins,
+                eggnog=parsed.get("eggnog"),
+                deeptmhmm=parsed.get("deeptmhmm"),
+                signalp=parsed.get("signalp"),
+                psortb=parsed.get("psortb"),
+                interproscan=parsed.get("interproscan"),
+                uniprot=uniprot_results,
+                use_heuristic=not args.no_heuristic,
+                aliases={fid: [x.uniprot] for fid, x in xrefs_by_id.items() if x.uniprot},
+            )
+            annotation_run.interproscan = ipr_install
+            annotation_run.uniprot_failures = uniprot_client.failures if uniprot_client else []
+            annotation_run.notes = annotation_notes
+
         ranked = rank_and_select(scores, top_n=args.top)
 
         kg_summary: dict[str, object] = {"enabled": False}
@@ -291,6 +436,15 @@ def run(args: argparse.Namespace) -> int:
                         "afdb_cif_url": model.cif_url if model else "",
                     }
                 )
+        terms_written = 0
+        if annotation_run is not None:
+            columns += FLAG_COLUMNS
+            for row in protein_rows:
+                annotation = annotation_run.annotations.get(row["feature_id"])
+                if annotation is not None:
+                    row.update(annotation.flag_row())
+            terms_written = write_terms_tsv(out_dir / "function_terms.tsv", annotation_run.annotations)
+
         _write_tsv(out_dir / "proteins.tsv", columns, protein_rows)
         _write_tsv(out_dir / "hits.tsv", HIT_COLUMNS, hit_rows)
         _write_tsv(out_dir / f"top{args.top}.tsv", columns, [r for r in protein_rows if r["selected"]])
@@ -318,6 +472,11 @@ def run(args: argparse.Namespace) -> int:
                             if args.map_ids
                             and xrefs_by_id.get(score.feature_id)
                             and xrefs_by_id[score.feature_id].uniprot
+                            else None
+                        ),
+                        functional=(
+                            annotation_run.annotations.get(score.feature_id)
+                            if annotation_run is not None
                             else None
                         ),
                         weights_version=WEIGHTS_VERSION,
@@ -402,6 +561,11 @@ def run(args: argparse.Namespace) -> int:
                 else {"enabled": False}
             ),
             "knowledge_graph": kg_summary,
+            "functional_annotation": (
+                {"enabled": True, "terms_written": terms_written, **annotation_run.summary()}
+                if annotation_run is not None
+                else {"enabled": False}
+            ),
             "failures": {
                 "search": [
                     {"sequence_sha256": digest, "error": result.error}
@@ -451,6 +615,40 @@ def build_parser() -> argparse.ArgumentParser:
         "--kg",
         action="store_true",
         help="assemble the capped knowledge subgraph for selected proteins (issue #11)",
+    )
+    group = parser.add_argument_group(
+        "functional annotation (issue #10)",
+        "See docs/02c-m2-functional-annotation.md for how to produce each provider's output.",
+    )
+    group.add_argument(
+        "--annotate",
+        action="store_true",
+        help="add function, localization and membrane flags to every protein",
+    )
+    group.add_argument("--eggnog", default="", help="eggNOG-mapper *.emapper.annotations file")
+    group.add_argument("--deeptmhmm", default="", help="DeepTMHMM TMRs.gff3 file")
+    group.add_argument("--signalp", default="", help="SignalP 6 prediction_results.txt file")
+    group.add_argument("--psortb", default="", help="PSORTb output (terse or long format)")
+    group.add_argument(
+        "--interproscan",
+        default="",
+        help="InterProScan TSV/JSON output, or 'auto' to find a local install and run it",
+    )
+    group.add_argument(
+        "--interproscan-path", default="", help="path to interproscan.sh, if discovery misses it"
+    )
+    group.add_argument(
+        "--interproscan-appl", default="", help="value for InterProScan's -appl (default: all)"
+    )
+    group.add_argument(
+        "--uniprot-function",
+        action="store_true",
+        help="fetch curated function and topology from UniProt (needs --map-ids)",
+    )
+    group.add_argument(
+        "--no-heuristic",
+        action="store_true",
+        help="do not fall back to the built-in sequence heuristic; leave flags unset instead",
     )
     return parser
 
