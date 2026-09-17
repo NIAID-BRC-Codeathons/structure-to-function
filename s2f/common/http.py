@@ -144,8 +144,20 @@ class CachedJsonClient:
             self.cache.set(namespace, key, body)
         return body
 
-    def get_json(self, namespace: str, url: str, params: dict[str, Any] | None = None) -> dict[str, Any]:
-        """GET with the same cache, retry and offline semantics as post_json."""
+    def get_json(
+        self,
+        namespace: str,
+        url: str,
+        params: dict[str, Any] | None = None,
+        *,
+        allow_statuses: tuple[int, ...] = (),
+    ) -> dict[str, Any]:
+        """GET with the same cache, retry and offline semantics as post_json.
+
+        ``allow_statuses`` names statuses that are a legitimate answer rather than a failure —
+        an AlphaFold 404 means "no model for this accession", not "the request broke". Those
+        come back as ``{"_http_status": <code>}`` and are cached, since they are stable answers.
+        """
         params = dict(params or {})
         key = self.cache_key({"url": url, "params": params})
         if self.cache is not None:
@@ -155,8 +167,11 @@ class CachedJsonClient:
         if self.offline:
             raise OfflineCacheMiss(f"no cached response for {namespace}:{key[:12]} ({url})")
 
-        response = self._request_with_retry("GET", url, params=params)
-        body = response.json() if response.content else {}
+        response = self._request_with_retry("GET", url, params=params, allow_statuses=allow_statuses)
+        if not response.ok:
+            body: dict[str, Any] = {"_http_status": response.status_code}
+        else:
+            body = response.json() if response.content else {}
         if self.cache is not None:
             self.cache.set(namespace, key, body)
         return body
@@ -181,6 +196,7 @@ class CachedJsonClient:
         *,
         json: dict[str, Any] | None = None,
         params: dict[str, Any] | None = None,
+        allow_statuses: tuple[int, ...] = (),
     ) -> requests.Response:
         last_error: str = ""
         for attempt in range(self.max_attempts):
@@ -196,6 +212,8 @@ class CachedJsonClient:
                 if response.status_code == 204:
                     return response
                 if response.ok:
+                    return response
+                if response.status_code in allow_statuses:
                     return response
                 last_error = f"HTTP {response.status_code}: {response.text[:200]}"
                 if response.status_code not in RETRY_STATUS:

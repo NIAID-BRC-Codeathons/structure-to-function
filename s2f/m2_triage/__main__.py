@@ -17,6 +17,7 @@ from pathlib import Path
 
 from ..common.http import CachedJsonClient, JsonCache
 from ..common.ids import IdMapper
+from .afdb import AlphaFoldClient
 from .kg import KnowledgeGraphBuilder
 from .bvbrc_input import load_input
 from .pdb_evidence import (
@@ -58,8 +59,12 @@ PROTEIN_COLUMNS = [
     "pdb_hit_organism", "uniprot_of_best_hit", "selected", "reason", "error",
 ]
 
-# Added only when --map-ids runs; see s2f/common/ids.py (issue #3).
-XREF_COLUMNS = ["uniprot", "uniprot_route", "uniparc", "gene_name", "chembl", "xref_note"]
+# Added only when --map-ids runs; see s2f/common/ids.py (issue #3) and afdb.py (issue #8).
+XREF_COLUMNS = [
+    "uniprot", "uniprot_route", "uniparc", "gene_name", "chembl", "xref_note",
+    "afdb_status", "afdb_entry", "afdb_plddt", "afdb_confidence", "afdb_coverage",
+    "afdb_usable", "afdb_reason", "afdb_cif_url",
+]
 
 
 def _write_tsv(path: Path, columns: list[str], rows: list[dict[str, object]]) -> None:
@@ -200,6 +205,13 @@ def run(args: argparse.Namespace) -> int:
             ]
             xrefs_by_id = mapper.map_many(requests_, workers=args.workers)
 
+            # AlphaFold DB is keyed by UniProt accession, so it rides on the mapping step.
+            # M3 must not re-fold what already exists (03-m3-fold.md).
+            afdb = AlphaFoldClient(client)
+            afdb_by_accession = afdb.lookup_many(
+                (x.uniprot for x in xrefs_by_id.values() if x.uniprot), workers=args.workers
+            )
+
         ranked = rank_and_select(scores, top_n=args.top)
 
         kg_summary: dict[str, object] = {"enabled": False}
@@ -256,6 +268,8 @@ def run(args: argparse.Namespace) -> int:
             columns += XREF_COLUMNS
             for row in protein_rows:
                 xrefs = xrefs_by_id.get(row["feature_id"])
+                model = afdb_by_accession.get(xrefs.uniprot) if xrefs and xrefs.uniprot else None
+                usable, reason = model.usable_for_docking() if model else (False, "not queried")
                 row.update(
                     {
                         "uniprot": xrefs.uniprot or "" if xrefs else "",
@@ -264,6 +278,14 @@ def run(args: argparse.Namespace) -> int:
                         "gene_name": (xrefs.gene_name or "") if xrefs else "",
                         "chembl": ";".join(xrefs.chembl) if xrefs else "",
                         "xref_note": xrefs.note if xrefs else "",
+                        "afdb_status": model.status if model else "not-queried",
+                        "afdb_entry": model.entry_id if model else "",
+                        "afdb_plddt": model.mean_plddt if model else "",
+                        "afdb_confidence": model.confidence_band if model else "",
+                        "afdb_coverage": model.coverage if model and model.coverage is not None else "",
+                        "afdb_usable": usable,
+                        "afdb_reason": reason,
+                        "afdb_cif_url": model.cif_url if model else "",
                     }
                 )
         _write_tsv(out_dir / "proteins.tsv", columns, protein_rows)
@@ -326,6 +348,21 @@ def run(args: argparse.Namespace) -> int:
                     "routes": {
                         route: sum(1 for x in xrefs_by_id.values() if x.route == route)
                         for route in sorted({x.route for x in xrefs_by_id.values()})
+                    },
+                    "alphafold": {
+                        "accessions_queried": len(afdb_by_accession),
+                        "status": {
+                            status: sum(1 for m in afdb_by_accession.values() if m.status == status)
+                            for status in sorted({m.status for m in afdb_by_accession.values()})
+                        },
+                        "confidence_band": {
+                            band: sum(1 for m in afdb_by_accession.values() if m.confidence_band == band)
+                            for band in sorted({m.confidence_band for m in afdb_by_accession.values() if m.found})
+                        },
+                        "usable_for_docking": sum(
+                            1 for m in afdb_by_accession.values() if m.usable_for_docking()[0]
+                        ),
+                        "failures": len(afdb.failures),
                     },
                 }
                 if args.map_ids

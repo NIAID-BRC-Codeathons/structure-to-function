@@ -134,6 +134,30 @@ All proteins are ranked and kept. The top N (default 50, per issue #24) get `sel
 Every protein carries `reason`, including discarded ones. Selection is reproducible from the
 recorded components alone: `triage_score` is recomputed from `proteins.tsv` columns in a test.
 
+## AlphaFold DB (issue #8)
+
+`--map-ids` also looks up AlphaFold DB by the resolved UniProt accession, so M3 does not re-fold
+what already exists (`03-m3-fold.md`). Two numbers are recorded, because "a model exists" is not
+enough on its own:
+
+- **Confidence** — mean pLDDT with AlphaFold's own bands (>90 very high, 70–90 confident,
+  50–70 low, <50 very low). A pocket in a low-confidence region is not a pocket.
+- **Coverage** — a prediction may cover only a fragment of the accession. SARS-CoV-2 orf1ab
+  (7,096 aa) returns a high-confidence model for residues 1368–1493, which is 2% of the protein.
+  `afdb_usable` therefore gates on pLDDT ≥ 70 **and** coverage ≥ 80%, and `afdb_reason` says
+  which one failed.
+
+API behaviour: 200 with a list = found, 404 = no model (e.g. titin), 400 = malformed accession.
+A 404 is an answer, not a failure, and is recorded as `no-model`.
+
+On G37: 476 accessions queried, all with models — 226 very high, 196 confident, 44 low, 10 very
+low; **422 usable**. More useful for M3, of the 206 proteins with no PDB hit, **113 have a usable
+predicted model**, leaving 93 with no structure from either source. Of the 147 uncharacterized
+proteins with no PDB hit, 58 are covered this way.
+
+A predicted model has no cofactors, metals or ligands (pitfall #2), so `holo_homolog` from the
+PDB side remains the stronger signal for docking.
+
 ## Genome sensitivity of the weights
 
 The weights were tuned on HS11286. They are **not automatically portable**, because the
