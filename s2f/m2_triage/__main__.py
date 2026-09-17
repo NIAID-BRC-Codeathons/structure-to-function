@@ -15,7 +15,8 @@ import time
 from datetime import UTC, datetime
 from pathlib import Path
 
-from ._http import CachedJsonClient, JsonCache
+from ..common.http import CachedJsonClient, JsonCache
+from ..common.ids import IdMapper
 from .bvbrc_input import load_input
 from .pdb_evidence import (
     EVALUE_CUTOFF,
@@ -55,6 +56,9 @@ PROTEIN_COLUMNS = [
     "human_homolog_identity", "transporter", "metal_resistance", "no_pdb_hit",
     "pdb_hit_organism", "uniprot_of_best_hit", "selected", "reason", "error",
 ]
+
+# Added only when --map-ids runs; see s2f/common/ids.py (issue #3).
+XREF_COLUMNS = ["uniprot", "uniprot_route", "uniparc", "gene_name", "chembl", "xref_note"]
 
 
 def _write_tsv(path: Path, columns: list[str], rows: list[dict[str, object]]) -> None:
@@ -176,17 +180,47 @@ def run(args: argparse.Namespace) -> int:
                     "pgfam": protein.pgfam,
                 }
 
+        xrefs_by_id: dict[str, object] = {}
+        mapper: IdMapper | None = None
+        if args.map_ids:
+            # One mapper for the whole pipeline (pitfall #11): this module never maps its own IDs.
+            mapper = IdMapper(client, taxon_id=args.taxon or None)
+            by_feature = {p.feature_id: p for p in proteins}
+            requests_ = [
+                {
+                    "feature_id": score.feature_id,
+                    "sequence": by_feature[score.feature_id].sequence,
+                    "locus_tag": by_feature[score.feature_id].locus_tag or None,
+                    "pdb_hit_uniprot_ids": (
+                        score.best_hit.uniprot_ids if score.best_hit is not None else ()
+                    ),
+                }
+                for score in scores
+            ]
+            xrefs_by_id = mapper.map_many(requests_, workers=args.workers)
+
         ranked = rank_and_select(scores, top_n=args.top)
 
         protein_rows = [_protein_row(score, meta_by_id.get(score.feature_id, {})) for score in ranked]
-        _write_tsv(out_dir / "proteins.tsv", PROTEIN_COLUMNS, protein_rows)
+        columns = list(PROTEIN_COLUMNS)
+        if args.map_ids:
+            columns += XREF_COLUMNS
+            for row in protein_rows:
+                xrefs = xrefs_by_id.get(row["feature_id"])
+                row.update(
+                    {
+                        "uniprot": xrefs.uniprot or "" if xrefs else "",
+                        "uniprot_route": xrefs.route if xrefs else "",
+                        "uniparc": (xrefs.uniparc or "") if xrefs else "",
+                        "gene_name": (xrefs.gene_name or "") if xrefs else "",
+                        "chembl": ";".join(xrefs.chembl) if xrefs else "",
+                        "xref_note": xrefs.note if xrefs else "",
+                    }
+                )
+        _write_tsv(out_dir / "proteins.tsv", columns, protein_rows)
         _write_tsv(out_dir / "hits.tsv", HIT_COLUMNS, hit_rows)
-        _write_tsv(out_dir / f"top{args.top}.tsv", PROTEIN_COLUMNS, [r for r in protein_rows if r["selected"]])
-        _write_tsv(
-            out_dir / "no_pdb_hit.tsv",
-            PROTEIN_COLUMNS,
-            [r for r in protein_rows if r["no_pdb_hit"]],
-        )
+        _write_tsv(out_dir / f"top{args.top}.tsv", columns, [r for r in protein_rows if r["selected"]])
+        _write_tsv(out_dir / "no_pdb_hit.tsv", columns, [r for r in protein_rows if r["no_pdb_hit"]])
 
         status_counts: dict[str, int] = {}
         for score in ranked:
@@ -234,6 +268,20 @@ def run(args: argparse.Namespace) -> int:
                 "table_rows_without_sequence": len(bundle.table_rows_without_sequence),
                 "sequences_without_table_row": len(bundle.sequences_without_table_row),
             },
+            "id_mapping": (
+                {
+                    "enabled": True,
+                    "taxon_id": args.taxon or None,
+                    "mapped": sum(1 for x in xrefs_by_id.values() if x.mapped),
+                    "unmapped": sum(1 for x in xrefs_by_id.values() if not x.mapped),
+                    "routes": {
+                        route: sum(1 for x in xrefs_by_id.values() if x.route == route)
+                        for route in sorted({x.route for x in xrefs_by_id.values()})
+                    },
+                }
+                if args.map_ids
+                else {"enabled": False}
+            ),
             "failures": {
                 "search": [
                     {"sequence_sha256": digest, "error": result.error}
@@ -241,6 +289,7 @@ def run(args: argparse.Namespace) -> int:
                     if result.status == "query-failed"
                 ],
                 "metadata": pdb.metadata_failures,
+                "id_mapping": mapper.failures if mapper is not None else [],
             },
         }
         (out_dir / "run.json").write_text(json.dumps(manifest, indent=2) + "\n", encoding="utf-8")
@@ -267,6 +316,12 @@ def build_parser() -> argparse.ArgumentParser:
     parser.add_argument("--cache", default="", help="override the SQLite cache path")
     parser.add_argument("--offline", action="store_true", help="replay from cache; never call the network")
     parser.add_argument("--dry-run", action="store_true", help="run from fixtures/m2 with no network")
+    parser.add_argument(
+        "--map-ids",
+        action="store_true",
+        help="resolve UniProt/UniParc/ChEMBL xrefs via s2f.common.ids (issue #3)",
+    )
+    parser.add_argument("--taxon", type=int, default=0, help="NCBI taxon ID of the genome, for id mapping")
     return parser
 
 

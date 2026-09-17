@@ -12,11 +12,18 @@ weights below were written before the first full run.** Any later change gets a 
 
 ## Status
 
-Standalone prototype. `s2f/common/` (issues #2, #4) does not exist yet, so this module reads
-M1-shaped files directly and writes its own TSV/JSON. When the schema lands, an adapter maps the
-output into `proteins[].xrefs`, `annotations[]`, `flags` and `triage`. No ID mapping is invented
-here (pitfall #11): RCSB sequence search needs no UniProt accession, which is what lets this
-slice run before #3.
+Standalone prototype for the `report.json` contract: `common/schema.py` and `common/io.py`
+(issue #2) do not exist yet, so this module reads M1-shaped files directly and writes its own
+TSV/JSON. When the schema lands, an adapter maps the output into `proteins[].xrefs`,
+`annotations[]`, `flags` and `triage`.
+
+Two shared pieces now live in `s2f/common/` rather than in this module:
+
+- `common/http.py` (issue #4) — the cached, retrying HTTP client every outbound call uses.
+  Provenance stamping, the other half of that issue, is still open.
+- `common/ids.py` (issue #3) — identifier mapping. This module maps nothing itself
+  (pitfall #11); `--map-ids` calls the shared helper. RCSB sequence search needs no UniProt
+  accession, which is why the PDB half could run before the mapper existed.
 
 ## Input contract
 

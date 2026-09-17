@@ -11,7 +11,7 @@ from concurrent.futures import ThreadPoolExecutor
 from dataclasses import dataclass, field
 from typing import Any, Iterable
 
-from ._http import CachedJsonClient, HttpError
+from ..common.http import CachedJsonClient, HttpError
 
 SEARCH_URL = "https://search.rcsb.org/rcsbsearch/v2/query"
 GRAPHQL_URL = "https://data.rcsb.org/graphql"

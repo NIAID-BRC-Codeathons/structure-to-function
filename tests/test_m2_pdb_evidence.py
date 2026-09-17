@@ -7,7 +7,7 @@ import json
 import pytest
 import requests
 
-from s2f.m2_triage._http import CachedJsonClient, HttpError, JsonCache, OfflineCacheMiss
+from s2f.common.http import CachedJsonClient, HttpError, JsonCache, OfflineCacheMiss
 from s2f.m2_triage.pdb_evidence import (
     PdbEvidenceClient,
     SequenceHit,

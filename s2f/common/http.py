@@ -1,9 +1,13 @@
-"""Cached HTTP with retry and polite rate limiting.
+"""Cached HTTP with retry and polite rate limiting (issue #4).
 
-Temporary stand-in for ``s2f/common/http.py`` (issue #4). When that ships, this module is
-deleted and the client takes the shared one. Cache and retry behaviour are adapted from
-``AutoPDB/src/autopdb/cache.py`` and ``rcsb.py`` (separate MIT-licensed repository by the same
-author), kept here rather than imported so this repo has no cross-repo dependency.
+Every outbound call in the pipeline should go through this client so responses are cached on
+disk, failures are retried, and a run can be replayed offline. Cache and retry behaviour are
+adapted from ``AutoPDB/src/autopdb/cache.py`` and ``rcsb.py`` (a separate MIT-licensed
+repository by the same author), kept here rather than imported so this repo has no cross-repo
+dependency.
+
+Provenance stamping (the other half of #4) is not here yet; records currently carry their own
+source fields.
 """
 
 from __future__ import annotations
@@ -19,7 +23,7 @@ from typing import Any
 
 import requests
 
-USER_AGENT = "s2f-m2/0.1 (NIAID-BRC Codeathon Project 9; +https://github.com/NIAID-BRC-Codeathons/structure-to-function)"
+USER_AGENT = "s2f/0.1 (NIAID-BRC Codeathon Project 9; +https://github.com/NIAID-BRC-Codeathons/structure-to-function)"
 RETRY_STATUS = {429, 500, 502, 503, 504}
 
 
@@ -140,6 +144,23 @@ class CachedJsonClient:
             self.cache.set(namespace, key, body)
         return body
 
+    def get_json(self, namespace: str, url: str, params: dict[str, Any] | None = None) -> dict[str, Any]:
+        """GET with the same cache, retry and offline semantics as post_json."""
+        params = dict(params or {})
+        key = self.cache_key({"url": url, "params": params})
+        if self.cache is not None:
+            cached = self.cache.get(namespace, key, max_age=None if self.offline else self.max_age)
+            if cached is not None:
+                return cached
+        if self.offline:
+            raise OfflineCacheMiss(f"no cached response for {namespace}:{key[:12]} ({url})")
+
+        response = self._request_with_retry("GET", url, params=params)
+        body = response.json() if response.content else {}
+        if self.cache is not None:
+            self.cache.set(namespace, key, body)
+        return body
+
     def _throttle(self) -> None:
         if self.min_interval_seconds <= 0:
             return
@@ -151,11 +172,24 @@ class CachedJsonClient:
             self._last_request = time.monotonic()
 
     def _post_with_retry(self, url: str, payload: dict[str, Any]) -> requests.Response:
+        return self._request_with_retry("POST", url, json=payload)
+
+    def _request_with_retry(
+        self,
+        method: str,
+        url: str,
+        *,
+        json: dict[str, Any] | None = None,
+        params: dict[str, Any] | None = None,
+    ) -> requests.Response:
         last_error: str = ""
         for attempt in range(self.max_attempts):
             self._throttle()
             try:
-                response = self.session.post(url, json=payload, timeout=self.timeout_seconds)
+                if method == "POST":
+                    response = self.session.post(url, json=json, timeout=self.timeout_seconds)
+                else:
+                    response = self.session.get(url, params=params, timeout=self.timeout_seconds)
             except requests.RequestException as exc:
                 last_error = f"{type(exc).__name__}: {exc}"
             else:
@@ -165,14 +199,14 @@ class CachedJsonClient:
                     return response
                 last_error = f"HTTP {response.status_code}: {response.text[:200]}"
                 if response.status_code not in RETRY_STATUS:
-                    raise HttpError(f"POST {url} failed — {last_error}")
+                    raise HttpError(f"{method} {url} failed — {last_error}")
                 retry_after = _retry_after_seconds(response)
                 if retry_after is not None:
                     self._sleep(retry_after)
                     continue
             if attempt < self.max_attempts - 1:
                 self._sleep(min(2.0**attempt, 8.0))
-        raise HttpError(f"POST {url} failed after {self.max_attempts} attempts — {last_error}")
+        raise HttpError(f"{method} {url} failed after {self.max_attempts} attempts — {last_error}")
 
 
 def _retry_after_seconds(response: requests.Response) -> float | None:

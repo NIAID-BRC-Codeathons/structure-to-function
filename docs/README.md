@@ -11,6 +11,7 @@ NIAID-BRCs AI Codeathon 2.0 · Argonne National Laboratory · Sept 16–18, 2026
 | [00-architecture.md](00-architecture.md) | Always, before writing code. Data contract, repo layout, ID and provenance rules. |
 | [pipeline.md](pipeline.md) | Choosing a tool or database for a step. |
 | [pitfalls.md](pitfalls.md) | Before trusting any result, and before designing a scoring or docking step. |
+| [common-ids.md](common-ids.md) | Mapping any identifier — feature_id, UniProt, PDB, ChEMBL. Never write your own mapping. |
 | [07-decisions-and-risks.md](07-decisions-and-risks.md) | Open decisions, thread dependencies, non-negotiables. |
 
 ## Modules
