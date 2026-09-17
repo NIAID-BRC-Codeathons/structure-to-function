@@ -91,6 +91,7 @@ PROTEIN_COLUMNS = [
     "best_coverage", "best_resolution", "best_method", "qualifying_hits", "distinct_entries",
     "has_ligand_in_entry", "holo_homolog", "metals_in_entry", "human_pdb_hit",
     "human_homolog_identity", "close_human_homolog", "human_homolog_source", "essential_source",
+    "same_species_hit", "same_genus_hit",
     "foldseek_status", "foldseek_hit", "foldseek_description", "foldseek_evalue",
     "foldseek_identity", "foldseek_coverage", "foldseek_informative",
     "transporter", "metal_resistance", "no_pdb_hit", "pdb_search_failed",
@@ -502,6 +503,7 @@ def run(args: argparse.Namespace) -> int:
                             if annotation_run is not None
                             else None
                         ),
+                        query_organism=args.organism or bundle.organism,
                     )
                 )
                 hit_rows.extend(_hit_rows(protein.feature_id, hits, hit_score))
@@ -781,6 +783,24 @@ def run(args: argparse.Namespace) -> int:
                 }
                 for name in OPTIONAL_COMPONENTS
             },
+            "query_organism": args.organism or bundle.organism,
+            # How much of the ranking rests on our own organism already being in the PDB. On a
+            # novel genome this is 0; on the smoke-test genome it is most of the top of the list.
+            "same_organism_hits": {
+                "same_species_in_top_n": sum(
+                    1 for s_ in ranked if s_.selected and s_.flags.get("same_species_hit")
+                ),
+                "same_species_total": sum(1 for s_ in ranked if s_.flags.get("same_species_hit")),
+                "same_genus_in_top_n": sum(
+                    1 for s_ in ranked if s_.selected and s_.flags.get("same_genus_hit")
+                ),
+                "same_genus_total": sum(1 for s_ in ranked if s_.flags.get("same_genus_hit")),
+                "note": (
+                    "A hit against our own organism or genus is not a cross-organism transfer. "
+                    "Weights calibrated on a genome with its own PDB structures will not carry "
+                    "to a novel one."
+                ),
+            },
             "components_nonzero": {
                 name: sum(1 for s_ in ranked if s_.components.as_dict().get(name))
                 for name in WEIGHTS
@@ -874,6 +894,11 @@ def build_parser() -> argparse.ArgumentParser:
         "--map-ids",
         action="store_true",
         help="resolve UniProt/UniParc/ChEMBL xrefs via s2f.common.ids (issue #3)",
+    )
+    parser.add_argument(
+        "--organism",
+        default="",
+        help="query organism name; read from the FASTA headers when not given",
     )
     parser.add_argument("--taxon", type=int, default=0, help="NCBI taxon ID of the genome, for id mapping and STRING")
     parser.add_argument(

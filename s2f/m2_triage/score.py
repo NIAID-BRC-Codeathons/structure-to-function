@@ -13,7 +13,7 @@ from __future__ import annotations
 from dataclasses import asdict, dataclass, field
 from typing import Any
 
-from .bvbrc_input import Protein
+from .bvbrc_input import Protein, same_genus, same_species
 from .pdb_evidence import SequenceHit
 
 # Scoring gates for a hit to count as evidence at all.
@@ -156,6 +156,7 @@ def score_protein(
     essential: bool | None = None,
     essential_source: str = "",
     annotation: Any = None,
+    query_organism: str = "",
 ) -> ProteinScore:
     """Score one protein from its PDB hits and M1 specialty rows.
 
@@ -231,6 +232,12 @@ def score_protein(
         "pdb_hit_organism": top.organism if top else "",
         "human_pdb_hit": bool(top and top.taxonomy_id == HUMAN_TAXONOMY_ID),
         "uniprot_of_best_hit": ";".join(top.uniprot_ids) if top else "",
+        # A hit against our own organism is not a cross-organism transfer: the test genome has
+        # its own structures in the PDB, so a 100% identity "discovery" can be a self-match
+        # (raised by @cmmann21 on #12). Recorded, never scored differently — but M6 must be able
+        # to say why an annotation was easy.
+        "same_species_hit": bool(top and query_organism and same_species(query_organism, top.organism)),
+        "same_genus_hit": bool(top and query_organism and same_genus(query_organism, top.organism)),
     }
 
     return ProteinScore(
@@ -281,6 +288,10 @@ def _reason(score: ProteinScore) -> str:
         parts.append("predicted membrane protein (penalty)")
     if score.components.human_homolog_penalty:
         parts.append(f"human homolog {score.components.human_homolog_penalty:.0%} identity (penalty)")
+    if score.flags.get("same_species_hit"):
+        parts.append("best structural hit is the same species — not a cross-organism transfer")
+    elif score.flags.get("same_genus_hit"):
+        parts.append("best structural hit is the same genus")
     if score.flags.get("antibiotic_target_not_resistance"):
         parts.append("antibiotic target in a susceptible species, not a resistance gene")
     return "; ".join(parts)
