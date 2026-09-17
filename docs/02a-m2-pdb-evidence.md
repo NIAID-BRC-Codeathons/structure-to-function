@@ -200,6 +200,33 @@ costs 0.16. A separate `close_human_homolog` flag marks ≥ 40% identity — tha
 state as a selectivity risk and M4 should read for scaffold borrowing, because "has a human
 homolog at 22% identity" is not a risk worth reporting.
 
+## Essentiality, transferred from relatives (issue #29)
+
+Same problem as human homology: BV-BRC's `Essential Gene` rows come from flux-balance analysis on
+**public** genomes. The public G37 record has 148; a fresh CGA run has none.
+
+`--essentiality --essentiality-keyword <genus>` builds a reference set of FBA-essential proteins
+from public relatives and transfers essentiality by orthology: DIAMOND `--very-sensitive`,
+**≥ 40% identity and ≥ 70% query coverage**, the conventional bar for functional transfer between
+bacteria. Every call records which relative genome and what identity justified it.
+
+**Fetch the whole reference set.** Capping it costs recall, measured against G37's 148 known
+essential genes:
+
+| Reference proteins | Genomes | Calls | Agreement with the public record |
+| --- | --- | --- | --- |
+| 5,000 (capped) | 95 | 131 | 113 of 148 |
+| **12,742 (all)** | **96** | **169** | **148 of 148** |
+
+The first fetch takes ~95 s and is cached; the alignment itself is ~1 s. The 21 extra calls are
+proteins with strong orthologs to essential genes in relatives that the public G37 record does
+not list — plausible, and each one names its source so a reviewer can check it.
+
+**What the call means, and does not.** FBA essentiality is a metabolic model's prediction that
+deleting the gene stops growth *in silico*. Transferring it by homology adds a second inference on
+top. Both are recorded, `evidence` stays `FBA`, and the annotation note says plainly that this is
+not an experimental knockout. That matters when M6 writes the report.
+
 ## Genome sensitivity of the weights
 
 The weights were tuned on HS11286. They are **not automatically portable**, because the
@@ -243,5 +270,6 @@ Written to `runs/<run_id>/m2_pdb/`:
 | --- | --- | --- |
 | 2026-09-16 | Initial weights, before any full run. | Written from the component list in `02-m2-triage.md` and what the HS11286 specialty export actually provides. |
 | 2026-09-16 | `pdb_evidence` normalized by 1.20 instead of clipped at 1.0. Weights unchanged. | A 10-protein smoke run put two different-quality hits (raw 1.09 and 1.043) at an identical 0.40, because clipping discards the bonus range exactly where ranking matters. Found before any full run. |
+| 2026-09-17 | `essential` now comes from orthology to FBA-essential proteins in public relatives, not BV-BRC's precomputed rows. Weight unchanged at 0.15. | Same reason as the human-homolog change: those rows exist for public genomes only (issue #29). Recovers 148 of G37's 148 known essential genes, plus 21 more that each name their source relative and identity. |
 | 2026-09-17 | `human_homolog_penalty` now comes from our own DIAMOND search, not BV-BRC's precomputed rows. Weight unchanged at −0.25. | Those rows exist for public genomes only, so on a blinded genome the penalty never fired (issue #29). The source change is larger than it sounds: 153 G37 proteins now carry a penalty where the public record listed 5. Ranking is barely affected — between penalising everything and penalising nothing, at most 5 of the top 50 change — but the recorded evidence is now ours and reproducible. |
 | 2026-09-16 | `annotation_gap` 0.10 → 0.30. **Changed after seeing the first full run** (pitfall #12 — recorded here rather than left implicit). | The HS11286 run selected 0 uncharacterized proteins out of 1,338 (best rank 57), because a known target collects 0.50 from virulence/essential/drug-target while a hypothetical can earn 0.10. That contradicts the project's purpose. Sensitivity over the recorded components: 0.20 → 6/50, 0.25 → 9/50, **0.30 → 10/50**, 0.35 → 15/50, 0.40 → 26/50. 0.30 admits 10, every one with a PDB hit and 8 with a ligand-bound homolog, while keeping 40 characterized targets as the validation set. Decision: project lead, 2026-09-16. |

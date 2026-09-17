@@ -139,6 +139,8 @@ def score_protein(
     *,
     human_identity: float | None = None,
     human_homolog_source: str = "",
+    essential: bool | None = None,
+    essential_source: str = "",
 ) -> ProteinScore:
     """Score one protein from its PDB hits and M1 specialty rows.
 
@@ -153,10 +155,13 @@ def score_protein(
     if human_identity is None:
         human_identity = protein.human_homolog_identity
         human_homolog_source = human_homolog_source or "bvbrc_specialty"
+    if essential is None:
+        essential = protein.is_essential_ortholog
+        essential_source = essential_source or "bvbrc_specialty"
     components = TriageComponents(
         pdb_evidence=round(pdb_evidence, 6),
         virulence_amr=1.0 if protein.has_virulence_or_amr else 0.0,
-        essential=1.0 if protein.is_essential_ortholog else 0.0,
+        essential=1.0 if essential else 0.0,
         drug_target=1.0 if protein.is_drug_target else 0.0,
         annotation_gap=1.0 if protein.is_uncharacterized else 0.0,
         human_homolog_penalty=round(human_identity / 100.0, 6) if human_identity else 0.0,
@@ -174,6 +179,7 @@ def score_protein(
             human_identity is not None and human_identity >= CLOSE_HUMAN_HOMOLOG_IDENTITY
         ),
         "human_homolog_source": human_homolog_source or "",
+        "essential_source": essential_source or "",
         "no_pdb_hit": not qualifying,
         "pdb_hit_organism": top.organism if top else "",
         "human_pdb_hit": bool(top and top.taxonomy_id == HUMAN_TAXONOMY_ID),

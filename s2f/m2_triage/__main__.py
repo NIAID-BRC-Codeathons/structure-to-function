@@ -22,6 +22,8 @@ from .report_adapter import kg_section, protein_enrichment, seed_proteins
 from .afdb import AlphaFoldClient
 from .human_homology import DEFAULT_MIN_COVERAGE, DiamondMissing, fetch_human_proteome
 from .human_homology import search as human_homology_search
+from .essentiality import DEFAULT_REFERENCE_LIMIT, fetch_reference_set
+from .essentiality import search as essentiality_search
 from .kg import KnowledgeGraphBuilder
 from .bvbrc_input import load_input
 from .pdb_evidence import (
@@ -60,7 +62,7 @@ PROTEIN_COLUMNS = [
     "human_homolog_penalty", "retrieval_status", "best_entity_id", "best_identity",
     "best_coverage", "best_resolution", "best_method", "qualifying_hits", "distinct_entries",
     "has_ligand_in_entry", "holo_homolog", "metals_in_entry", "human_pdb_hit",
-    "human_homolog_identity", "close_human_homolog", "human_homolog_source",
+    "human_homolog_identity", "close_human_homolog", "human_homolog_source", "essential_source",
     "transporter", "metal_resistance", "no_pdb_hit",
     "pdb_hit_organism", "uniprot_of_best_hit", "selected", "reason", "error",
 ]
@@ -194,6 +196,29 @@ def run(args: argparse.Namespace) -> int:
                 human_summary = {"enabled": False, "error": str(exc)}
                 print(f"Warning: human-homology search skipped — {exc}")
 
+        essential_calls = {}
+        essentiality_summary: dict[str, object] = {"enabled": False}
+        if args.essentiality:
+            # BV-BRC's FBA essentiality exists for public genomes only, so transfer it from
+            # public relatives and record which one justified each call (issue #29).
+            try:
+                reference = fetch_reference_set(
+                    client, keyword=args.essentiality_keyword, limit=args.essentiality_limit
+                )
+                found = essentiality_search(
+                    [(p.feature_id, p.sequence) for p in proteins],
+                    reference,
+                    reference_query=args.essentiality_keyword,
+                    min_identity=args.essentiality_min_identity,
+                    min_coverage=args.essentiality_min_coverage,
+                    threads=args.workers,
+                )
+                essential_calls = found.calls
+                essentiality_summary = {"enabled": True, **found.summary()}
+            except (DiamondMissing, RuntimeError, OSError) as exc:
+                essentiality_summary = {"enabled": False, "error": str(exc)}
+                print(f"Warning: essentiality transfer skipped — {exc}")
+
         scores: list[ProteinScore] = []
         hit_rows: list[dict[str, object]] = []
         meta_by_id: dict[str, dict[str, str]] = {}
@@ -212,6 +237,14 @@ def run(args: argparse.Namespace) -> int:
                         error=error if status == "query-failed" else "",
                         human_identity=(human.identity if human is not None and human.counted else None),
                         human_homolog_source="diamond_human_proteome" if human is not None else "",
+                        essential=(
+                            essential_calls[protein.feature_id].essential
+                            if protein.feature_id in essential_calls
+                            else None
+                        ),
+                        essential_source=(
+                            "ortholog_of_fba_essential" if protein.feature_id in essential_calls else ""
+                        ),
                     )
                 )
                 hit_rows.extend(_hit_rows(protein.feature_id, hits, hit_score))
@@ -434,6 +467,7 @@ def run(args: argparse.Namespace) -> int:
                 else {"enabled": False}
             ),
             "human_homology": human_summary,
+            "essentiality": essentiality_summary,
             "knowledge_graph": kg_summary,
             "failures": {
                 "search": [
@@ -491,6 +525,19 @@ def build_parser() -> argparse.ArgumentParser:
         default=DEFAULT_MIN_COVERAGE,
         help="minimum query coverage for a hit to count as a homolog",
     )
+    parser.add_argument(
+        "--essentiality",
+        action="store_true",
+        help="transfer FBA essentiality from public relatives by orthology (issue #29)",
+    )
+    parser.add_argument(
+        "--essentiality-keyword",
+        default="",
+        help="genus or species selecting the public relatives, e.g. Mycoplasma",
+    )
+    parser.add_argument("--essentiality-limit", type=int, default=DEFAULT_REFERENCE_LIMIT)
+    parser.add_argument("--essentiality-min-identity", type=float, default=40.0)
+    parser.add_argument("--essentiality-min-coverage", type=float, default=0.7)
     parser.add_argument(
         "--report",
         action="store_true",
