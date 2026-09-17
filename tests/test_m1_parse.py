@@ -168,3 +168,14 @@ class TestUploadSafety:
         monkeypatch.setattr(cga, "remote_size", lambda path: None)
         with pytest.raises(cga.CgaError, match="left nothing"):
             cga.upload(local, "/someone@bvbrc/home/s2f")
+
+
+def test_cga_files_that_are_not_valid_utf8_still_parse(tmp_path):
+    """A real USA300 sp_gene.json carried a 0xa0 byte (Latin-1 NBSP) and broke a
+    strict UTF-8 read. BV-BRC's encoding is not guaranteed; the parser must cope."""
+    from s2f.m1_genome.parse import _load_json, _read_text
+
+    path = tmp_path / "sp_gene.json"
+    path.write_bytes(b'[{"gene": "mecA", "product": "penicillin\xa0binding protein"}]')
+    assert "binding protein" in _read_text(path)
+    assert _load_json(path)[0]["gene"] == "mecA"
