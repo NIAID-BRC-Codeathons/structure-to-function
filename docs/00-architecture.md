@@ -49,7 +49,7 @@ Rules:
 
 - Protein amino-acid sequences live in `proteins.faa`, not in JSON. JSON holds IDs and a `faa_offset` if useful.
 - Writes go through `common.io.update_section(run_dir, key, obj)`: read, replace one key, write temp file, atomic rename. Never hand-edit a live `report.json`.
-- `schema.py` holds JSON Schema for each section plus `validate(section, obj)`. CI runs it; a module that fails validation is broken, not the schema.
+- `schema.py` holds JSON Schema for each section plus `validate(section, obj)`. CI runs it; a module that fails validation is broken, not the schema. Implemented in `s2f/common/schema.py` and `s2f/common/io.py` — see [00a-data-contract.md](00a-data-contract.md) (issue #2).
 - Schema changes are announced in the group channel and bumped in `schema_version`; fixtures update in the same commit.
 
 ## Identity
