@@ -4,6 +4,23 @@ Companion to [02-m2-triage.md](02-m2-triage.md), covering M2 step 4 (`annotate_f
 Issue [#10](https://github.com/NIAID-BRC-Codeathons/structure-to-function/issues/10).
 Implemented in `s2f/m2_triage/function.py`.
 
+## Status — issue #10 stays open
+
+Both definition-of-done items are met: `flags.secreted` and `flags.membrane` are set for every
+protein, and a full-proteome runtime is measured (`02d-remote-runbook.md`). Two of the four
+providers in the issue's scope have been run for real — InterProScan and DeepTMHMM. The issue
+stays open for the rest:
+
+| Outstanding | Why it matters |
+| --- | --- |
+| **SignalP 6** | `secreted` is the weaker of the two required flags. The heuristic's signal-peptide call measures at MCC 0.41 (below), and `lipoprotein` — which vetoes `secreted` — is unvalidated because DeepTMHMM cannot set it. SignalP 6 fixes both: it calls signal peptides properly and emits `LIPO(Sec/SPII)` directly. Licensed download, then `pip install`. |
+| **eggNOG-mapper** | 95 of 530 proteins in the reference run have no function terms. eggNOG assigns by orthology rather than domain signature, so it reaches exactly the hypotheticals InterProScan misses — which are the proteins triage cares most about. |
+| **PSORTb** | Deliberately not run on *M. genitalium*: no cell wall, no outer membrane, so neither the Gram-negative nor Gram-positive model applies and it would return confident localizations for compartments the organism lacks. Worth running if the target genome changes. |
+| **`--uniprot-function`** | Written against the documented UniProtKB REST v2 shape and verified field-by-field against two entries, but never executed against the live API. The one code path here with no real-world exercise. |
+
+Nothing above blocks M3 or M4: the flags exist, they are labelled with their source, and
+`run.json` reports how many rest on the fallback.
+
 The acceptance check is "`flags.secreted` and `flags.membrane` set for every protein". The
 second requirement is the one that shapes the design: **the flag has to carry the evidence that
 produced it.** Pitfall #3 deprioritizes membrane proteins explicitly rather than silently, and a
