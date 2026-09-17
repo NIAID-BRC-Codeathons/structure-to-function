@@ -17,6 +17,7 @@ from pathlib import Path
 
 from ..common.http import CachedJsonClient, JsonCache
 from ..common.ids import IdMapper
+from .kg import KnowledgeGraphBuilder
 from .bvbrc_input import load_input
 from .pdb_evidence import (
     EVALUE_CUTOFF,
@@ -201,6 +202,54 @@ def run(args: argparse.Namespace) -> int:
 
         ranked = rank_and_select(scores, top_n=args.top)
 
+        kg_summary: dict[str, object] = {"enabled": False}
+        if args.kg:
+            selected = [score for score in ranked if score.selected]
+            builder = KnowledgeGraphBuilder(client, taxon_id=args.taxon or None)
+            by_feature = {p.feature_id: p for p in proteins}
+            kg_input = []
+            for score in selected:
+                protein = by_feature[score.feature_id]
+                top = score.best_hit
+                homologs = []
+                if top is not None:
+                    # The PDB hit's accessions are the homolog's, carrying the identity that
+                    # justifies anything transferred from it (pitfall #4).
+                    for accession in top.uniprot_ids:
+                        homologs.append(
+                            {
+                                "accession": accession,
+                                "identity": round(top.identity * 100, 1),
+                                "coverage": round(top.query_coverage, 4),
+                                "organism": top.organism,
+                                "via": f"PDB sequence hit {top.entity_id}",
+                                "name": top.description,
+                            }
+                        )
+                kg_input.append(
+                    {
+                        "feature_id": score.feature_id,
+                        "locus_tag": protein.locus_tag,
+                        "product": protein.product,
+                        "homologs": homologs,
+                        "human_homolog_identity": protein.human_homolog_identity,
+                    }
+                )
+            graph = builder.build(kg_input)
+            kg_path = out_dir / "kg.json"
+            kg_path.write_text(
+                json.dumps(graph.to_dict(caps=builder.caps()), indent=2) + "\n", encoding="utf-8"
+            )
+            kg_summary = {
+                "enabled": True,
+                "proteins": len(kg_input),
+                "path": str(kg_path),
+                "caps": builder.caps(),
+                "source_versions": graph.source_versions,
+                "failures": len(graph.failures),
+                **graph.summary(),
+            }
+
         protein_rows = [_protein_row(score, meta_by_id.get(score.feature_id, {})) for score in ranked]
         columns = list(PROTEIN_COLUMNS)
         if args.map_ids:
@@ -282,6 +331,7 @@ def run(args: argparse.Namespace) -> int:
                 if args.map_ids
                 else {"enabled": False}
             ),
+            "knowledge_graph": kg_summary,
             "failures": {
                 "search": [
                     {"sequence_sha256": digest, "error": result.error}
@@ -321,7 +371,12 @@ def build_parser() -> argparse.ArgumentParser:
         action="store_true",
         help="resolve UniProt/UniParc/ChEMBL xrefs via s2f.common.ids (issue #3)",
     )
-    parser.add_argument("--taxon", type=int, default=0, help="NCBI taxon ID of the genome, for id mapping")
+    parser.add_argument("--taxon", type=int, default=0, help="NCBI taxon ID of the genome, for id mapping and STRING")
+    parser.add_argument(
+        "--kg",
+        action="store_true",
+        help="assemble the capped knowledge subgraph for selected proteins (issue #11)",
+    )
     return parser
 
 
