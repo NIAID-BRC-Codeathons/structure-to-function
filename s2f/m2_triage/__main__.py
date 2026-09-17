@@ -12,7 +12,7 @@ import argparse
 import csv
 import json
 import time
-from datetime import UTC, datetime
+from datetime import datetime, timezone
 from pathlib import Path
 
 from ..common.http import CachedJsonClient, JsonCache
@@ -144,7 +144,7 @@ def run(args: argparse.Namespace) -> int:
     out_dir = run_dir / "m2_pdb"
     out_dir.mkdir(parents=True, exist_ok=True)
 
-    started = datetime.now(UTC)
+    started = datetime.now(timezone.utc)
     clock = time.monotonic()
 
     bundle = load_input(m1_dir)
@@ -335,7 +335,7 @@ def run(args: argparse.Namespace) -> int:
             "docs": "docs/02a-m2-pdb-evidence.md",
             "issues": [8, 12],
             "started_utc": started.isoformat(),
-            "finished_utc": datetime.now(UTC).isoformat(),
+            "finished_utc": datetime.now(timezone.utc).isoformat(),
             "elapsed_seconds": round(time.monotonic() - clock, 2),
             "input_dir": str(m1_dir),
             "output_dir": str(out_dir),

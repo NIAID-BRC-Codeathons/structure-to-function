@@ -17,7 +17,7 @@ import json
 import sqlite3
 import threading
 import time
-from datetime import UTC, datetime, timedelta
+from datetime import datetime, timedelta, timezone
 from pathlib import Path
 from typing import Any
 
@@ -69,7 +69,7 @@ class JsonCache:
         payload_json, fetched_at = row
         if max_age is not None:
             fetched = datetime.fromisoformat(fetched_at)
-            if datetime.now(UTC) - fetched > max_age:
+            if datetime.now(timezone.utc) - fetched > max_age:
                 return None
         return json.loads(payload_json)
 
@@ -83,7 +83,7 @@ class JsonCache:
                     payload_json = excluded.payload_json,
                     fetched_at = excluded.fetched_at
                 """,
-                (namespace, cache_key, json.dumps(payload, sort_keys=True), datetime.now(UTC).isoformat()),
+                (namespace, cache_key, json.dumps(payload, sort_keys=True), datetime.now(timezone.utc).isoformat()),
             )
             self._connection.commit()
 

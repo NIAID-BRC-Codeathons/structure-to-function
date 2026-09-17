@@ -25,7 +25,7 @@ from __future__ import annotations
 
 import re
 from dataclasses import dataclass, field
-from datetime import UTC, datetime
+from datetime import datetime, timezone
 from typing import Any, Iterable
 
 from ..common.http import CachedJsonClient, HttpError
@@ -53,7 +53,7 @@ def _slug(value: str) -> str:
 
 
 def _now() -> str:
-    return datetime.now(UTC).isoformat()
+    return datetime.now(timezone.utc).isoformat()
 
 
 @dataclass
