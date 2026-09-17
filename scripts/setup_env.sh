@@ -1,8 +1,8 @@
 #!/usr/bin/env bash
-# Build the environment for a run on Lambda (or any Linux node) and prove it works.
+# Build the environment for a run on a remote Linux node (or locally) and prove it works.
 #
-#   bash scripts/setup_lambda.sh                  # venv + deps + import check + tests
-#   bash scripts/setup_lambda.sh --with-biolib    # also install pybiolib (DeepTMHMM)
+#   bash scripts/setup_env.sh                  # venv + deps + import check + tests
+#   bash scripts/setup_env.sh --with-biolib    # also install pybiolib (DeepTMHMM)
 #
 # Stops at the first failure rather than reporting success over a broken install.
 # Re-running reuses the venv. Prints a provider availability table at the end, so a run
@@ -100,6 +100,6 @@ print("sequence heuristic and records heuristic_only in run.json.")
 PYTOOLS
 
 echo
-echo "Next: docs/02d-lambda-runbook.md"
+echo "Next: docs/02d-remote-runbook.md"
 echo "  source .venv/bin/activate"
 echo "  python -m s2f.run --run runs/<id> --from-cga-dir data/<cga> --annotate"

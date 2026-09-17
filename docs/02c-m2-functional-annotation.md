@@ -233,13 +233,12 @@ In rough order of value per hour spent: DeepTMHMM and SignalP 6 (they set the tw
 
 ## InterProScan
 
-Already installed on lambda13 at
-`/nfs/lambda_stor_01/homes/cmann/software/interproscan-5.78-109.0` (version 5.78-109.0,
-installed 2026-09-03 for the GenSLM-ESM homology work), with `INTERPROSCAN_HOME` exported in
-`~/.bashrc` — so `--interproscan auto` finds it there without being told. Member database
-versions recorded with that install: Gene3D 4.3.0, FunFam 4.3.0, Pfam 38.2, SUPERFAMILY 1.75.
+`--interproscan auto` finds an existing install without being told where it is, and records the
+path, the version and the discovery route in `run.json` (pitfall #19). Record the member
+database versions with the run too — they change between releases and annotations are not
+comparable across them.
 
-Elsewhere, to check from a shell:
+To check from a shell:
 
 ```bash
 which interproscan.sh || ls -d /opt/interproscan* /software/interproscan* 2>/dev/null
@@ -353,7 +352,7 @@ for a novel genome that can be most of the proteome or very little of it, and th
 
 - [02-m2-triage.md](02-m2-triage.md) — the module contract
 - [00a-data-contract.md](00a-data-contract.md) — `report.json`, the schema and the section writer
-- [02d-lambda-runbook.md](02d-lambda-runbook.md) — installing and running the providers on Lambda
+- [02d-remote-runbook.md](02d-remote-runbook.md) — running the providers on a compute node
 - [02a-m2-pdb-evidence.md](02a-m2-pdb-evidence.md) — triage weights and their change log
 - [02b-m2-knowledge-graph.md](02b-m2-knowledge-graph.md) — the knowledge subgraph
 - [pitfalls.md](pitfalls.md) — #3 membrane proteins, #12 triage bias, #19 reproducibility
