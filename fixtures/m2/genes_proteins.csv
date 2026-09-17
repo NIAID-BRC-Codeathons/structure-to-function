@@ -1,0 +1,5 @@
+patric_id,refseq_locus_tag,gene,product,aa_length,start,end,strand,plfam_id,pgfam_id
+fig|999999.1.peg.1,FIX_00001,,"Spike protein S1 receptor-binding domain (positive control)",223,1,669,+,PLF_FIX_00001,PGF_FIX_00001
+fig|999999.1.peg.2,FIX_00002,,"Lysozyme C (EC 3.2.1.17)",129,1,387,+,PLF_FIX_00002,PGF_FIX_00002
+fig|999999.1.peg.3,FIX_00003,,"hypothetical protein",93,1,279,+,PLF_FIX_00003,PGF_FIX_00003
+fig|999999.1.peg.4,FIX_00004,,"Spike protein S1 receptor-binding domain, duplicate sequence",223,1,669,+,PLF_FIX_00004,PGF_FIX_00004
