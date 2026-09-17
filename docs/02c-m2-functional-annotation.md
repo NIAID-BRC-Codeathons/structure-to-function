@@ -4,6 +4,23 @@ Companion to [02-m2-triage.md](02-m2-triage.md), covering M2 step 4 (`annotate_f
 Issue [#10](https://github.com/NIAID-BRC-Codeathons/structure-to-function/issues/10).
 Implemented in `s2f/m2_triage/function.py`.
 
+## Status — issue #10 stays open
+
+Both definition-of-done items are met: `flags.secreted` and `flags.membrane` are set for every
+protein, and a full-proteome runtime is measured (`02d-remote-runbook.md`). Two of the four
+providers in the issue's scope have been run for real — InterProScan and DeepTMHMM. The issue
+stays open for the rest:
+
+| Outstanding | Why it matters |
+| --- | --- |
+| **SignalP 6** | `secreted` is the weaker of the two required flags. The heuristic's signal-peptide call measures at MCC 0.41 (below), and `lipoprotein` — which vetoes `secreted` — is unvalidated because DeepTMHMM cannot set it. SignalP 6 fixes both: it calls signal peptides properly and emits `LIPO(Sec/SPII)` directly. Licensed download, then `pip install`. |
+| **eggNOG-mapper** | 95 of 530 proteins in the reference run have no function terms. eggNOG assigns by orthology rather than domain signature, so it reaches exactly the hypotheticals InterProScan misses — which are the proteins triage cares most about. |
+| **PSORTb** | Deliberately not run on *M. genitalium*: no cell wall, no outer membrane, so neither the Gram-negative nor Gram-positive model applies and it would return confident localizations for compartments the organism lacks. Worth running if the target genome changes. |
+| **`--uniprot-function`** | Written against the documented UniProtKB REST v2 shape and verified field-by-field against two entries, but never executed against the live API. The one code path here with no real-world exercise. |
+
+Nothing above blocks M3 or M4: the flags exist, they are labelled with their source, and
+`run.json` reports how many rest on the fallback.
+
 The acceptance check is "`flags.secreted` and `flags.membrane` set for every protein". The
 second requirement is the one that shapes the design: **the flag has to carry the evidence that
 produced it.** Pitfall #3 deprioritizes membrane proteins explicitly rather than silently, and a
@@ -119,12 +136,63 @@ Sanity check against M1 product names, which the heuristic never sees:
 | hypothetical | 161 | 45 | 16 | 0 |
 
 Permeases are almost all membrane; ribosomal proteins and aminoacyl-tRNA synthetases none at
-all. That is the shape it should have. It is **not a benchmark** — nothing here was scored
-against a labelled set, the random null is a floor rather than a false-positive rate, and the
-19 "lipoprotein"-named proteins show the recall problem plainly: 7 get a signal peptide and 5 a
-lipobox. Mycoplasma lipoprotein signal peptides are unusual, but the honest reading is that
-this heuristic finds roughly a third of them. Run DeepTMHMM and SignalP over the selected set
-before anything depends on these flags.
+all. That is the shape it should have — but it is not a benchmark, and the 19
+"lipoprotein"-named proteins show a recall problem plainly: 7 get a signal peptide and 5 a
+lipobox. Mycoplasma lipoprotein signal peptides are unusual, but the honest reading is that the
+heuristic finds roughly a third of them.
+
+### Checked against DeepTMHMM
+
+Both heuristic calls were compared against DeepTMHMM 1.0 over a whole real proteome —
+*M. genitalium*, 530 proteins, DeepTMHMM run locally on a V100
+(`docs/02d-remote-runbook.md`). The two flags came out very differently:
+
+| | positives | TP | FP | FN | TN | precision | recall | MCC | accuracy vs always-negative |
+| --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |
+| `membrane` | 99 (18.7%) | 93 | 2 | 6 | 429 | **0.98** | **0.94** | **0.95** | 98.5% vs 81.3% |
+| `signal_peptide` | 36 (6.8%) | 17 | 23 | 19 | 471 | **0.42** | **0.47** | **0.41** | 92.1% vs **93.2%** |
+
+Exact transmembrane-helix count agreement: 459/530 (87%).
+
+**The membrane call is good.** 98.5% accuracy against an 81.3% always-negative baseline, MCC
+0.95 — it is doing real work rather than riding the class imbalance, and with 99 positives the
+numbers mean something. The binary flag is much better than the count (87% exact agreement), so
+`flags.membrane` from the heuristic tier can carry weight while a heuristic `tm_helices` value
+should not be read as a topology model.
+
+**The signal-peptide call is not.** It scores *below* the always-say-no baseline on accuracy.
+MCC 0.41 says it is not noise — it carries real signal — but 23 of the 40 proteins it calls are
+wrong and it misses 19 of the 36 that are there. **Do not use a heuristic-tier `signal_peptide`,
+or the `secreted` flag derived from it, as if it were a prediction.** Run SignalP 6, or at
+minimum DeepTMHMM, for any protein where that flag matters.
+
+The likely mechanism is the n-region rule: the heuristic requires a lysine or arginine in
+residues 1–12, which keeps N-terminal transmembrane helices out of the signal-peptide bucket at
+the cost of missing every signal peptide with a neutral n-region. That accounts for the recall
+half. The false positives point at the h-region and cleavage-site rules being too permissive.
+
+**These thresholds have deliberately not been retuned against this measurement.** The heuristic
+was calibrated against a random-sequence null and against product names; tuning it to fit
+DeepTMHMM and then reporting agreement with DeepTMHMM would be circular. If the signal-peptide
+side is to be improved, it needs a held-out reference — SignalP 6 output on a different
+proteome — not this one.
+
+**Read all of this as concordance, not accuracy.** DeepTMHMM is itself a predictor, not
+experimental ground truth. It is one organism, and one with unusual membrane biology (no cell
+wall, sterol-containing membrane). And DeepTMHMM's signal detection is a side output of a
+topology model rather than a dedicated signal-peptide predictor, so the signal-peptide row is
+the weaker of the two comparisons in both directions.
+
+**`lipoprotein` remains unvalidated entirely.** DeepTMHMM never sets it — only the built-in
+lipobox scan, SignalP's LIPO class, or a UniProt lipidation feature can. On a run where
+DeepTMHMM is the only provider, `lipoprotein` is still a heuristic call, and because `secreted`
+is `signal_peptide AND no TM AND not lipoprotein`, those heuristic lipobox calls silently veto
+`secreted`. `confidence` does not capture this: it reports the weaker of the membrane and signal
+sources only.
+
+The point of the fallback was never to replace a predictor — it is what makes the flags exist at
+all for a protein nothing else reached, and `run.json`'s `heuristic_only` says how many of those
+there are. On a run where the providers cover the proteome, that number is zero.
 
 ## Running it
 
@@ -194,7 +262,15 @@ Added to `runs/<run_id>/m2_pdb/`:
 | `function_terms.tsv` | long format, one row per (protein, term, source): GO, EC, KEGG KO, COG, COG category, Pfam, InterPro, gene name |
 | `annotate_all.faa` | cleaned, deduplicated FASTA of every protein — the input for the external tools |
 | `annotate_selected.faa` | the same for the selected ~50, for the tools that are slow per sequence |
-| `run.json` | `functional_annotation`: per-provider counts, unmatched provider rows, flag totals, localization histogram, which source set each membrane flag, `heuristic_only`, the FASTA stats and the InterProScan install record |
+| `run.json` | `functional_annotation`: per-provider counts, unmatched provider rows, flag totals, localization histogram, which source set each membrane flag, `heuristic_only`, the FASTA stats, the InterProScan install record, and `provider_files` |
+
+`provider_files` records the path, size, modification time and **SHA-256** of every provider
+output that was ingested. These tools run out of band — DeepTMHMM in its own environment,
+eggNOG-mapper on a web server, PSORTb in a container — so this is the only record tying a set of
+flags to the file that produced them. Counts cannot do it: two versions of the same tool over
+the same proteome give the same `providers` histogram (pitfall #19). A file that parsed to zero
+records is listed too, with its digest, because "this file, and nothing came out of it" is more
+useful in a manifest than silence.
 
 `run.json`'s `functional_annotation.notes` carries anything that went wrong: a file that did not
 exist, a file that failed to parse, and — the quiet one — a file that parsed without error and
@@ -233,13 +309,12 @@ In rough order of value per hour spent: DeepTMHMM and SignalP 6 (they set the tw
 
 ## InterProScan
 
-Already installed on lambda13 at
-`/nfs/lambda_stor_01/homes/cmann/software/interproscan-5.78-109.0` (version 5.78-109.0,
-installed 2026-09-03 for the GenSLM-ESM homology work), with `INTERPROSCAN_HOME` exported in
-`~/.bashrc` — so `--interproscan auto` finds it there without being told. Member database
-versions recorded with that install: Gene3D 4.3.0, FunFam 4.3.0, Pfam 38.2, SUPERFAMILY 1.75.
+`--interproscan auto` finds an existing install without being told where it is, and records the
+path, the version and the discovery route in `run.json` (pitfall #19). Record the member
+database versions with the run too — they change between releases and annotations are not
+comparable across them.
 
-Elsewhere, to check from a shell:
+To check from a shell:
 
 ```bash
 which interproscan.sh || ls -d /opt/interproscan* /software/interproscan* 2>/dev/null
@@ -353,7 +428,7 @@ for a novel genome that can be most of the proteome or very little of it, and th
 
 - [02-m2-triage.md](02-m2-triage.md) — the module contract
 - [00a-data-contract.md](00a-data-contract.md) — `report.json`, the schema and the section writer
-- [02d-lambda-runbook.md](02d-lambda-runbook.md) — installing and running the providers on Lambda
+- [02d-remote-runbook.md](02d-remote-runbook.md) — running the providers on a compute node
 - [02a-m2-pdb-evidence.md](02a-m2-pdb-evidence.md) — triage weights and their change log
 - [02b-m2-knowledge-graph.md](02b-m2-knowledge-graph.md) — the knowledge subgraph
 - [pitfalls.md](pitfalls.md) — #3 membrane proteins, #12 triage bias, #19 reproducibility

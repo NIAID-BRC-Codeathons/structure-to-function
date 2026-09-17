@@ -36,12 +36,14 @@ and setup instructions for the external tools.
 from __future__ import annotations
 
 import csv
+import hashlib
 import json
 import os
 import re
 import shutil
 import subprocess
 from dataclasses import asdict, dataclass, field
+from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any, Iterable, Sequence
 
@@ -491,6 +493,36 @@ def heuristic_annotation(feature_id: str, sequence: str) -> ProviderResult:
     result.signal_peptide = Call(value=has_signal, source=SOURCE_HEURISTIC, evidence=signal_evidence)
     result.lipoprotein = Call(value=is_lipo, source=SOURCE_HEURISTIC, evidence=lipo_evidence)
     return result
+
+
+# ---------------------------------------------------------------------------
+# Provider file provenance
+# ---------------------------------------------------------------------------
+
+
+def describe_file(path: str | Path) -> dict[str, Any]:
+    """Identify an ingested provider output, so a run can be traced back to it.
+
+    The providers here are run out of band — DeepTMHMM in its own environment, eggNOG-mapper on
+    a web server, PSORTb in a container — so the only record that a particular file produced a
+    particular set of flags is the one made here. Counts alone cannot distinguish two runs of the
+    same tool at different versions over the same proteome (pitfall #19: pin versions and access
+    dates). The digest is what makes "the same input" checkable rather than assumed.
+    """
+    path = Path(path)
+    record: dict[str, Any] = {"path": str(path.resolve())}
+    try:
+        stat = path.stat()
+        record["bytes"] = stat.st_size
+        record["modified_utc"] = datetime.fromtimestamp(stat.st_mtime, tz=timezone.utc).isoformat()
+        digest = hashlib.sha256()
+        with path.open("rb") as handle:
+            for block in iter(lambda: handle.read(1 << 20), b""):
+                digest.update(block)
+        record["sha256"] = digest.hexdigest()
+    except OSError as exc:
+        record["error"] = f"{type(exc).__name__}: {exc}"
+    return record
 
 
 # ---------------------------------------------------------------------------
@@ -1385,6 +1417,7 @@ class AnnotationRun:
     unmatched: dict[str, list[str]] = field(default_factory=dict)
     tool_fasta: ToolFasta | None = None
     selected_fasta: ToolFasta | None = None
+    provider_files: dict[str, dict[str, Any]] = field(default_factory=dict)
     interproscan: InterProScanInstall = field(default_factory=InterProScanInstall)
     uniprot_failures: list[dict[str, str]] = field(default_factory=list)
     notes: list[str] = field(default_factory=list)
@@ -1407,6 +1440,7 @@ class AnnotationRun:
                 1 for a in values if a.membrane_source == SOURCE_HEURISTIC or a.signal_source == SOURCE_HEURISTIC
             ),
             "with_function_terms": sum(1 for a in values if a.terms),
+            "provider_files": self.provider_files,
             "tool_fasta": self.tool_fasta.summary() if self.tool_fasta else None,
             "selected_fasta": self.selected_fasta.summary() if self.selected_fasta else None,
             "interproscan": {
