@@ -77,7 +77,9 @@ def main(argv: list[str] | None = None) -> int:
 
         contigs = Path(args.contigs)
         if not args.no_blind:
-            contigs = cga.blind_contigs(contigs, m1_dir / "contigs.blinded.fna")
+            # Named for the run: the workspace upload keeps this basename, and p3-cp
+            # will not overwrite, so a shared name would hand Minhash a stale genome.
+            contigs = cga.blind_contigs(contigs, m1_dir / f"{run_id}.contigs.fna")
             print(f"blinded contigs -> {contigs}")
 
         if args.taxon_id:

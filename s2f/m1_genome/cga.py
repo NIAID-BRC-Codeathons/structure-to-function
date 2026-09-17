@@ -52,16 +52,53 @@ def blind_contigs(source: str | Path, destination: str | Path) -> Path:
     return destination
 
 
-def upload(local: str | Path, ws_dir: str, *, name: str | None = None) -> str:
+LS_SIZE = re.compile(r"^\S+\s+\S+\s+(\d+)\s")
+
+
+def remote_size(ws_path: str) -> int | None:
+    """Size in bytes of a workspace file, or None if it is not there.
+
+    Parsed from `p3-ls -l`, whose rows look like:
+        -rw-- user@bvbrc 20866 Sep 17 09:32 name
+    """
+    try:
+        out = _run(["p3-ls", "-l", ws_path], timeout=300)
+    except CgaError:
+        return None
+    for line in out.splitlines():
+        match = LS_SIZE.match(line.strip())
+        if match:
+            return int(match.group(1))
+    return None
+
+
+def upload(local: str | Path, ws_dir: str, *, verify: bool = True) -> str:
     """Copy a local file into the workspace and return its workspace path.
 
     Minhash reads the FASTA from the workspace, so it has to be there before the
     taxon can be called - `p3-submit-CGA` uploads its own copy later.
+
+    Verified by size, because `p3-cp` exits 0 without overwriting an existing file:
+    a run that reused a filename would otherwise call the taxon of whatever genome
+    happened to be there. Give each run's file a distinct name.
     """
     local = Path(local)
     target = f"{ws_dir}/uploads"
+    remote = f"{target}/{local.name}"
     _run(["p3-cp", str(local), f"ws:{target}"], timeout=1800)
-    return f"{target}/{name or local.name}"
+
+    if verify:
+        want = local.stat().st_size
+        got = remote_size(remote)
+        if got is None:
+            raise CgaError(f"upload of {local} to {remote} left nothing at that path")
+        if got != want:
+            raise CgaError(
+                f"{remote} is {got} bytes but {local} is {want}: the workspace copy is not "
+                f"this run's file. p3-cp does not overwrite; remove the stale file or use a "
+                f"different name."
+            )
+    return remote
 
 
 def submit(contigs: str | Path, *, ws_dir: str, out_name: str, scientific_name: str,
