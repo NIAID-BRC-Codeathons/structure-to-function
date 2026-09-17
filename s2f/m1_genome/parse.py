@@ -105,6 +105,21 @@ def _read_text(path: Path) -> str:
     return data.decode("utf-8", errors="replace")
 
 
+def _as_float(value: Any) -> float | None:
+    """Numeric fields arrive as strings from some sources and numbers from others.
+
+    In one USA300 run, DIAMOND rows carried `identity: '99'` while AMRFinderPlus and
+    RGI carried `identity: 99.77`. Downstream comparisons need one type. None stays
+    None: a k-mer row has no identity, which is not the same as zero.
+    """
+    if value is None or value == "":
+        return None
+    try:
+        return float(value)
+    except (TypeError, ValueError):
+        return None
+
+
 def _load_json(path: Path) -> Any:
     return json.loads(_read_text(path))
 
@@ -208,10 +223,12 @@ def _specialty_by_feature(run: CgaRun) -> dict[str, list[dict[str, Any]]]:
                 "evidence": row.get("evidence"),
                 "gene": row.get("gene"),
                 "hit": row.get("source_id") or row.get("product"),
-                "identity": row.get("identity"),
-                "coverage": row.get("query_coverage"),
-                "subject_coverage": row.get("subject_coverage"),
-                "e_value": row.get("e_value"),
+                "identity": _as_float(row.get("identity")),
+                "coverage": _as_float(row.get("query_coverage")),
+                "subject_coverage": _as_float(row.get("subject_coverage")),
+                "e_value": _as_float(row.get("e_value")),
+                "same_species": row.get("same_species"),
+                "same_genus": row.get("same_genus"),
                 "antibiotics": antibiotics if isinstance(antibiotics, list) else [antibiotics],
                 "pmid": row.get("pmid") or [],
             }

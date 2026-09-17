@@ -179,3 +179,15 @@ def test_cga_files_that_are_not_valid_utf8_still_parse(tmp_path):
     path.write_bytes(b'[{"gene": "mecA", "product": "penicillin\xa0binding protein"}]')
     assert "binding protein" in _read_text(path)
     assert _load_json(path)[0]["gene"] == "mecA"
+
+
+def test_specialty_identity_is_normalized_to_float(tmp_path):
+    """DIAMOND rows carry identity as a string ('99'), AMRFinderPlus and RGI as a
+    float (99.77). One type downstream; a k-mer row's absent identity stays None."""
+    from s2f.m1_genome.parse import _as_float
+
+    assert _as_float("99") == 99.0
+    assert _as_float(99.77) == 99.77
+    assert _as_float(None) is None
+    assert _as_float("") is None
+    assert _as_float("not a number") is None
