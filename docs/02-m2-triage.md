@@ -33,7 +33,7 @@
 1. `map_ids()` — every protein to UniProt where possible; cache aggressively.
 2. `lookup_structures()` — PDB and AFDB hits; record whether a holo (ligand-bound) structure exists for the closest homolog. RCSB query parameters and the hit-scoring rules live in [02a-m2-pdb-evidence.md](02a-m2-pdb-evidence.md); implemented in `s2f/m2_triage` (issue #8).
 3. `foldseek_search()` — for proteins with no informative sequence hit, especially hypotheticals.
-4. `annotate_function()` — eggNOG, localization, membrane prediction.
+4. `annotate_function()` — eggNOG, localization, membrane prediction. Source precedence, flag definitions and external-tool setup in [02c-m2-functional-annotation.md](02c-m2-functional-annotation.md); implemented in `s2f/m2_triage/function.py` (issue #10). Every flag records which source set it, so a DeepTMHMM call and the built-in hydropathy fallback are never confused for each other.
 5. `build_kg()` — pathogen protein → homolog (human or characterized pathogen) → disease/pathway → known ligands. Every edge keeps its source and the homology identity that justified it. Source survey, edge types and caps in [02b-m2-knowledge-graph.md](02b-m2-knowledge-graph.md); implemented in `s2f/m2_triage/kg.py` (issue #11).
 6. `score_and_select()` — weighted score from written-down components; the current weights and their change log are in [02a-m2-pdb-evidence.md](02a-m2-pdb-evidence.md), e.g. virulence/AMR hit, essentiality ortholog, secreted or surface, ligandable homolog (known ligand exists), structure availability, **penalty for close human homolog**, penalty for predicted membrane protein. Emit rank, `selected` for the top ~50, and `reason` per protein. Keep the full ranked list, not just the winners.
 

@@ -1,0 +1,19 @@
+# Fixture, not a real DeepTMHMM run. Format follows DeepTMHMM TMRs.gff3.
+# fig|999999.1.peg.1 Length: 223
+# fig|999999.1.peg.1 Number of predicted TMRs: 0
+fig|999999.1.peg.1	signal	1	18
+fig|999999.1.peg.1	outside	19	223
+//
+# fig|999999.1.peg.2 Length: 129
+# fig|999999.1.peg.2 Number of predicted TMRs: 0
+fig|999999.1.peg.2	signal	1	18
+fig|999999.1.peg.2	outside	19	129
+//
+# fig|999999.1.peg.3 Length: 93
+# fig|999999.1.peg.3 Number of predicted TMRs: 2
+fig|999999.1.peg.3	inside	1	10
+fig|999999.1.peg.3	TMhelix	11	33
+fig|999999.1.peg.3	outside	34	50
+fig|999999.1.peg.3	TMhelix	51	73
+fig|999999.1.peg.3	inside	74	93
+//

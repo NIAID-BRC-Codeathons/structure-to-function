@@ -42,6 +42,12 @@ def build_parser() -> argparse.ArgumentParser:
     p.add_argument("--limit", type=int, help="passed to M2 as --limit")
     p.add_argument("--map-ids", action="store_true", help="M2: resolve UniProt/ChEMBL xrefs")
     p.add_argument("--kg", action="store_true", help="M2: assemble the knowledge subgraph")
+    p.add_argument("--annotate", action="store_true",
+                   help="M2: function, localization and membrane flags (docs/02c)")
+    p.add_argument("--interproscan", metavar="PATH_OR_AUTO",
+                   help="M2: InterProScan output to ingest, or 'auto' to find a local install")
+    for tool in ("eggnog", "deeptmhmm", "signalp", "psortb"):
+        p.add_argument(f"--{tool}", metavar="PATH", help=f"M2: {tool} output file")
     p.add_argument("--offline", action="store_true", help="M2: replay from cache, no network")
     p.add_argument("--allow-poor", action="store_true", help="passed to M1")
     p.add_argument("--dry-run", action="store_true",
@@ -77,9 +83,17 @@ def stage_args(stage: str, args: argparse.Namespace) -> list[str]:
         out = common + ["--report"]
         if args.limit:
             out += ["--limit", str(args.limit)]
-        for flag, on in (("--map-ids", args.map_ids), ("--kg", args.kg), ("--offline", args.offline)):
+        for flag, on in (("--map-ids", args.map_ids), ("--kg", args.kg), ("--offline", args.offline),
+                         ("--annotate", args.annotate)):
             if on:
                 out.append(flag)
+        # A provider path implies --annotate: passing one and getting nothing would be a trap.
+        for tool in ("interproscan", "eggnog", "deeptmhmm", "signalp", "psortb"):
+            value = getattr(args, tool, None)
+            if value:
+                if "--annotate" not in out:
+                    out.append("--annotate")
+                out += [f"--{tool}", value]
         taxon = _taxon_id(args.run)
         if taxon:
             out += ["--taxon", str(taxon)]
