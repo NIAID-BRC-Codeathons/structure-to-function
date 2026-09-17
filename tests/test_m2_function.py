@@ -35,6 +35,7 @@ from s2f.m2_triage.function import (
     Term,
     annotate,
     clean_sequence,
+    describe_file,
     discover_interproscan,
     heuristic_annotation,
     hydrophobic_segments,
@@ -646,6 +647,44 @@ def test_annotate_dry_run_writes_both_tool_fastas(tmp_path):
     assert fasta["records"] == 3
     assert fasta["proteins"] == 4
     assert fasta["duplicate_groups"] == 1
+
+
+def test_describe_file_identifies_an_ingested_provider_output(tmp_path):
+    """The providers run out of band, so this record is the only trace of what was ingested."""
+    path = tmp_path / "TMRs.gff3"
+    path.write_text("# fig|1.peg.1 Number of predicted TMRs: 0\n", encoding="utf-8")
+    record = describe_file(path)
+    assert record["path"] == str(path.resolve())
+    assert record["bytes"] == path.stat().st_size
+    assert len(record["sha256"]) == 64
+    assert record["modified_utc"].endswith("+00:00")
+
+    # Same content, different file: same digest. That is the point of recording one.
+    twin = tmp_path / "copy.gff3"
+    twin.write_text(path.read_text(encoding="utf-8"), encoding="utf-8")
+    assert describe_file(twin)["sha256"] == record["sha256"]
+
+    path.write_text("# fig|1.peg.1 Number of predicted TMRs: 2\n", encoding="utf-8")
+    assert describe_file(path)["sha256"] != record["sha256"]
+
+
+def test_describe_file_records_the_error_rather_than_raising(tmp_path):
+    record = describe_file(tmp_path / "missing.gff3")
+    assert "error" in record
+    assert "sha256" not in record
+
+
+def test_run_json_records_which_provider_file_was_ingested(tmp_path):
+    run_dir = tmp_path / "provenance"
+    _dry_run(run_dir, "--annotate")
+    manifest = json.loads((run_dir / "m2_pdb" / "run.json").read_text(encoding="utf-8"))
+    files = manifest["functional_annotation"]["provider_files"]
+    assert SOURCE_DEEPTMHMM in files
+    record = files[SOURCE_DEEPTMHMM]
+    assert record["path"].endswith("deeptmhmm.TMRs.gff3")
+    assert len(record["sha256"]) == 64
+    # Counts alone cannot distinguish two versions of a tool over the same proteome.
+    assert record["bytes"] > 0
 
 
 def test_write_terms_tsv_is_long_format(tmp_path):

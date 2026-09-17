@@ -45,6 +45,7 @@ from .function import (
     parse_interproscan,
     parse_psortb,
     parse_signalp6,
+    describe_file,
     run_interproscan,
     write_terms_tsv,
     write_tool_fasta,
@@ -230,7 +231,7 @@ def _annotation_aliases(tool_fasta, xrefs_by_id: dict) -> dict[str, list[str]]:
 
 def _load_annotation_providers(
     args: argparse.Namespace, m1_dir: Path, out_dir: Path, scan_fasta: Path | None = None
-) -> tuple[dict[str, dict], object, list[str]]:
+) -> tuple[dict[str, dict], object, list[str], dict[str, dict]]:
     """Resolve each provider's output file, parsing what exists and saying what did not.
 
     ``--interproscan auto`` looks for an installation (PATH, $INTERPROSCAN_HOME, the usual
@@ -238,6 +239,7 @@ def _load_annotation_providers(
     module carries on with the other providers rather than failing.
     """
     notes: list[str] = []
+    provider_files: dict[str, dict] = {}
     paths = {
         "eggnog": args.eggnog,
         "deeptmhmm": args.deeptmhmm,
@@ -295,11 +297,14 @@ def _load_annotation_providers(
         except Exception as exc:  # noqa: BLE001 - an add-on must never lose the triage output
             notes.append(f"{key}: failed to parse {path} — {type(exc).__name__}: {exc}")
             continue
+        # Recorded whether or not it parsed to anything: "this file, this digest, zero records"
+        # is a more useful thing to find in a manifest than silence.
+        provider_files[key] = describe_file(path)
         if not parsed[key]:
             # Parsed without error and produced nothing: almost always a format the parser did
             # not recognise. Silence here would look like "the tool found nothing".
             notes.append(f"{key}: {path} parsed to zero records — check the file format")
-    return parsed, install, notes
+    return parsed, install, notes, provider_files
 
 
 def run(args: argparse.Namespace) -> int:
@@ -452,7 +457,7 @@ def run(args: argparse.Namespace) -> int:
             # because the two-pass flow (run M2, run the tools, re-run M2 with their output)
             # needs a FASTA the tools will accept. See docs/02d-remote-runbook.md.
             tool_fasta = write_tool_fasta(out_dir / "annotate_all.faa", proteins)
-            parsed, ipr_install, annotation_notes = _load_annotation_providers(
+            parsed, ipr_install, annotation_notes, provider_files = _load_annotation_providers(
                 args, m1_dir, out_dir, scan_fasta=tool_fasta.path
             )
             uniprot_results: dict[str, object] = {}
@@ -478,6 +483,7 @@ def run(args: argparse.Namespace) -> int:
                 aliases=_annotation_aliases(tool_fasta, xrefs_by_id),
             )
             annotation_run.tool_fasta = tool_fasta
+            annotation_run.provider_files = provider_files
             annotation_run.interproscan = ipr_install
             annotation_run.uniprot_failures = uniprot_client.failures if uniprot_client else []
             annotation_run.notes = annotation_notes

@@ -262,7 +262,15 @@ Added to `runs/<run_id>/m2_pdb/`:
 | `function_terms.tsv` | long format, one row per (protein, term, source): GO, EC, KEGG KO, COG, COG category, Pfam, InterPro, gene name |
 | `annotate_all.faa` | cleaned, deduplicated FASTA of every protein — the input for the external tools |
 | `annotate_selected.faa` | the same for the selected ~50, for the tools that are slow per sequence |
-| `run.json` | `functional_annotation`: per-provider counts, unmatched provider rows, flag totals, localization histogram, which source set each membrane flag, `heuristic_only`, the FASTA stats and the InterProScan install record |
+| `run.json` | `functional_annotation`: per-provider counts, unmatched provider rows, flag totals, localization histogram, which source set each membrane flag, `heuristic_only`, the FASTA stats, the InterProScan install record, and `provider_files` |
+
+`provider_files` records the path, size, modification time and **SHA-256** of every provider
+output that was ingested. These tools run out of band — DeepTMHMM in its own environment,
+eggNOG-mapper on a web server, PSORTb in a container — so this is the only record tying a set of
+flags to the file that produced them. Counts cannot do it: two versions of the same tool over
+the same proteome give the same `providers` histogram (pitfall #19). A file that parsed to zero
+records is listed too, with its digest, because "this file, and nothing came out of it" is more
+useful in a manifest than silence.
 
 `run.json`'s `functional_annotation.notes` carries anything that went wrong: a file that did not
 exist, a file that failed to parse, and — the quiet one — a file that parsed without error and
