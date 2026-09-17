@@ -1,0 +1,802 @@
+{
+ "parameters": {
+  "queue_nowait": "1",
+  "lowvan_fallback_viral_taxon": false,
+  "public": false,
+  "contigs": "/USER@bvbrc/home/s2f/uploads/mgen_G37.blinded.fna",
+  "lowvan_max_contig_length": 40000,
+  "skip_indexing": 0,
+  "scientific_name": "Mycoplasma genitalium",
+  "code": 4,
+  "analyze_quality": "1",
+  "skip_workspace_output": false,
+  "output_path": "/USER@bvbrc/home/s2f/.mgen_G37_cga",
+  "taxonomy_id": 243273,
+  "lowvan_min_contig_length": 300,
+  "domain": "Bacteria",
+  "output_file": "annotation"
+ },
+ "success": 1,
+ "end_time": 1789655246.61804,
+ "output_files": [
+  [
+   "/USER@bvbrc/home/s2f/.mgen_G37_cga/.annotation/specialty-rgi.txt",
+   "D9BB2074-B2A3-11F1-94C6-BED4617A854C"
+  ],
+  [
+   "/USER@bvbrc/home/s2f/.mgen_G37_cga/.annotation/specialty-blast-alignments.txt",
+   "DA7739A8-B2A3-11F1-BD5A-77DA617A854C"
+  ]
+ ],
+ "elapsed_time": 164.526771068573,
+ "hostname": "pear.cels.anl.gov",
+ "app": {
+  "id": "GenomeAnnotation",
+  "default_memory": "100G",
+  "script": "App-GenomeAnnotation",
+  "parameters": [
+   {
+    "required": 1,
+    "desc": "Input set of DNA contigs for annotation",
+    "default": null,
+    "type": "wstype",
+    "id": "contigs",
+    "label": "Contig file",
+    "wstype": "Contigs"
+   },
+   {
+    "desc": "Scientific name of genome to be annotated",
+    "required": 1,
+    "id": "scientific_name",
+    "type": "string",
+    "default": null,
+    "label": "Scientific Name"
+   },
+   {
+    "default": null,
+    "type": "int",
+    "label": "NCBI Taxonomy ID",
+    "desc": "NCBI Taxonomy identfier for this genome",
+    "id": "taxonomy_id",
+    "required": 0
+   },
+   {
+    "desc": "Genetic code used in translation of DNA sequences",
+    "required": 1,
+    "type": "int",
+    "default": 0,
+    "id": "code",
+    "enum": [
+     0,
+     1,
+     4,
+     11,
+     25
+    ],
+    "label": "Genetic Code"
+   },
+   {
+    "default": "auto",
+    "type": "enum",
+    "required": 1,
+    "desc": "Domain of the submitted genome",
+    "enum": [
+     "Bacteria",
+     "Archaea",
+     "Viruses",
+     "auto"
+    ],
+    "label": "Domain",
+    "id": "domain"
+   },
+   {
+    "default": false,
+    "type": "bool",
+    "label": "Public",
+    "desc": "Make this genome public",
+    "id": "public",
+    "required": 0
+   },
+   {
+    "required": 0,
+    "id": "queue_nowait",
+    "desc": "If set, don't wait for the indexing to finish before marking the job complete.",
+    "label": "Don't wait on indexing queue",
+    "type": "bool",
+    "default": false
+   },
+   {
+    "label": "Don't index genome",
+    "default": false,
+    "type": "bool",
+    "id": "skip_indexing",
+    "required": 0,
+    "desc": "If set, don't index this genome in solr. It will not be available for analysis through the PATRIC site."
+   },
+   {
+    "label": "Don't write to workspace",
+    "default": false,
+    "type": "bool",
+    "id": "skip_workspace_output",
+    "required": 0,
+    "desc": "If set, don't write anything to workspace."
+   },
+   {
+    "label": "Output Folder",
+    "type": "folder",
+    "default": null,
+    "required": 0,
+    "id": "output_path",
+    "desc": "Path to which the output will be written. Defaults to the directory containing the input data. "
+   },
+   {
+    "default": null,
+    "type": "wsid",
+    "label": "File Basename",
+    "desc": "Basename for the generated output files. Defaults to the basename of the input data.",
+    "id": "output_file",
+    "required": 0
+   },
+   {
+    "desc": "Reference genome ID",
+    "required": 0,
+    "id": "reference_genome_id",
+    "type": "string",
+    "default": null,
+    "label": "Reference genome ID"
+   },
+   {
+    "type": "int",
+    "default": 300,
+    "label": "Minimum contig length",
+    "desc": "Minimum contig length for lowvan",
+    "required": 0,
+    "id": "lowvan_min_contig_length"
+   },
+   {
+    "default": 40000,
+    "type": "int",
+    "label": "Maximum contig length",
+    "desc": "Maximum contig length for lowvan",
+    "id": "lowvan_max_contig_length",
+    "required": 0
+   },
+   {
+    "desc": "Minimum BLASTn bit score for lowvan to accept a taxon call. Leave unset to use the annotation's own default of 150",
+    "id": "lowvan_min_contig_bit",
+    "required": 0,
+    "default": null,
+    "type": "float",
+    "label": "Minimum classification bit score"
+   },
+   {
+    "default": false,
+    "type": "bool",
+    "label": "Fall back to the lineage taxon",
+    "desc": "If lowvan's BLASTn classification finds no reference above the minimum bit score, retry once using the annotation taxon taken from the genome's own lineage. BLASTn still goes first, so this only affects genomes that would otherwise be left unannotated",
+    "id": "lowvan_fallback_viral_taxon",
+    "required": 0
+   },
+   {
+    "required": 0,
+    "id": "reference_virus_name",
+    "desc": "Reference virus name",
+    "label": "Reference virus name",
+    "type": "string",
+    "default": null
+   },
+   {
+    "label": "(Internal) Container to use for this run",
+    "type": "string",
+    "default": null,
+    "required": 0,
+    "id": "container_id",
+    "desc": "(Internal) Container to use for this run"
+   },
+   {
+    "id": "indexing_url",
+    "required": 0,
+    "desc": "(Internal) Override Data API URL for use in indexing",
+    "label": "(Internal) Override Data API URL for use in indexing",
+    "default": null,
+    "type": "string"
+   },
+   {
+    "type": "string",
+    "default": null,
+    "label": "(Internal) Parent job for this annotation",
+    "desc": "(Internal) Parent job for this annotation",
+    "required": 0,
+    "id": "_parent_job"
+   },
+   {
+    "required": 0,
+    "id": "fix_errors",
+    "desc": "The automatic annotation process may run into problems, such as gene candidates overlapping RNAs, or genes embedded inside other genes. To automatically resolve these problems (even if that requires deleting some gene candidates), enable this option.",
+    "label": "Automatically fix errors?",
+    "type": "bool",
+    "default": null
+   },
+   {
+    "desc": "If you wish for the pipeline to fix frameshifts, enable this option. Otherwise frameshifts will not be corrected.",
+    "required": 0,
+    "id": "fix_frameshifts",
+    "type": "bool",
+    "default": null,
+    "label": "Fix frameshifts?"
+   },
+   {
+    "desc": "If you wish debug statements to be printed for this job, enable this option.",
+    "id": "enable_debug",
+    "required": 0,
+    "default": null,
+    "type": "bool",
+    "label": "Enable debug?"
+   },
+   {
+    "default": null,
+    "type": "int",
+    "label": "Set verbose level",
+    "desc": "Set this to the verbosity level of choice for error messages.",
+    "id": "verbose_level",
+    "required": 0
+   },
+   {
+    "default": null,
+    "type": "string",
+    "label": "Custom workflow",
+    "desc": "Specifies a custom workflow document (expert).",
+    "id": "workflow",
+    "required": 0
+   },
+   {
+    "required": 0,
+    "id": "recipe",
+    "desc": "Specifies a non-default annotation recipe",
+    "label": "Annotation recipe",
+    "type": "string",
+    "default": null
+   },
+   {
+    "type": "bool",
+    "default": null,
+    "label": "Disable replication?",
+    "desc": "Even if this job is identical to a previous job, run it from scratch.",
+    "required": 0,
+    "id": "disable_replication"
+   },
+   {
+    "id": "analyze_quality",
+    "required": 0,
+    "desc": "If enabled, run quality analysis on genome",
+    "label": "Enable quality analysis of genome",
+    "default": null,
+    "type": "bool"
+   },
+   {
+    "id": "assembly_output",
+    "required": 0,
+    "desc": "Workspace path holding assembly output for this genome",
+    "label": "Workspace path holding assembly output for this genome",
+    "default": null,
+    "type": "folder"
+   },
+   {
+    "type": "group",
+    "default": null,
+    "group": [
+     {
+      "default": null,
+      "type": "group",
+      "label": "call-features-rRNA-SEED",
+      "group": [
+       {
+        "default": null,
+        "type": "string",
+        "id": "condition",
+        "required": 0,
+        "desc": ""
+       }
+      ],
+      "desc": "call-features-rRNA-SEED",
+      "id": "call-features-rRNA-SEED",
+      "required": 0
+     },
+     {
+      "type": "group",
+      "default": null,
+      "group": [
+       {
+        "default": null,
+        "type": "string",
+        "id": "condition",
+        "required": 0,
+        "desc": ""
+       }
+      ],
+      "label": "call-features-tRNA-trnascan",
+      "desc": "call-features-tRNA-trnascan",
+      "required": 0,
+      "id": "call-features-tRNA-trnascan"
+     },
+     {
+      "desc": "call-features-repeat-region-SEED",
+      "id": "call-features-repeat-region-SEED",
+      "required": 0,
+      "default": null,
+      "type": "group",
+      "label": "call-features-repeat-region-SEED",
+      "group": [
+       {
+        "type": "string",
+        "default": null,
+        "desc": "",
+        "required": 0,
+        "id": "condition"
+       },
+       {
+        "group": [
+         {
+          "label": "Minimum identity",
+          "default": "95",
+          "type": "int",
+          "id": "minimum_identity",
+          "required": 0
+         },
+         {
+          "required": 0,
+          "id": "minimum_length",
+          "type": "int",
+          "default": "100",
+          "label": "Minimum length"
+         }
+        ],
+        "type": "group",
+        "default": null,
+        "required": 0,
+        "id": "parameters",
+        "desc": ""
+       }
+      ]
+     },
+     {
+      "type": "group",
+      "default": null,
+      "group": [
+       {
+        "default": null,
+        "type": "string",
+        "id": "condition",
+        "required": 0,
+        "desc": ""
+       }
+      ],
+      "label": "call-selenoproteins",
+      "desc": "call-selenoproteins",
+      "required": 0,
+      "id": "call-selenoproteins"
+     },
+     {
+      "desc": "call-pyrrolysoproteins",
+      "id": "call-pyrrolysoproteins",
+      "required": 0,
+      "default": null,
+      "type": "group",
+      "label": "call-pyrrolysoproteins",
+      "group": [
+       {
+        "required": 0,
+        "id": "condition",
+        "desc": "",
+        "type": "string",
+        "default": ""
+       }
+      ]
+     },
+     {
+      "desc": "call-features-insertion-sequences",
+      "id": "call-features-insertion-sequences",
+      "required": 0,
+      "default": null,
+      "type": "group",
+      "label": "call-features-insertion-sequences",
+      "group": [
+       {
+        "type": "string",
+        "default": "",
+        "desc": "",
+        "required": 0,
+        "id": "condition"
+       }
+      ]
+     },
+     {
+      "id": "call-features-strep-suis-repeat",
+      "required": 0,
+      "desc": "call-features-strep-suis-repeat",
+      "label": "call-features-strep-suis-repeat",
+      "group": [
+       {
+        "default": "$genome->",
+        "type": "string",
+        "desc": "",
+        "id": "condition",
+        "required": 0
+       }
+      ],
+      "default": null,
+      "type": "group"
+     },
+     {
+      "desc": "call-features-strep-pneumo-repeat",
+      "id": "call-features-strep-pneumo-repeat",
+      "required": 0,
+      "default": null,
+      "type": "group",
+      "label": "call-features-strep-pneumo-repeat",
+      "group": [
+       {
+        "default": "$genome->",
+        "type": "string",
+        "desc": "",
+        "id": "condition",
+        "required": 0
+       }
+      ]
+     },
+     {
+      "desc": "call-features-crispr",
+      "required": 0,
+      "id": "call-features-crispr",
+      "type": "group",
+      "default": null,
+      "group": [
+       {
+        "desc": "",
+        "id": "condition",
+        "required": 0,
+        "default": null,
+        "type": "string"
+       }
+      ],
+      "label": "call-features-crispr"
+     },
+     {
+      "required": 0,
+      "id": "call-features-CDS-glimmer3",
+      "desc": "call-features-CDS-glimmer3",
+      "group": [
+       {
+        "desc": "",
+        "required": 0,
+        "id": "condition",
+        "type": "string",
+        "default": null
+       },
+       {
+        "desc": "",
+        "required": 0,
+        "id": "parameters",
+        "type": "group",
+        "default": null,
+        "group": [
+         {
+          "id": "minimum_training_length",
+          "required": 0,
+          "default": "2000",
+          "type": "int",
+          "label": "Minimum training length"
+         }
+        ]
+       }
+      ],
+      "label": "call-features-CDS-glimmer3",
+      "type": "group",
+      "default": null
+     },
+     {
+      "group": [
+       {
+        "id": "condition",
+        "required": 0,
+        "desc": "",
+        "default": null,
+        "type": "string"
+       }
+      ],
+      "label": "call-features-CDS-prodigal",
+      "type": "group",
+      "default": null,
+      "required": 0,
+      "id": "call-features-CDS-prodigal",
+      "desc": "call-features-CDS-prodigal"
+     },
+     {
+      "type": "group",
+      "default": null,
+      "group": [
+       {
+        "required": 0,
+        "id": "condition",
+        "desc": "",
+        "type": "string",
+        "default": ""
+       }
+      ],
+      "label": "call-features-CDS-genemark",
+      "desc": "call-features-CDS-genemark",
+      "required": 0,
+      "id": "call-features-CDS-genemark"
+     },
+     {
+      "group": [
+       {
+        "id": "condition",
+        "required": 0,
+        "desc": "",
+        "default": null,
+        "type": "string"
+       },
+       {
+        "default": null,
+        "type": "group",
+        "group": [
+         {
+          "id": "kmer_dataset",
+          "enum": [
+           "release70",
+           "release59"
+          ],
+          "label": "Kmer dataset to use",
+          "required": 0,
+          "default": "release70",
+          "type": "enum"
+         },
+         {
+          "default": 1,
+          "type": "bool",
+          "label": "Only annotate hypothetical proteins",
+          "id": "only_hypothetical",
+          "required": 0
+         }
+        ],
+        "desc": "",
+        "id": "parameters",
+        "required": 0
+       }
+      ],
+      "label": "call-features-ProtoCDS-kmer-v1",
+      "type": "group",
+      "default": null,
+      "required": 0,
+      "id": "call-features-ProtoCDS-kmer-v1",
+      "desc": "call-features-ProtoCDS-kmer-v1"
+     },
+     {
+      "group": [
+       {
+        "type": "string",
+        "default": null,
+        "required": 0,
+        "id": "condition",
+        "desc": ""
+       },
+       {
+        "default": null,
+        "type": "group",
+        "group": [
+         {
+          "id": "kmer_hits_required",
+          "required": 0,
+          "desc": "Minimum kmer hits required",
+          "label": "Minimum kmer hits required",
+          "default": "5",
+          "type": "int"
+         },
+         {
+          "required": 0,
+          "id": "only_hypothetical",
+          "type": "bool",
+          "default": 0,
+          "label": "Only annotate hypothetical proteins"
+         }
+        ],
+        "desc": "",
+        "id": "parameters",
+        "required": 0
+       }
+      ],
+      "label": "call-features-ProtoCDS-kmer-v2",
+      "type": "group",
+      "default": null,
+      "required": 0,
+      "id": "call-features-ProtoCDS-kmer-v2",
+      "desc": "call-features-ProtoCDS-kmer-v2"
+     },
+     {
+      "label": "annotate-proteins-kmer-v2",
+      "group": [
+       {
+        "type": "string",
+        "default": null,
+        "desc": "",
+        "required": 0,
+        "id": "condition"
+       },
+       {
+        "group": [
+         {
+          "label": "Minimum kmer hits required",
+          "default": "5",
+          "type": "int",
+          "id": "kmer_hits_required",
+          "required": 0,
+          "desc": "Minimum kmer hits required"
+         },
+         {
+          "id": "only_hypothetical",
+          "required": 0,
+          "default": 0,
+          "type": "bool",
+          "label": "Only annotate hypothetical proteins"
+         }
+        ],
+        "type": "group",
+        "default": null,
+        "required": 0,
+        "id": "parameters",
+        "desc": ""
+       }
+      ],
+      "default": null,
+      "type": "group",
+      "id": "annotate-proteins-kmer-v2",
+      "required": 0,
+      "desc": "annotate-proteins-kmer-v2"
+     },
+     {
+      "label": "annotate-proteins-kmer-v1",
+      "group": [
+       {
+        "default": null,
+        "type": "string",
+        "id": "condition",
+        "required": 0,
+        "desc": ""
+       },
+       {
+        "group": [
+         {
+          "required": 0,
+          "type": "enum",
+          "default": "release70",
+          "id": "kmer_dataset",
+          "enum": [
+           "release70",
+           "release59"
+          ],
+          "label": "Kmer dataset to use"
+         },
+         {
+          "required": 0,
+          "id": "only_hypothetical",
+          "type": "bool",
+          "default": 1,
+          "label": "Only annotate hypothetical proteins"
+         }
+        ],
+        "default": null,
+        "type": "group",
+        "id": "parameters",
+        "required": 0,
+        "desc": ""
+       }
+      ],
+      "default": null,
+      "type": "group",
+      "id": "annotate-proteins-kmer-v1",
+      "required": 0,
+      "desc": "annotate-proteins-kmer-v1"
+     },
+     {
+      "label": "annotate-proteins-similarity",
+      "group": [
+       {
+        "required": 0,
+        "id": "condition",
+        "desc": "",
+        "type": "string",
+        "default": null
+       },
+       {
+        "group": [
+         {
+          "default": 1,
+          "type": "bool",
+          "label": "Only annotate hypothetical proteins",
+          "id": "only_hypothetical",
+          "required": 0
+         }
+        ],
+        "type": "group",
+        "default": null,
+        "required": 0,
+        "id": "parameters",
+        "desc": ""
+       }
+      ],
+      "default": null,
+      "type": "group",
+      "id": "annotate-proteins-similarity",
+      "required": 0,
+      "desc": "annotate-proteins-similarity"
+     },
+     {
+      "label": "resolve-overlapping-features",
+      "group": [
+       {
+        "default": null,
+        "type": "string",
+        "id": "condition",
+        "required": 0,
+        "desc": ""
+       }
+      ],
+      "default": null,
+      "type": "group",
+      "id": "resolve-overlapping-features",
+      "required": 0,
+      "desc": "resolve-overlapping-features"
+     },
+     {
+      "default": null,
+      "type": "group",
+      "label": "find-close-neighbors",
+      "group": [
+       {
+        "default": null,
+        "type": "string",
+        "desc": "",
+        "id": "condition",
+        "required": 0
+       }
+      ],
+      "desc": "find-close-neighbors",
+      "id": "find-close-neighbors",
+      "required": 0
+     },
+     {
+      "desc": "call-features-prophage-phispy",
+      "id": "call-features-prophage-phispy",
+      "required": 0,
+      "default": null,
+      "type": "group",
+      "label": "call-features-prophage-phispy",
+      "group": [
+       {
+        "default": null,
+        "type": "string",
+        "id": "condition",
+        "required": 0,
+        "desc": ""
+       }
+      ]
+     }
+    ],
+    "label": "Customize the RASTtk pipeline",
+    "desc": "Customize the RASTtk pipeline",
+    "required": 0,
+    "id": "custom_pipeline"
+   }
+  ],
+  "label": "Annotate genome",
+  "description": "Calls genes and functionally annotate input contig set."
+ },
+ "start_time": 1789655082.09126,
+ "job_output": {
+  "genome_id": "243273.147",
+  "index_queue_id": "169d0e0c-1953-4980-b49e-148743d9ca3f",
+  "gto_path": "/USER@bvbrc/home/s2f/.mgen_G37_cga/.annotation/annotation.genome"
+ },
+ "id": "23587516"
+}

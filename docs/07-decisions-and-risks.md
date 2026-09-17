@@ -1,15 +1,24 @@
 # Open decisions and standing risks
 
-## Decisions needed (owner: team lead, today)
+## Decisions (recorded 2026-09-16, issue #24)
 
-| Decision | Options | Default if nobody decides |
+| Decision | Chosen | Note |
 | --- | --- | --- |
-| Test genome | *S. aureus* USA300 (MRSA), *K. pneumoniae* HS11286, *P. aeruginosa* PAO1 | USA300, blinded (headers stripped, name never in prompts or filenames) |
-| Triage target count | 20 / 50 / 100 proteins | 50, with the pipeline proven on 10 first |
-| Ligand cap per protein | candidates in / docked | 200 in, top 20 docked |
-| Docking engine | Vina, smina, gnina rescoring | Vina + gnina rescoring on the top poses |
-| Module owners | one per M1–M6 | assign before any code is written; every module needs a name |
-| Argo model | haiku for prototyping, opus for final | as stated; cap `max_tokens`, cap loop iterations |
+| Smoke-test genome | *M. genitalium* G37, BV-BRC 243273.25, 580,076 bp, 542 CDS | `fixtures/genomes/mgen_G37/`. Pipeline shakedown and fixtures only, never a reported result. Human pathogen with AMR, human homologs and a TTD drug target; no virulence-factor hits, so that triage component is untested by it. |
+| Test genome | *S. aureus* USA300 (MRSA), blinded | Default taken. Headers stripped, name never in prompts or filenames. |
+| Triage target count | 50 proteins | Default taken. Pipeline proven on 10 first. |
+| Ligand cap per protein | 200 candidates in, top 20 docked | Default taken. Caps recorded in the `run` manifest. |
+| Docking engine | Vina, with gnina rescoring on the top poses | Default taken. Fixed seed and exhaustiveness, both recorded. |
+| Argo model | haiku for prototyping, opus for final | Default taken. Cap `max_tokens`, cap loop iterations. |
+
+Options considered for each are in the issue. Changes from here are noted in the
+commit message that makes them.
+
+### Still open
+
+| Decision | Options | Status |
+| --- | --- | --- |
+| Module owners | one per M1-M6 | Claimed: M2 sequence/structure lookups and triage scoring (#8, #12, Jiahuic), M2 Foldseek (#9, Ashita2619). M1, M3, M4, M5, M6 have no owner. |
 
 ## Standing risks
 
