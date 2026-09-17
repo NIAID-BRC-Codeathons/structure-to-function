@@ -1,0 +1,476 @@
+{
+ "amr_phenotypes": [
+  {
+   "antibiotic": "amikacin",
+   "computational_method": "MIC XGBoost Model",
+   "evidence": "Computational Method",
+   "laboratory_typing_method": null,
+   "measurement": 32.0,
+   "measurement_unit": "mg/L",
+   "resistant_phenotype": null
+  },
+  {
+   "antibiotic": "amoxicillin/clavulanic acid",
+   "computational_method": "MIC XGBoost Model",
+   "evidence": "Computational Method",
+   "laboratory_typing_method": null,
+   "measurement": 32.0,
+   "measurement_unit": "mg/L",
+   "resistant_phenotype": null
+  },
+  {
+   "antibiotic": "ampicillin",
+   "computational_method": "MIC XGBoost Model",
+   "evidence": "Computational Method",
+   "laboratory_typing_method": null,
+   "measurement": 32.0,
+   "measurement_unit": "mg/L",
+   "resistant_phenotype": null
+  },
+  {
+   "antibiotic": "ampicillin/sulbactam",
+   "computational_method": "MIC XGBoost Model",
+   "evidence": "Computational Method",
+   "laboratory_typing_method": null,
+   "measurement": 64.0,
+   "measurement_unit": "mg/L",
+   "resistant_phenotype": null
+  },
+  {
+   "antibiotic": "aztreonam",
+   "computational_method": "MIC XGBoost Model",
+   "evidence": "Computational Method",
+   "laboratory_typing_method": null,
+   "measurement": 32.0,
+   "measurement_unit": "mg/L",
+   "resistant_phenotype": null
+  },
+  {
+   "antibiotic": "cefazolin",
+   "computational_method": "MIC XGBoost Model",
+   "evidence": "Computational Method",
+   "laboratory_typing_method": null,
+   "measurement": 32.0,
+   "measurement_unit": "mg/L",
+   "resistant_phenotype": null
+  },
+  {
+   "antibiotic": "cefepime",
+   "computational_method": "MIC XGBoost Model",
+   "evidence": "Computational Method",
+   "laboratory_typing_method": null,
+   "measurement": 16.0,
+   "measurement_unit": "mg/L",
+   "resistant_phenotype": null
+  },
+  {
+   "antibiotic": "cefotaxime",
+   "computational_method": "MIC XGBoost Model",
+   "evidence": "Computational Method",
+   "laboratory_typing_method": null,
+   "measurement": 32.0,
+   "measurement_unit": "mg/L",
+   "resistant_phenotype": null
+  }
+ ],
+ "close_pathogens_facet": {
+  "Klebsiella aerogenes": 997,
+  "Klebsiella grimontii": 192,
+  "Klebsiella michiganensis": 685,
+  "Klebsiella oxytoca": 1006,
+  "Klebsiella quasipneumoniae": 1141,
+  "Klebsiella variicola": 1130
+ },
+ "features": [
+  {
+   "aa_length": 180,
+   "aa_sequence_md5": "00000000000000000000000000000000",
+   "end": 1086299,
+   "gene": null,
+   "patric_id": "fig|1125630.4.peg.994",
+   "pgfam_id": "PGF_00010728",
+   "plfam_id": "PLF_570_00000247",
+   "product": "Transcriptional regulator EcpR",
+   "refseq_locus_tag": "KPHS_10260",
+   "start": 1085757,
+   "strand": "+"
+  },
+  {
+   "aa_length": 841,
+   "aa_sequence_md5": "00000000000000000000000000000001",
+   "end": 1090239,
+   "gene": null,
+   "patric_id": "fig|1125630.4.peg.997",
+   "pgfam_id": "PGF_00415059",
+   "plfam_id": "PLF_570_00001335",
+   "product": "CFA/I fimbrial subunit C usher protein",
+   "refseq_locus_tag": "KPHS_10290",
+   "start": 1087714,
+   "strand": "+"
+  },
+  {
+   "aa_length": 547,
+   "aa_sequence_md5": "00000000000000000000000000000002",
+   "end": 1091872,
+   "gene": null,
+   "patric_id": "fig|1125630.4.peg.998",
+   "pgfam_id": "PGF_00415056",
+   "plfam_id": "PLF_570_00000203",
+   "product": "CFA/I fimbrial minor adhesin",
+   "refseq_locus_tag": "KPHS_10300",
+   "start": 1090229,
+   "strand": "+"
+  },
+  {
+   "aa_length": 729,
+   "aa_sequence_md5": "00000000000000000000000000000003",
+   "end": 2052460,
+   "gene": null,
+   "patric_id": "fig|1125630.4.peg.1937",
+   "pgfam_id": "PGF_00853704",
+   "plfam_id": "PLF_570_00000121",
+   "product": "Aerobactin siderophore receptor IutA",
+   "refseq_locus_tag": "KPHS_19870",
+   "start": 2050271,
+   "strand": "-"
+  },
+  {
+   "aa_length": 223,
+   "aa_sequence_md5": "00000000000000000000000000000004",
+   "end": 1696166,
+   "gene": null,
+   "patric_id": "fig|1125630.4.peg.1591",
+   "pgfam_id": "PGF_00063150",
+   "plfam_id": "PLF_570_00000985",
+   "product": "Two-component transcriptional regulatory protein BasR/PmrA (activated by BasS/PmrB)",
+   "refseq_locus_tag": "KPHS_16340",
+   "start": 1695495,
+   "strand": "-"
+  },
+  {
+   "aa_length": 673,
+   "aa_sequence_md5": "00000000000000000000000000000005",
+   "end": 3464002,
+   "gene": null,
+   "patric_id": "fig|1125630.4.peg.3382",
+   "pgfam_id": "PGF_00400374",
+   "plfam_id": "PLF_570_00005330",
+   "product": "iron aquisition outermembrane yersiniabactin receptor (FyuA,Psn,pesticin receptor) @ Outer membrane receptor for ferric siderophore",
+   "refseq_locus_tag": "KPHS_34710",
+   "start": 3461981,
+   "strand": "+"
+  },
+  {
+   "aa_length": 391,
+   "aa_sequence_md5": "00000000000000000000000000000006",
+   "end": 36412,
+   "gene": null,
+   "patric_id": "fig|1125630.4.peg.5465",
+   "pgfam_id": "PGF_03024591",
+   "plfam_id": "PLF_570_00031030",
+   "product": "Tetracycline resistance, MFS efflux pump => Tet(G)",
+   "refseq_locus_tag": "KPHS_p300630",
+   "start": 35237,
+   "strand": "-"
+  },
+  {
+   "aa_length": 63,
+   "aa_sequence_md5": "00000000000000000000000000000007",
+   "end": 766,
+   "gene": null,
+   "patric_id": "fig|1125630.4.peg.5521",
+   "pgfam_id": "PGF_08225224",
+   "plfam_id": "PLF_570_00005744",
+   "product": "hypothetical protein",
+   "refseq_locus_tag": "KPHS_p500020",
+   "start": 575,
+   "strand": "-"
+  },
+  {
+   "aa_length": 308,
+   "aa_sequence_md5": "00000000000000000000000000000008",
+   "end": 1663,
+   "gene": null,
+   "patric_id": "fig|1125630.4.peg.5518",
+   "pgfam_id": "PGF_08225224",
+   "plfam_id": "PLF_570_00018277",
+   "product": "hypothetical protein",
+   "refseq_locus_tag": "KPHS_p400020",
+   "start": 737,
+   "strand": "+"
+  }
+ ],
+ "genome": {
+  "cell_shape": null,
+  "collection_year": 2011,
+  "contigs": 7,
+  "disease": [
+   "Nosocomial infection"
+  ],
+  "family": "Enterobacteriaceae",
+  "gc_content": 57.1,
+  "genetic_code": 11,
+  "genome_id": "1125630.4",
+  "genome_length": 5682322,
+  "genome_name": "Klebsiella pneumoniae subsp. pneumoniae HS11286",
+  "genome_quality": "Good",
+  "genome_status": "Complete",
+  "genus": "Klebsiella",
+  "gram_stain": null,
+  "host_name": "Homo sapiens",
+  "isolation_country": "China",
+  "order": "Enterobacterales",
+  "oxygen_requirement": "Facultative",
+  "patric_cds": 5497,
+  "publication": "22408243",
+  "reference_genome": "Representative",
+  "species": "Klebsiella pneumoniae",
+  "taxon_id": 1125630,
+  "taxon_lineage_ids": [
+   "2",
+   "1224",
+   "1236",
+   "91347",
+   "543",
+   "570",
+   "573",
+   "72407"
+  ],
+  "taxon_lineage_names": [
+   "Bacteria",
+   "Pseudomonadota",
+   "Gammaproteobacteria",
+   "Enterobacterales",
+   "Enterobacteriaceae",
+   "Klebsiella",
+   "Klebsiella pneumoniae",
+   "Klebsiella pneumoniae subsp. pneumoniae"
+  ]
+ },
+ "neighbors": [
+  {
+   "genome_id": "573.11313",
+   "genome_name": "Klebsiella pneumoniae strain X",
+   "reference_genome": "Representative",
+   "species": "Klebsiella pneumoniae"
+  },
+  {
+   "genome_id": "571.200",
+   "genome_name": "Klebsiella oxytoca strain Y",
+   "reference_genome": "Reference",
+   "species": "Klebsiella oxytoca"
+  },
+  {
+   "genome_id": "1463165.3",
+   "genome_name": "Klebsiella quasipneumoniae strain Z",
+   "reference_genome": "Representative",
+   "species": "Klebsiella quasipneumoniae"
+  }
+ ],
+ "sequences": {
+  "00000000000000000000000000000000": "MAGVLKSTPQRYWFDENCHIAGVLKSTPQRYWFDENCHIAGVLKSTPQRYWFDENCHIAGVLKSTPQRYWFDENCHIAGVLKSTPQRYWFDENCHIAGVLKSTPQRYWFDENCHI",
+  "00000000000000000000000000000001": "MAGVLKSTPQRYWFDENCHIAGVLKSTPQRYWFDENCHIAGVLKSTPQRYWFDENCHIAGVLKSTPQRYWFDENCHIAGVLKSTPQRYWFDENCHIAGVLKSTPQRYWFDENCHI",
+  "00000000000000000000000000000002": "MAGVLKSTPQRYWFDENCHIAGVLKSTPQRYWFDENCHIAGVLKSTPQRYWFDENCHIAGVLKSTPQRYWFDENCHIAGVLKSTPQRYWFDENCHIAGVLKSTPQRYWFDENCHI",
+  "00000000000000000000000000000003": "MAGVLKSTPQRYWFDENCHIAGVLKSTPQRYWFDENCHIAGVLKSTPQRYWFDENCHIAGVLKSTPQRYWFDENCHIAGVLKSTPQRYWFDENCHIAGVLKSTPQRYWFDENCHI",
+  "00000000000000000000000000000004": "MAGVLKSTPQRYWFDENCHIAGVLKSTPQRYWFDENCHIAGVLKSTPQRYWFDENCHIAGVLKSTPQRYWFDENCHIAGVLKSTPQRYWFDENCHIAGVLKSTPQRYWFDENCHI",
+  "00000000000000000000000000000005": "MAGVLKSTPQRYWFDENCHIAGVLKSTPQRYWFDENCHIAGVLKSTPQRYWFDENCHIAGVLKSTPQRYWFDENCHIAGVLKSTPQRYWFDENCHIAGVLKSTPQRYWFDENCHI",
+  "00000000000000000000000000000006": "MAGVLKSTPQRYWFDENCHIAGVLKSTPQRYWFDENCHIAGVLKSTPQRYWFDENCHIAGVLKSTPQRYWFDENCHIAGVLKSTPQRYWFDENCHIAGVLKSTPQRYWFDENCHI",
+  "00000000000000000000000000000007": "MAGVLKSTPQRYWFDENCHIAGVLKSTPQRYWFDENCHIAGVLKSTPQRYWFDENCHIAGVLKSTPQRYWFDENCHIAGVLKSTPQRYWFDENCHIAGVLKSTPQRYWFDENCHI",
+  "00000000000000000000000000000008": "MAGVLKSTPQRYWFDENCHIAGVLKSTPQRYWFDENCHIAGVLKSTPQRYWFDENCHIAGVLKSTPQRYWFDENCHIAGVLKSTPQRYWFDENCHIAGVLKSTPQRYWFDENCHI"
+ },
+ "specialty": [
+  {
+   "antibiotics_class": null,
+   "classification": [
+    "Adherence"
+   ],
+   "evidence": "BLASTP",
+   "function": null,
+   "gene": null,
+   "identity": 92,
+   "patric_id": "fig|1125630.4.peg.994",
+   "product": "Transcriptional regulator EcpR",
+   "property": "Virulence Factor",
+   "query_coverage": 96,
+   "same_genus": 1,
+   "same_species": 1,
+   "source": "VFDB",
+   "source_id": "VFG002413",
+   "subject_coverage": null
+  },
+  {
+   "antibiotics_class": null,
+   "classification": [
+    "Adherence"
+   ],
+   "evidence": "BLASTP",
+   "function": null,
+   "gene": null,
+   "identity": 93,
+   "patric_id": "fig|1125630.4.peg.997",
+   "product": "CFA/I fimbrial subunit C usher protein",
+   "property": "Virulence Factor",
+   "query_coverage": 100,
+   "same_genus": 1,
+   "same_species": 1,
+   "source": "VFDB",
+   "source_id": "VFG002415",
+   "subject_coverage": null
+  },
+  {
+   "antibiotics_class": null,
+   "classification": [
+    "Adherence"
+   ],
+   "evidence": "BLASTP",
+   "function": null,
+   "gene": null,
+   "identity": 94,
+   "patric_id": "fig|1125630.4.peg.998",
+   "product": "CFA/I fimbrial minor adhesin",
+   "property": "Virulence Factor",
+   "query_coverage": 100,
+   "same_genus": 1,
+   "same_species": 1,
+   "source": "VFDB",
+   "source_id": "VFG002416",
+   "subject_coverage": null
+  },
+  {
+   "antibiotics_class": null,
+   "classification": [
+    "Nutritional/Metabolic factor"
+   ],
+   "evidence": "BLASTP",
+   "function": null,
+   "gene": null,
+   "identity": 99,
+   "patric_id": "fig|1125630.4.peg.1937",
+   "product": "Aerobactin siderophore receptor IutA",
+   "property": "Virulence Factor",
+   "query_coverage": 100,
+   "same_genus": 1,
+   "same_species": 1,
+   "source": "VFDB",
+   "source_id": "VFG048620",
+   "subject_coverage": null
+  },
+  {
+   "antibiotics_class": "polymixins",
+   "classification": [
+    "regulator modulating expression of antibiotic resistance genes"
+   ],
+   "evidence": "BLASTP",
+   "function": null,
+   "gene": null,
+   "identity": null,
+   "patric_id": "fig|1125630.4.peg.1591",
+   "product": "Two-component transcriptional regulatory protein BasR/PmrA (activated by BasS/PmrB)",
+   "property": "Antibiotic Resistance",
+   "query_coverage": null,
+   "same_genus": 1,
+   "same_species": 1,
+   "source": "PATRIC",
+   "source_id": null,
+   "subject_coverage": null
+  },
+  {
+   "antibiotics_class": null,
+   "classification": [
+    "aminoglycoside resistance gene",
+    "tetracycline resistance gene"
+   ],
+   "evidence": "BLASTP",
+   "function": null,
+   "gene": null,
+   "identity": 99,
+   "patric_id": "fig|1125630.4.peg.3382",
+   "product": "iron aquisition outermembrane yersiniabactin receptor (FyuA,Psn,pesticin receptor) @ Outer membrane receptor for ferric siderophore",
+   "property": "Antibiotic Resistance",
+   "query_coverage": 100,
+   "same_genus": 1,
+   "same_species": 1,
+   "source": "CARD",
+   "source_id": null,
+   "subject_coverage": null
+  },
+  {
+   "antibiotics_class": null,
+   "classification": [
+    "efflux pump conferring antibiotic resistance"
+   ],
+   "evidence": "BLASTP",
+   "function": null,
+   "gene": null,
+   "identity": 94,
+   "patric_id": "fig|1125630.4.peg.5465",
+   "product": "Tetracycline resistance, MFS efflux pump => Tet(G)",
+   "property": "Antibiotic Resistance",
+   "query_coverage": 100,
+   "same_genus": 1,
+   "same_species": 1,
+   "source": "CARD",
+   "source_id": null,
+   "subject_coverage": null
+  }
+ ],
+ "subsystems": [
+  {
+   "class": "Amino acids and derivatives",
+   "subclass": "Lysine biosynthesis",
+   "subsystem_name": "Lysine biosynthesis DAP pathway"
+  },
+  {
+   "class": "Amino acids and derivatives",
+   "subclass": "Histidine",
+   "subsystem_name": "Histidine biosynthesis"
+  },
+  {
+   "class": "Cofactors, vitamins, prosthetic groups",
+   "subclass": "Folate",
+   "subsystem_name": "Folate biosynthesis"
+  },
+  {
+   "class": "Carbohydrates",
+   "subclass": "Glycolysis",
+   "subsystem_name": "Glycolysis and gluconeogenesis"
+  }
+ ],
+ "taxonomy": [
+  {
+   "lineage_ids": [
+    "2",
+    "1224",
+    "1236",
+    "91347",
+    "543",
+    "570",
+    "573",
+    "72407"
+   ],
+   "lineage_names": [
+    "Bacteria",
+    "Pseudomonadota",
+    "Gammaproteobacteria",
+    "Enterobacterales",
+    "Enterobacteriaceae",
+    "Klebsiella",
+    "Klebsiella pneumoniae",
+    "Klebsiella pneumoniae subsp. pneumoniae"
+   ],
+   "lineage_ranks": [
+    "superkingdom",
+    "phylum",
+    "class",
+    "order",
+    "family",
+    "genus",
+    "species",
+    "subspecies"
+   ],
+   "taxon_id": 1125630,
+   "taxon_name": "Klebsiella pneumoniae subsp. pneumoniae HS11286",
+   "taxon_rank": "strain"
+  }
+ ]
+}

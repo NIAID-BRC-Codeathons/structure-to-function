@@ -21,7 +21,8 @@ Each module doc carries scope, inputs, outputs, tools, steps, acceptance checks,
 
 | Module | Doc | Owns in `report.json` |
 | --- | --- | --- |
-| M1 genome | [01-m1-genome.md](01-m1-genome.md) | `run`, `genome`, `proteins` (list) |
+| M1 genome | [01-m1-genome.md](01-m1-genome.md) | `run`, `genome`, `proteins` (list), `proteins[].m1_priority` |
+| M1b API route | [01b-m1-api-mode.md](01b-m1-api-mode.md) | the no-account route, its caveats, and the shared contract |
 | M2 triage | [02-m2-triage.md](02-m2-triage.md) | `proteins.*` enrichment, `kg` |
 | M2a PDB evidence | [02a-m2-pdb-evidence.md](02a-m2-pdb-evidence.md) | query parameters, scoring weights, weight change log |
 | M2b knowledge graph | [02b-m2-knowledge-graph.md](02b-m2-knowledge-graph.md) | source survey, edge types, caps, the homolog bridge |
