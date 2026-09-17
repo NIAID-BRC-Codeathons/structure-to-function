@@ -1,0 +1,109 @@
+{
+ "amr_gene_summary": {
+  "antibiotic target in susceptible species": [
+   "EF-G",
+   "EF-Tu",
+   "folA, Dfr",
+   "gyrA",
+   "gyrB",
+   "Iso-tRNA",
+   "rpoB",
+   "rpoC",
+   "S10p",
+   "S12p"
+  ],
+  "gene conferring resistance via absence": [
+   "gidB"
+  ],
+  "protein altering cell wall charge conferring antibiotic resistance": [
+   "GdpD",
+   "PgsA"
+  ]
+ },
+ "amr_genes": [
+  [
+   "fig|243273.147.peg.3",
+   "gyrB",
+   "DNA gyrase subunit B (EC 5.99.1.3)",
+   "antibiotic target in susceptible species"
+  ],
+  [
+   "fig|243273.147.peg.4",
+   "gyrA",
+   "DNA gyrase subunit A (EC 5.99.1.3)",
+   "antibiotic target in susceptible species"
+  ],
+  [
+   "fig|243273.147.peg.94",
+   "S12p",
+   "SSU ribosomal protein S12p (S23e)",
+   "antibiotic target in susceptible species"
+  ],
+  [
+   "fig|243273.147.peg.96",
+   "EF-G",
+   "Translation elongation factor G",
+   "antibiotic target in susceptible species"
+  ],
+  [
+   "fig|243273.147.peg.122",
+   "PgsA",
+   "CDP-diacylglycerol--glycerol-3-phosphate 3-phosphatidyltransferase (EC 2.7.8.5)",
+   "protein altering cell wall charge conferring antibiotic resistance"
+  ],
+  [
+   "fig|243273.147.peg.166",
+   "S10p",
+   "SSU ribosomal protein S10p (S20e)",
+   "antibiotic target in susceptible species"
+  ],
+  [
+   "fig|243273.147.peg.258",
+   "folA, Dfr",
+   "Dihydrofolate reductase (EC 1.5.1.3)",
+   "antibiotic target in susceptible species"
+  ],
+  [
+   "fig|243273.147.peg.336",
+   "GdpD",
+   "Glycerophosphoryl diester phosphodiesterase (EC 3.1.4.46)",
+   "protein altering cell wall charge conferring antibiotic resistance"
+  ],
+  [
+   "fig|243273.147.peg.390",
+   "rpoC",
+   "DNA-directed RNA polymerase beta' subunit (EC 2.7.7.6)",
+   "antibiotic target in susceptible species"
+  ],
+  [
+   "fig|243273.147.peg.391",
+   "rpoB",
+   "DNA-directed RNA polymerase beta subunit (EC 2.7.7.6)",
+   "antibiotic target in susceptible species"
+  ],
+  [
+   "fig|243273.147.peg.395",
+   "Iso-tRNA",
+   "Isoleucyl-tRNA synthetase (EC 6.1.1.5)",
+   "antibiotic target in susceptible species"
+  ],
+  [
+   "fig|243273.147.peg.435",
+   "gidB",
+   "16S rRNA (guanine(527)-N(7))-methyltransferase (EC 2.1.1.170)",
+   "gene conferring resistance via absence"
+  ],
+  [
+   "fig|243273.147.peg.441",
+   "GdpD",
+   "Glycerophosphoryl diester phosphodiesterase (EC 3.1.4.46)",
+   "protein altering cell wall charge conferring antibiotic resistance"
+  ],
+  [
+   "fig|243273.147.peg.507",
+   "EF-Tu",
+   "Translation elongation factor Tu",
+   "antibiotic target in susceptible species"
+  ]
+ ]
+}

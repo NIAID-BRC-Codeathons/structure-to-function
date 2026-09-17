@@ -1,0 +1,334 @@
+[
+ {
+  "annotations": [
+   [
+    "Add feature called by PRODIGAL",
+    "prodigal",
+    1789655106.28429,
+    "944F695A-B2A3-11F1-A388-C542D24D7A8A"
+   ],
+   [
+    "Function updated to DNA gyrase subunit A (EC 5.99.1.3)",
+    "annotate_proteins_kmer_v2",
+    1789655113.5231,
+    "989FF4DE-B2A3-11F1-AA45-8F5FF5B34E91"
+   ],
+   [
+    "Feature renumbered from fig|243273.147.peg.4 to fig|243273.147.peg.4",
+    "cmann@bvbrc",
+    1789655125.57413,
+    "9FCDB994-B2A3-11F1-9195-94DA575918DD"
+   ]
+  ],
+  "ec_numbers": [
+   [
+    "5.99.1.3",
+    "DNA topoisomerase (ATP-hydrolyzing)"
+   ]
+  ],
+  "family_assignments": [
+   [
+    "PGFAM",
+    "PGF_03272313",
+    "DNA gyrase subunit A (EC 5.99.1.3)",
+    "2018-0531",
+    1120
+   ],
+   [
+    "PLFAM",
+    "PLF_2093_00001144",
+    "DNA gyrase subunit A (EC 5.99.1.3)",
+    "2018-0531"
+   ]
+  ],
+  "feature_creation_event": "944F695A-B2A3-11F1-A388-C542D24D7A8A",
+  "function": "DNA gyrase subunit A (EC 5.99.1.3)",
+  "go_terms": [
+   [
+    "GO:0003918",
+    "DNA topoisomerase type II (ATP-hydrolyzing) activity"
+   ]
+  ],
+  "id": "fig|243273.147.peg.4",
+  "location": [
+   [
+    "contig_1",
+    "4812",
+    "+",
+    2511
+   ]
+  ],
+  "pathways": [],
+  "quality": {
+   "hit_count": "648",
+   "priority": 265.801595812337,
+   "weighted_hit_count": "689.711"
+  },
+  "similarity_associations": [],
+  "type": "CDS"
+ },
+ {
+  "annotations": [
+   [
+    "Add feature called by PRODIGAL",
+    "prodigal",
+    1789655106.28435,
+    "944F695A-B2A3-11F1-A388-C542D24D7A8A"
+   ],
+   [
+    "Function updated to hypothetical protein",
+    "annotate_proteins_kmer_v2",
+    1789655113.52319,
+    "989FF4DE-B2A3-11F1-AA45-8F5FF5B34E91"
+   ],
+   [
+    "Feature renumbered from fig|243273.147.peg.11 to fig|243273.147.peg.11",
+    "cmann@bvbrc",
+    1789655125.5742,
+    "9FCDB994-B2A3-11F1-9195-94DA575918DD"
+   ]
+  ],
+  "family_assignments": [
+   [
+    "PGFAM",
+    "PGF_00098790",
+    "hypothetical protein",
+    "2018-0531",
+    263
+   ],
+   [
+    "PLFAM",
+    "PLF_2093_00004476",
+    "hypothetical protein",
+    "2018-0531"
+   ]
+  ],
+  "feature_creation_event": "944F695A-B2A3-11F1-A388-C542D24D7A8A",
+  "function": "hypothetical protein",
+  "id": "fig|243273.147.peg.11",
+  "location": [
+   [
+    "contig_1",
+    "13564",
+    "-",
+    864
+   ]
+  ],
+  "quality": {
+   "hit_count": "241",
+   "priority": 127.519620684318,
+   "weighted_hit_count": "179.0662"
+  },
+  "similarity_associations": [],
+  "type": "CDS"
+ },
+ {
+  "annotations": [
+   [
+    "Add feature called by PRODIGAL",
+    "prodigal",
+    1789655106.28506,
+    "944F695A-B2A3-11F1-A388-C542D24D7A8A"
+   ],
+   [
+    "Function updated to SSU ribosomal protein S12p (S23e)",
+    "annotate_proteins_kmer_v2",
+    1789655113.52424,
+    "989FF4DE-B2A3-11F1-AA45-8F5FF5B34E91"
+   ],
+   [
+    "Feature renumbered from fig|243273.147.peg.95 to fig|243273.147.peg.94",
+    "cmann@bvbrc",
+    1789655125.57512,
+    "9FCDB994-B2A3-11F1-9195-94DA575918DD"
+   ]
+  ],
+  "family_assignments": [
+   [
+    "PGFAM",
+    "PGF_06941403",
+    "SSU ribosomal protein S12p (S23e)",
+    "2018-0531",
+    256
+   ],
+   [
+    "PLFAM",
+    "PLF_2093_00000006",
+    "SSU ribosomal protein S12p (S23e)",
+    "2018-0531"
+   ]
+  ],
+  "feature_creation_event": "944F695A-B2A3-11F1-A388-C542D24D7A8A",
+  "function": "SSU ribosomal protein S12p (S23e)",
+  "id": "fig|243273.147.peg.94",
+  "location": [
+   [
+    "contig_1",
+    "113895",
+    "+",
+    420
+   ]
+  ],
+  "quality": {
+   "hit_count": "125",
+   "priority": 78.6402877459515,
+   "weighted_hit_count": "308.726"
+  },
+  "similarity_associations": [],
+  "type": "CDS"
+ },
+ {
+  "annotations": [
+   [
+    "Add feature called by PRODIGAL",
+    "prodigal",
+    1789655106.28648,
+    "944F695A-B2A3-11F1-A388-C542D24D7A8A"
+   ],
+   [
+    "Function updated to Uncharacterized amino acid permease, GabP family",
+    "annotate_proteins_kmer_v2",
+    1789655113.52593,
+    "989FF4DE-B2A3-11F1-AA45-8F5FF5B34E91"
+   ],
+   [
+    "Feature renumbered from fig|243273.147.peg.255 to fig|243273.147.peg.254",
+    "cmann@bvbrc",
+    1789655125.57707,
+    "9FCDB994-B2A3-11F1-9195-94DA575918DD"
+   ]
+  ],
+  "family_assignments": [
+   [
+    "PGFAM",
+    "PGF_00778630",
+    "Uncharacterized amino acid permease, GabP family",
+    "2018-0531",
+    444
+   ],
+   [
+    "PLFAM",
+    "PLF_2093_00003459",
+    "Uncharacterized amino acid permease, GabP family",
+    "2018-0531"
+   ]
+  ],
+  "feature_creation_event": "944F695A-B2A3-11F1-A388-C542D24D7A8A",
+  "function": "Uncharacterized amino acid permease, GabP family",
+  "id": "fig|243273.147.peg.254",
+  "location": [
+   [
+    "contig_1",
+    "270405",
+    "+",
+    1470
+   ]
+  ],
+  "quality": {
+   "hit_count": "394",
+   "priority": 183.590717639953,
+   "weighted_hit_count": "294.306"
+  },
+  "similarity_associations": [
+   [
+    "TCDB",
+    "TCDB|P47467",
+    "100",
+    "100",
+    "100",
+    "0.0",
+    {
+     "classification": "2.A.3.3.15",
+     "event_id": "AB50871A-B2A3-11F1-8D95-8611019A6076",
+     "organism": "Mycoplasma genitalium strain ATCC 33530",
+     "product": "Uncharacterized protein MG225",
+     "property": "Transporter",
+     "source": "TCDB",
+     "source_id": "P47467",
+     "tool": "diamond"
+    }
+   ]
+  ],
+  "type": "CDS"
+ },
+ {
+  "annotations": [
+   [
+    "Add feature called by PRODIGAL",
+    "prodigal",
+    1789655106.28858,
+    "944F695A-B2A3-11F1-A388-C542D24D7A8A"
+   ],
+   [
+    "Function updated to 2,3-bisphosphoglycerate-independent phosphoglycerate mutase (EC 5.4.2.12)",
+    "annotate_proteins_kmer_v2",
+    1789655113.5283,
+    "989FF4DE-B2A3-11F1-AA45-8F5FF5B34E91"
+   ],
+   [
+    "Feature renumbered from fig|243273.147.peg.483 to fig|243273.147.peg.485",
+    "cmann@bvbrc",
+    1789655125.5798,
+    "9FCDB994-B2A3-11F1-9195-94DA575918DD"
+   ]
+  ],
+  "ec_numbers": [
+   [
+    "5.4.2.12",
+    "Phosphoglycerate mutase (2,3-diphosphoglycerate-independent)"
+   ]
+  ],
+  "family_assignments": [
+   [
+    "PGFAM",
+    "PGF_00021217",
+    "2,3-bisphosphoglycerate-independent phosphoglycerate mutase (EC 5.4.2.12)",
+    "2018-0531",
+    842
+   ],
+   [
+    "PLFAM",
+    "PLF_2093_00005111",
+    "2,3-bisphosphoglycerate-independent phosphoglycerate mutase (EC 5.4.2.12)",
+    "2018-0531"
+   ]
+  ],
+  "feature_creation_event": "944F695A-B2A3-11F1-A388-C542D24D7A8A",
+  "function": "2,3-bisphosphoglycerate-independent phosphoglycerate mutase (EC 5.4.2.12)",
+  "go_terms": [],
+  "id": "fig|243273.147.peg.485",
+  "location": [
+   [
+    "contig_1",
+    "537564",
+    "-",
+    1524
+   ]
+  ],
+  "pathways": [],
+  "quality": {
+   "hit_count": "431",
+   "priority": 198.551641823914,
+   "weighted_hit_count": "529.393"
+  },
+  "similarity_associations": [
+   [
+    "TTD",
+    "TTD|T54526",
+    "100",
+    "100",
+    "100",
+    "0.0",
+    {
+     "event_id": "ADC8DB14-B2A3-11F1-8903-881A84B015B4",
+     "product": "Mycobacterium Bisphosphoglycerate phosphoglycerate mutase",
+     "property": "Drug Target",
+     "source": "TTD",
+     "source_id": "T54526",
+     "tool": "diamond"
+    }
+   ]
+  ],
+  "type": "CDS"
+ }
+]
