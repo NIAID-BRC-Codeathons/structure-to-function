@@ -9,6 +9,7 @@ from __future__ import annotations
 
 import csv
 import hashlib
+import json
 import re
 from collections import defaultdict
 from dataclasses import dataclass, field
@@ -137,6 +138,38 @@ def _normalize_header(name: str) -> str:
     return re.sub(r"[^a-z0-9]+", "_", (name or "").strip().lower()).strip("_")
 
 
+def _read_records(path: Path) -> list[dict[str, str]]:
+    """Read a feature or specialty table as CSV/TSV or as BV-BRC JSON."""
+    if path.suffix.lower() == ".json":
+        payload = json.loads(path.read_text(encoding="utf-8"))
+        if isinstance(payload, dict):
+            for key in ("features", "items", "records", "response", "docs"):
+                if isinstance(payload.get(key), list):
+                    payload = payload[key]
+                    break
+            else:
+                payload = [payload]
+        return [
+            {_normalize_header(k): ("" if v is None else str(v)) for k, v in row.items()}
+            for row in payload
+            if isinstance(row, dict)
+        ]
+    return _read_table(path)
+
+
+def _find_input(m1_dir: Path, names: tuple[str, ...], patterns: tuple[str, ...]) -> Path | None:
+    """Exact filenames first, then glob patterns, so both export layouts work."""
+    for name in names:
+        candidate = m1_dir / name
+        if candidate.exists():
+            return candidate
+    for pattern in patterns:
+        matches = sorted(m1_dir.glob(pattern))
+        if matches:
+            return matches[0]
+    return None
+
+
 def _read_table(path: Path) -> list[dict[str, str]]:
     with path.open(encoding="utf-8-sig", newline="") as handle:
         sample = handle.read(8192)
@@ -174,10 +207,25 @@ def _read_fasta(path: Path) -> list[tuple[str, str]]:
     return records
 
 
+FIG_ID = re.compile(r"^(fig\|[^|\s]+)")
+ORGANISM_SUFFIX = re.compile(r"\s*\[[^\]]*\]\s*$")
+
+
 def _feature_id_from_header(header: str) -> tuple[str, str]:
-    """Split ``fig|1125630.4.peg.5196  DNA replication protein`` into id and product."""
-    parts = header.split(None, 1)
-    return parts[0].strip(), (parts[1].strip() if len(parts) > 1 else "")
+    """Split a BV-BRC FASTA header into feature ID and product.
+
+    Two layouts are in circulation:
+    ``fig|1125630.4.peg.5196  DNA replication protein`` (p3-CLI/web export) and
+    ``fig|243273.25.peg.308|MG_267|VBIMycGen98045_0308| hypothetical protein [Organism | id]``
+    (the fixture on main). Only the ``fig|`` part is the canonical ID.
+    """
+    header = header.strip()
+    first, _, rest = header.partition(" ")
+    match = FIG_ID.match(header)
+    feature_id = match.group(1) if match else first.strip()
+    product = rest.strip() if match is None else header[len(first):].strip()
+    product = product.lstrip("| ").strip()
+    return feature_id, ORGANISM_SUFFIX.sub("", product).strip()
 
 
 def _float_or_none(value: str) -> float | None:
@@ -190,16 +238,17 @@ def _float_or_none(value: str) -> float | None:
 def load_input(m1_dir: Path) -> InputBundle:
     """Load ``proteins.faa`` plus the feature and (optional) specialty tables."""
     m1_dir = Path(m1_dir)
-    fasta_path = m1_dir / "proteins.faa"
-    if not fasta_path.exists():
-        raise FileNotFoundError(f"missing protein FASTA: {fasta_path}")
+    # *.faa only: a genome directory also holds nucleotide *.fna, which is not our input.
+    fasta_path = _find_input(m1_dir, ("proteins.faa",), ("*.faa",))
+    if fasta_path is None:
+        raise FileNotFoundError(f"missing protein FASTA (proteins.faa or *.faa) in {m1_dir}")
 
-    table_rows: list[dict[str, str]] = []
-    for name in ("genes_proteins.csv", "features.csv", "proteins.tsv", "features.tsv"):
-        candidate = m1_dir / name
-        if candidate.exists():
-            table_rows = _read_table(candidate)
-            break
+    table_path = _find_input(
+        m1_dir,
+        ("genes_proteins.csv", "features.csv", "proteins.tsv", "features.tsv", "features.json"),
+        ("*.features.json", "*features*.csv", "*features*.tsv"),
+    )
+    table_rows = _read_records(table_path) if table_path is not None else []
 
     by_id: dict[str, dict[str, str]] = {}
     for row in table_rows:
@@ -236,9 +285,13 @@ def load_input(m1_dir: Path) -> InputBundle:
     protein_index = {protein.feature_id: protein for protein in proteins}
 
     specialty_orphans: list[str] = []
-    specialty_path = m1_dir / "specialty_genes_all.csv"
-    if specialty_path.exists():
-        for row in _read_table(specialty_path):
+    specialty_path = _find_input(
+        m1_dir,
+        ("specialty_genes_all.csv", "specialty_genes.csv", "sp_gene.json"),
+        ("*.sp_gene.json", "*specialty*.csv", "*specialty*.tsv"),
+    )
+    if specialty_path is not None:
+        for row in _read_records(specialty_path):
             feature_id = _pick(row, ID_ALIASES)
             target = protein_index.get(feature_id)
             if target is None:

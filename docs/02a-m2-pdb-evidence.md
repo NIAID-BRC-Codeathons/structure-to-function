@@ -127,6 +127,31 @@ All proteins are ranked and kept. The top N (default 50, per issue #24) get `sel
 Every protein carries `reason`, including discarded ones. Selection is reproducible from the
 recorded components alone: `triage_score` is recomputed from `proteins.tsv` columns in a test.
 
+## Genome sensitivity of the weights
+
+The weights were tuned on HS11286. They are **not automatically portable**, because the
+components other than `pdb_evidence` come from BV-BRC's specialty table, whose coverage varies by
+organism:
+
+| Genome | Proteins | virulence/AMR | essential | drug target | uncharacterized | no PDB hit |
+| --- | --- | --- | --- | --- | --- | --- |
+| *K. pneumoniae* HS11286 | 5,523 | 6.2% | 3.7% | 6.5% | 24.2% | 33% |
+| *M. genitalium* G37 (fixture) | 542 | 2.8% | 27.3% | 0.2% | 35.1% | 38% |
+
+Same weights, very different selections: HS11286 gives 10 uncharacterized in the top 50, G37 gives
+32. G37 is a minimal genome with almost no drug-target or virulence annotation, so characterized
+proteins cannot collect the 0.15 + 0.20 those components carry, and structure-backed hypothetical
+proteins rise instead. Neither result is wrong, but the balance is a property of the genome's
+annotation, not only of the weights.
+
+Practical rules:
+
+- Read the composition line in `run.json` (`counts`) before trusting a top-50 from a new genome.
+- Retune per genome only with a dated row in the change log below, never silently.
+- A future fix, if this keeps biting: normalize each component by its prevalence in the genome, so
+  a rare annotation counts for more than a common one. Not done here — it would make one run's
+  scores incomparable with another's, which is its own trap.
+
 ## Outputs
 
 Written to `runs/<run_id>/m2_pdb/`:
