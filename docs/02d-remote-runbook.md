@@ -34,32 +34,39 @@ Everything below ran on a real CGA directory (*M. genitalium*, 530 proteins) on 
 | Pass one against the network | **verified** — 337/530 proteins have a PDB hit, id mapping ran |
 | InterProScan via `--interproscan auto` | **verified** — 435/530 proteins got Pfam/InterPro terms |
 | DeepTMHMM, BioLib cloud | **verified** — 50 sequences in 76 s (1.32 seq/s) |
+| Heuristic `membrane` vs DeepTMHMM | **verified** — precision 0.98, recall 0.94, MCC 0.95 over 530 proteins |
+| Heuristic `signal_peptide` vs DeepTMHMM | **verified, and poor** — precision 0.42, recall 0.47, MCC 0.41 |
 | DeepTMHMM, local install | **verified** on a V100 with `torch==1.5.0+cu101` — 530 sequences in **6m45s** |
-| Two-pass ingest, real provider output | **verified** — see below |
+| Two-pass ingest, real provider output | **verified** — 530/530 flags from a real predictor, `heuristic_only: 0` |
 | Provider runtime on a full proteome | **measured** — see below |
 | eggNOG-mapper, PSORTb, SignalP 6 | **not run** |
 
-Pass two over real DeepTMHMM and InterProScan output:
+Pass two over real DeepTMHMM (all 530) and InterProScan output:
 
 ```
-providers              {'deeptmhmm': 50, 'interproscan': 435, 'heuristic': 530}
+providers              {'deeptmhmm': 530, 'interproscan': 435, 'heuristic': 530}
 unmatched_ids          {}
-membrane_flag_source   {'deeptmhmm': 50, 'heuristic': 480}
-confidence             {'heuristic': 480, 'predicted': 50}
-heuristic_only         480
+membrane_flag_source   {'deeptmhmm': 530}
+confidence             {'predicted': 530}
+heuristic_only         0
+membrane 99 · secreted 19 · signal_peptide 36 · lipoprotein 11 · with_function_terms 435
 ```
 
-Every selected protein has a DeepTMHMM-backed membrane flag, 435 carry real function terms, and
-nothing went unmatched — the identifier round-trip through the tools holds.
+**That is what a finished annotation run looks like**: every flag set by a real predictor, no
+protein left on the fallback, nothing unmatched. The heuristic still ran for all 530 — it simply
+lost to DeepTMHMM everywhere, which is the precedence table doing its job.
 
-Two things learned from that run worth carrying forward. **DeepTMHMM found transmembrane helices
-in only 2 of the 50 selected proteins**, which is low for a membrane-rich organism and is the
-triage criteria showing through: selecting for PDB evidence, essentiality and drug-target status
-selects against membrane proteins, because they rarely crystallize. A membrane penalty in the
-triage score would therefore have very little to do among the selected set. And on those same
-50, the built-in heuristic **agreed with DeepTMHMM on all 50**, with no false positives and no
-false negatives — but 48 of the 50 are negatives, so a classifier that always said "not
-membrane" would score 48/50. Concordant, on a set too easy to prove much.
+Two findings worth carrying forward. **The heuristic's two flags are of very different quality.**
+Over the same 530 proteins its membrane call tracks DeepTMHMM closely — precision 0.98, recall
+0.94, MCC 0.95, against 81.3% accuracy for an always-negative baseline — while its signal-peptide
+call does not: precision 0.42, recall 0.47, MCC 0.41, and an accuracy *below* the always-negative
+baseline. Treat a heuristic-tier `membrane` as usable and a heuristic-tier `signal_peptide`, or
+the `secreted` derived from it, as not. Full numbers and caveats in
+[02c](02c-m2-functional-annotation.md#checked-against-deeptmhmm). **And DeepTMHMM found helices
+in only 2 of the 50 triage-selected proteins** against 99 across the proteome — the selection
+criteria showing through, since selecting for PDB evidence and drug-target status selects against
+membrane proteins, which rarely crystallize. A membrane penalty in the triage score would have
+very little to do among the selected set.
 
 ### Measured runtimes
 

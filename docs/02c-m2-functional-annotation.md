@@ -119,12 +119,63 @@ Sanity check against M1 product names, which the heuristic never sees:
 | hypothetical | 161 | 45 | 16 | 0 |
 
 Permeases are almost all membrane; ribosomal proteins and aminoacyl-tRNA synthetases none at
-all. That is the shape it should have. It is **not a benchmark** — nothing here was scored
-against a labelled set, the random null is a floor rather than a false-positive rate, and the
-19 "lipoprotein"-named proteins show the recall problem plainly: 7 get a signal peptide and 5 a
-lipobox. Mycoplasma lipoprotein signal peptides are unusual, but the honest reading is that
-this heuristic finds roughly a third of them. Run DeepTMHMM and SignalP over the selected set
-before anything depends on these flags.
+all. That is the shape it should have — but it is not a benchmark, and the 19
+"lipoprotein"-named proteins show a recall problem plainly: 7 get a signal peptide and 5 a
+lipobox. Mycoplasma lipoprotein signal peptides are unusual, but the honest reading is that the
+heuristic finds roughly a third of them.
+
+### Checked against DeepTMHMM
+
+Both heuristic calls were compared against DeepTMHMM 1.0 over a whole real proteome —
+*M. genitalium*, 530 proteins, DeepTMHMM run locally on a V100
+(`docs/02d-remote-runbook.md`). The two flags came out very differently:
+
+| | positives | TP | FP | FN | TN | precision | recall | MCC | accuracy vs always-negative |
+| --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |
+| `membrane` | 99 (18.7%) | 93 | 2 | 6 | 429 | **0.98** | **0.94** | **0.95** | 98.5% vs 81.3% |
+| `signal_peptide` | 36 (6.8%) | 17 | 23 | 19 | 471 | **0.42** | **0.47** | **0.41** | 92.1% vs **93.2%** |
+
+Exact transmembrane-helix count agreement: 459/530 (87%).
+
+**The membrane call is good.** 98.5% accuracy against an 81.3% always-negative baseline, MCC
+0.95 — it is doing real work rather than riding the class imbalance, and with 99 positives the
+numbers mean something. The binary flag is much better than the count (87% exact agreement), so
+`flags.membrane` from the heuristic tier can carry weight while a heuristic `tm_helices` value
+should not be read as a topology model.
+
+**The signal-peptide call is not.** It scores *below* the always-say-no baseline on accuracy.
+MCC 0.41 says it is not noise — it carries real signal — but 23 of the 40 proteins it calls are
+wrong and it misses 19 of the 36 that are there. **Do not use a heuristic-tier `signal_peptide`,
+or the `secreted` flag derived from it, as if it were a prediction.** Run SignalP 6, or at
+minimum DeepTMHMM, for any protein where that flag matters.
+
+The likely mechanism is the n-region rule: the heuristic requires a lysine or arginine in
+residues 1–12, which keeps N-terminal transmembrane helices out of the signal-peptide bucket at
+the cost of missing every signal peptide with a neutral n-region. That accounts for the recall
+half. The false positives point at the h-region and cleavage-site rules being too permissive.
+
+**These thresholds have deliberately not been retuned against this measurement.** The heuristic
+was calibrated against a random-sequence null and against product names; tuning it to fit
+DeepTMHMM and then reporting agreement with DeepTMHMM would be circular. If the signal-peptide
+side is to be improved, it needs a held-out reference — SignalP 6 output on a different
+proteome — not this one.
+
+**Read all of this as concordance, not accuracy.** DeepTMHMM is itself a predictor, not
+experimental ground truth. It is one organism, and one with unusual membrane biology (no cell
+wall, sterol-containing membrane). And DeepTMHMM's signal detection is a side output of a
+topology model rather than a dedicated signal-peptide predictor, so the signal-peptide row is
+the weaker of the two comparisons in both directions.
+
+**`lipoprotein` remains unvalidated entirely.** DeepTMHMM never sets it — only the built-in
+lipobox scan, SignalP's LIPO class, or a UniProt lipidation feature can. On a run where
+DeepTMHMM is the only provider, `lipoprotein` is still a heuristic call, and because `secreted`
+is `signal_peptide AND no TM AND not lipoprotein`, those heuristic lipobox calls silently veto
+`secreted`. `confidence` does not capture this: it reports the weaker of the membrane and signal
+sources only.
+
+The point of the fallback was never to replace a predictor — it is what makes the flags exist at
+all for a protein nothing else reached, and `run.json`'s `heuristic_only` says how many of those
+there are. On a run where the providers cover the proteome, that number is zero.
 
 ## Running it
 
