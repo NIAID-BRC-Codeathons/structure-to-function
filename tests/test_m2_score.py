@@ -157,3 +157,122 @@ def test_best_hit_prefers_higher_scoring_structure() -> None:
     assert scored.best_hit.entity_id == "1HIG_1"
     assert scored.qualifying_hits == 2
     assert scored.distinct_entries == 2
+
+
+# --- issue #12: the components #10 unlocked, and the AMR correction --------------------
+
+
+class FakeAnnotation:
+    """Stands in for function.FunctionalAnnotation; only the fields scoring reads."""
+
+    def __init__(self, *, membrane=False, membrane_source="", secreted=False,
+                 surface_exposed=False, signal_source="", localization_source=""):
+        self.membrane = membrane
+        self.membrane_source = membrane_source
+        self.secreted = secreted
+        self.surface_exposed = surface_exposed
+        self.signal_source = signal_source
+        self.localization_source = localization_source
+
+
+def specialty(property_name, classification="", identity=None, source="PATRIC"):
+    return SpecialtyHit(
+        property_name=property_name, source=source, product="", identity=identity,
+        query_coverage=None, classification=classification,
+    )
+
+
+def test_a_drug_target_in_a_susceptible_species_is_not_resistance_evidence() -> None:
+    """gyrA and rpoB are what fluoroquinolones and rifamycins hit, not resistance genes (#30)."""
+    target = Protein(
+        feature_id="fig|1.1.peg.1", sequence="MKALIV", product="DNA gyrase subunit A",
+        specialty=[specialty("Antibiotic Resistance", "antibiotic target in susceptible species")],
+    )
+    scored = score_protein(target, [make_hit()], "found")
+
+    assert scored.components.virulence_amr == 0.0       # not resistance
+    assert scored.components.drug_target == 1.0          # but it *is* a drug target
+    assert scored.flags["antibiotic_target_not_resistance"] is True
+
+    # rank_and_select writes the reason, and a reader must see why it is not resistance.
+    ranked = rank_and_select([scored], top_n=1)
+    assert "antibiotic target in a susceptible species" in ranked[0].reason
+    assert "not a resistance gene" in ranked[0].reason
+
+
+def test_a_real_resistance_mechanism_still_counts() -> None:
+    efflux = Protein(
+        feature_id="fig|1.1.peg.2", sequence="MKALIV", product="efflux pump",
+        specialty=[specialty("Antibiotic Resistance", "['efflux pump conferring antibiotic resistance']")],
+    )
+    scored = score_protein(efflux, [make_hit()], "found")
+
+    assert scored.components.virulence_amr == 1.0
+    assert "efflux pump" in scored.flags["amr_basis"]
+
+
+def test_an_unclassified_amr_row_is_half_not_full_credit() -> None:
+    """The export sometimes omits classification; that is uncertainty, not confirmation."""
+    unknown = Protein(
+        feature_id="fig|1.1.peg.3", sequence="MKALIV", product="something",
+        specialty=[specialty("Antibiotic Resistance", "")],
+    )
+    scored = score_protein(unknown, [make_hit()], "found")
+
+    assert scored.components.virulence_amr == 0.5
+    assert "no classification" in scored.flags["amr_basis"]
+
+
+def test_a_virulence_factor_still_scores_in_full() -> None:
+    virulent = Protein(
+        feature_id="fig|1.1.peg.4", sequence="MKALIV", product="adhesin",
+        specialty=[specialty("Virulence Factor", identity=84.0)],
+    )
+    assert score_protein(virulent, [make_hit()], "found").components.virulence_amr == 1.0
+
+
+def test_surface_exposure_adds_and_membrane_subtracts() -> None:
+    plain = score_protein(make_protein(), [make_hit()], "found")
+    surface = score_protein(
+        make_protein(), [make_hit()], "found",
+        annotation=FakeAnnotation(secreted=True, surface_exposed=True, signal_source="signalp6"),
+    )
+    membrane = score_protein(
+        make_protein(), [make_hit()], "found",
+        annotation=FakeAnnotation(membrane=True, membrane_source="deeptmhmm"),
+    )
+
+    assert round(surface.score - plain.score, 6) == 0.10
+    assert round(membrane.score - plain.score, 6) == -0.15   # deprioritized, not excluded
+    assert membrane.score > 0  # pitfall #3 says deprioritize, not drop
+
+
+def test_an_unmeasured_flag_is_recorded_as_unmeasured_not_false() -> None:
+    """A missing DeepTMHMM run must not read as "no membrane proteins in this genome"."""
+    unmeasured = score_protein(make_protein(), [make_hit()], "found", annotation=FakeAnnotation())
+    measured_false = score_protein(
+        make_protein(), [make_hit()], "found",
+        annotation=FakeAnnotation(membrane=False, membrane_source="deeptmhmm"),
+    )
+
+    # Both contribute 0 to the score...
+    assert unmeasured.components.membrane_penalty == 0.0
+    assert measured_false.components.membrane_penalty == 0.0
+    # ...but only one of them was actually looked at.
+    assert unmeasured.components_available["membrane_penalty"] is False
+    assert measured_false.components_available["membrane_penalty"] is True
+
+
+def test_no_annotation_at_all_leaves_both_components_unmeasured() -> None:
+    scored = score_protein(make_protein(), [make_hit()], "found")
+
+    assert scored.components_available == {"surface_bonus": False, "membrane_penalty": False}
+    assert scored.components.surface_bonus == 0.0
+
+
+def test_score_is_still_reproducible_from_the_recorded_components() -> None:
+    scored = score_protein(
+        make_protein(product="hypothetical protein"), [make_hit()], "found",
+        annotation=FakeAnnotation(membrane=True, membrane_source="deeptmhmm"),
+    )
+    assert triage_score_from_components(TriageComponents(**scored.components.as_dict())) == scored.score

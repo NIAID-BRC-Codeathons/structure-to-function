@@ -107,11 +107,14 @@ Components come from PDB evidence plus the M1 specialty table. Components that n
 | `essential` | **0.15** | 1.0 if an `Essential Gene` specialty row exists; else 0 |
 | `drug_target` | **0.15** | 1.0 if a `Drug Target` specialty row exists (DrugBank, TTD); else 0 |
 | `annotation_gap` | **0.30** | 1.0 if the product is hypothetical, uncharacterized, putative or a DUF; else 0 |
+| `surface_bonus` | **0.10** | 1.0 if #10 calls the protein secreted or surface-exposed; 0 if it called it neither; **unmeasured when no provider covered it** |
+| `membrane_penalty` | **−0.15** | 1.0 if #10 calls it a membrane protein — deprioritized, never excluded (pitfall #3) |
 | `human_homolog` | **−0.25 × identity/100** | applied when a `Human Homolog` specialty row exists (identity is always populated in the export) |
 
 ```
 triage_score = 0.40·pdb_evidence + 0.20·virulence_amr + 0.15·essential
-             + 0.15·drug_target + 0.30·annotation_gap − 0.25·(human_identity/100)
+             + 0.15·drug_target + 0.30·annotation_gap + 0.10·surface_bonus
+             − 0.15·membrane_penalty − 0.25·(human_identity/100)
 ```
 
 Rationale, so the numbers are arguable rather than arbitrary:
@@ -227,6 +230,41 @@ deleting the gene stops growth *in silico*. Transferring it by homology adds a s
 top. Both are recorded, `evidence` stays `FBA`, and the annotation note says plainly that this is
 not an experimental knockout. That matters when M6 writes the report.
 
+## An "Antibiotic Resistance" row usually is not resistance
+
+BV-BRC classifies most AMR specialty rows as **"antibiotic target in susceptible species"** —
+gyrA and rpoB are what fluoroquinolones and rifamycins *hit*, not genes conferring resistance.
+Scoring them as resistance evidence is the specific mistake flagged in issue #30, and the ranking
+we published did exactly that.
+
+`virulence_amr` now reads the classification:
+
+| Evidence | Value | Example |
+| --- | --- | --- |
+| A classified resistance mechanism | **1.0** | efflux pump, antibiotic inactivation, cell-wall charge alteration |
+| An AMR row with no classification recorded | **0.5** | the export omits it; that is uncertainty, not confirmation |
+| Only "antibiotic target in susceptible species" | **0.0** | scored as `drug_target` instead, which is what it is |
+
+Measured on *K. pneumoniae* HS11286, whose export carries classifications: of 130 proteins with an
+AMR row, **95** are real resistance mechanisms, **19** are unclassified, and **16** were being
+counted as resistance evidence when they are drug targets. Every protein records `amr_basis`, so
+a reader sees which of the three applied.
+
+G37's public export has no `classification` column at all, so all 15 of its AMR rows score 0.5.
+The CGA output does carry it — 10 of its 14 AMR rows are "antibiotic target in susceptible
+species" — so the correction takes effect as soon as M1's real output is used.
+
+## Measured or merely zero
+
+`surface_bonus` and `membrane_penalty` depend on providers that may not have run. A component
+with no provider behind it contributes 0 — the same number as "measured, and false" — so each
+protein records `surface_exposed_measured` and `membrane_measured`, and `run.json` carries
+`components_available` per component and `components_nonzero` for all of them.
+
+Without this, a run where DeepTMHMM never ran looks exactly like a genome with no membrane
+proteins. This is the same distinction #10 makes in its own flags, and the same class of bug
+@Ashita2619 found in `no_pdb_hit`.
+
 ## Genome sensitivity of the weights
 
 The weights were tuned on HS11286. They are **not automatically portable**, because the
@@ -270,6 +308,8 @@ Written to `runs/<run_id>/m2_pdb/`:
 | --- | --- | --- |
 | 2026-09-16 | Initial weights, before any full run. | Written from the component list in `02-m2-triage.md` and what the HS11286 specialty export actually provides. |
 | 2026-09-16 | `pdb_evidence` normalized by 1.20 instead of clipped at 1.0. Weights unchanged. | A 10-protein smoke run put two different-quality hits (raw 1.09 and 1.043) at an identical 0.40, because clipping discards the bonus range exactly where ranking matters. Found before any full run. |
+| 2026-09-17 | Added `surface_bonus` (+0.10) and `membrane_penalty` (−0.15), fed by #10's localization flags. | #10 shipped the flags and deliberately left them unscored, noting the weights belonged here. Surface-exposed proteins are the accessible ones (and M5's vaccine/antibody angle); membrane proteins fold and dock badly, so pitfall #3 says deprioritize rather than exclude — hence a penalty a strong protein can still outweigh. On G37: 19 proteins surface-exposed, 91 membrane, 1 of each in the top 50. |
+| 2026-09-17 | `virulence_amr` now reads the AMR classification instead of counting any AMR row. | Issue #30: most "Antibiotic Resistance" rows are "antibiotic target in susceptible species" — drug targets, not resistance genes. On HS11286, 16 of 130 such proteins were being scored as resistance evidence. Those now score `drug_target` instead, unclassified rows get 0.5, and `amr_basis` records which applied. Weight unchanged at 0.20. |
 | 2026-09-17 | `essential` now comes from orthology to FBA-essential proteins in public relatives, not BV-BRC's precomputed rows. Weight unchanged at 0.15. | Same reason as the human-homolog change: those rows exist for public genomes only (issue #29). Recovers 148 of G37's 148 known essential genes, plus 21 more that each name their source relative and identity. |
 | 2026-09-17 | `human_homolog_penalty` now comes from our own DIAMOND search, not BV-BRC's precomputed rows. Weight unchanged at −0.25. | Those rows exist for public genomes only, so on a blinded genome the penalty never fired (issue #29). The source change is larger than it sounds: 153 G37 proteins now carry a penalty where the public record listed 5. Ranking is barely affected — between penalising everything and penalising nothing, at most 5 of the top 50 change — but the recorded evidence is now ours and reproducible. |
 | 2026-09-16 | `annotation_gap` 0.10 → 0.30. **Changed after seeing the first full run** (pitfall #12 — recorded here rather than left implicit). | The HS11286 run selected 0 uncharacterized proteins out of 1,338 (best rank 57), because a known target collects 0.50 from virulence/essential/drug-target while a hypothetical can earn 0.10. That contradicts the project's purpose. Sensitivity over the recorded components: 0.20 → 6/50, 0.25 → 9/50, **0.30 → 10/50**, 0.35 → 15/50, 0.40 → 26/50. 0.30 admits 10, every one with a PDB hit and 8 with a ligand-bound homolog, while keeping 40 characterized targets as the validation set. Decision: project lead, 2026-09-16. |
