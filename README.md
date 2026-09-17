@@ -25,7 +25,9 @@ Project page: https://niaid-brc-codeathons.github.io/projects/structure-to-funct
 
 ## Requirements
 
-- **Python 3.11 or newer.** The code uses `datetime.UTC`, which 3.10 does not have.
+- **Python 3.10 or newer**, the floor `scripts/setup_env.sh` enforces. `jsonschema>=4.20`
+  will not install below 3.8; the setup script stops at 3.10 rather than build an
+  environment nobody has tested. Nothing in `s2f/` uses syntax or stdlib newer than that.
 - `curl`, for the BV-BRC services that reject some HTTP client user agents.
 - Optional, for M1: `scipy` and `numpy` for the gene-content phylogeny, `matplotlib`
   for publication figures. Without them the run succeeds and says what it skipped.
@@ -38,16 +40,18 @@ Project page: https://niaid-brc-codeathons.github.io/projects/structure-to-funct
 ```bash
 git clone https://github.com/NIAID-BRC-Codeathons/structure-to-function.git
 cd structure-to-function
-python3.11 -m venv .venv && source .venv/bin/activate
+python3 -m venv .venv && source .venv/bin/activate   # python3 must be 3.10 or newer
 pip install -r requirements-common.txt -r requirements-m1.txt -r requirements-m2.txt
 ```
 
 ### Notes
 
 The code assumes nothing about the host beyond the requirements above: no shared
-filesystem, no module system, no site-specific paths. If `python3.11` is not on
-`PATH`, a `module load python` or a conda environment provides one; 3.10 fails at
-import.
+filesystem, no module system, no site-specific paths. If `python3` is older than 3.10, a
+`module load python` or a conda environment provides a newer one. `scripts/setup_env.sh`
+does the whole install: it picks the newest Python >= 3.10 on `PATH`, builds `.venv/`,
+installs the requirements, imports every module and runs the suite, stopping at the first
+failure rather than reporting success over a broken environment.
 
 For M2's optional annotation providers (InterProScan, DeepTMHMM, SignalP, PSORTb,
 eggNOG-mapper), see `docs/02c-m2-functional-annotation.md`. None are required, and
@@ -187,7 +191,7 @@ Team assignments are still being finalized. Participants can review their projec
 
 ## Setup
 
-Python 3.11+. Python dependencies:
+Python 3.10+. Python dependencies:
 
 ```bash
 pip install -r requirements-common.txt   # jsonschema, requests — needed by s2f/common
