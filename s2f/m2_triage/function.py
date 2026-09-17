@@ -494,6 +494,118 @@ def heuristic_annotation(feature_id: str, sequence: str) -> ProviderResult:
 
 
 # ---------------------------------------------------------------------------
+# FASTA for the external tools
+# ---------------------------------------------------------------------------
+
+# SignalP 6 and some other tools truncate FASTA identifiers. A truncated ID does not match a
+# feature_id, so the provider's rows land in `unmatched_ids` instead of on a protein. Warned
+# about rather than worked around, because the fix is the tool's flags, not a guess here.
+ID_TRUNCATION_RISK = 20
+
+
+@dataclass
+class ToolFasta:
+    """A FASTA written for an external annotation tool, plus what had to be changed.
+
+    One record per distinct sequence: InterProScan's cost scales with unique sequences, and
+    DeepTMHMM and SignalP 6 are slow enough that duplicates are worth collapsing. ``aliases``
+    maps every protein back to the record that represents it, so a provider keyed on the
+    representative reaches all of them (``annotate(aliases=...)``).
+    """
+
+    path: Path
+    records: int = 0
+    proteins: int = 0
+    duplicate_groups: int = 0
+    stops_stripped: int = 0
+    skipped_empty: int = 0
+    skipped_long: int = 0
+    aliases: dict[str, list[str]] = field(default_factory=dict)
+    long_ids: list[str] = field(default_factory=list)
+
+    def summary(self) -> dict[str, Any]:
+        payload = {
+            "path": str(self.path),
+            "records": self.records,
+            "proteins": self.proteins,
+            "duplicate_groups": self.duplicate_groups,
+            "stops_stripped": self.stops_stripped,
+            "skipped_empty": self.skipped_empty,
+            "skipped_long": self.skipped_long,
+        }
+        if self.long_ids:
+            payload["ids_over_%d_chars" % ID_TRUNCATION_RISK] = len(self.long_ids)
+            payload["id_truncation_warning"] = (
+                f"{len(self.long_ids)} identifiers exceed {ID_TRUNCATION_RISK} characters; "
+                "tools that truncate IDs will produce rows that match no protein "
+                "(watch unmatched_ids)"
+            )
+        return payload
+
+
+def clean_sequence(sequence: str) -> tuple[str, int]:
+    """Uppercase, drop whitespace and stop characters. Returns (sequence, stops removed).
+
+    InterProScan rejects sequences containing ``*``; BV-BRC protein FASTA sometimes carries
+    them. Cheap to remove here, and the count is recorded rather than silently applied.
+    """
+    text = "".join((sequence or "").split()).upper()
+    stops = text.count("*")
+    return text.replace("*", ""), stops
+
+
+def write_tool_fasta(
+    path: str | Path,
+    proteins: Sequence[Any],
+    *,
+    dedupe: bool = True,
+    max_length: int = 0,
+    width: int = 60,
+) -> ToolFasta:
+    """Write a cleaned FASTA for an external tool and return what it covers."""
+    path = Path(path)
+    path.parent.mkdir(parents=True, exist_ok=True)
+    result = ToolFasta(path=path)
+
+    groups: dict[str, list[Any]] = {}
+    order: list[str] = []
+    for protein in proteins:
+        sequence, stops = clean_sequence(getattr(protein, "sequence", ""))
+        result.stops_stripped += stops
+        if not sequence:
+            result.skipped_empty += 1
+            continue
+        if max_length and len(sequence) > max_length:
+            result.skipped_long += 1
+            continue
+        key = sequence if dedupe else f"{protein.feature_id}\x00{sequence}"
+        if key not in groups:
+            groups[key] = []
+            order.append(key)
+        groups[key].append(protein)
+
+    with path.open("w", encoding="utf-8") as handle:
+        for key in order:
+            members = groups[key]
+            representative = members[0]
+            sequence, _ = clean_sequence(representative.sequence)
+            handle.write(f">{representative.feature_id}\n")
+            for start in range(0, len(sequence), width):
+                handle.write(sequence[start:start + width] + "\n")
+            result.records += 1
+            result.proteins += len(members)
+            if len(members) > 1:
+                result.duplicate_groups += 1
+            if len(representative.feature_id) > ID_TRUNCATION_RISK:
+                result.long_ids.append(representative.feature_id)
+            for member in members:
+                # Every protein points at the record that stands for it, including itself, so
+                # the merge can find a provider row whichever ID the tool echoed back.
+                result.aliases.setdefault(member.feature_id, []).append(representative.feature_id)
+    return result
+
+
+# ---------------------------------------------------------------------------
 # File-ingest providers
 # ---------------------------------------------------------------------------
 
@@ -1271,6 +1383,8 @@ class AnnotationRun:
     annotations: dict[str, FunctionalAnnotation]
     providers: dict[str, int] = field(default_factory=dict)
     unmatched: dict[str, list[str]] = field(default_factory=dict)
+    tool_fasta: ToolFasta | None = None
+    selected_fasta: ToolFasta | None = None
     interproscan: InterProScanInstall = field(default_factory=InterProScanInstall)
     uniprot_failures: list[dict[str, str]] = field(default_factory=list)
     notes: list[str] = field(default_factory=list)
@@ -1293,6 +1407,8 @@ class AnnotationRun:
                 1 for a in values if a.membrane_source == SOURCE_HEURISTIC or a.signal_source == SOURCE_HEURISTIC
             ),
             "with_function_terms": sum(1 for a in values if a.terms),
+            "tool_fasta": self.tool_fasta.summary() if self.tool_fasta else None,
+            "selected_fasta": self.selected_fasta.summary() if self.selected_fasta else None,
             "interproscan": {
                 "path": self.interproscan.path,
                 "version": self.interproscan.version,

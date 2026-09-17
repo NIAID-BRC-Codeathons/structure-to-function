@@ -39,6 +39,7 @@ from .function import (
     parse_signalp6,
     run_interproscan,
     write_terms_tsv,
+    write_tool_fasta,
 )
 from .pdb_evidence import (
     EVALUE_CUTOFF,
@@ -182,8 +183,24 @@ def _protein_fasta(m1_dir: Path) -> Path | None:
     return matches[0] if matches else None
 
 
+def _annotation_aliases(tool_fasta, xrefs_by_id: dict) -> dict[str, list[str]]:
+    """Every identifier a provider might have echoed back for a protein.
+
+    Two sources: the FASTA record that represented it (its own ID, or a duplicate's), and its
+    UniProt accession when --map-ids resolved one.
+    """
+    aliases: dict[str, list[str]] = {}
+    if tool_fasta is not None:
+        for feature_id, representatives in tool_fasta.aliases.items():
+            aliases.setdefault(feature_id, []).extend(representatives)
+    for feature_id, xrefs in xrefs_by_id.items():
+        if xrefs.uniprot:
+            aliases.setdefault(feature_id, []).append(xrefs.uniprot)
+    return aliases
+
+
 def _load_annotation_providers(
-    args: argparse.Namespace, m1_dir: Path, out_dir: Path
+    args: argparse.Namespace, m1_dir: Path, out_dir: Path, scan_fasta: Path | None = None
 ) -> tuple[dict[str, dict], object, list[str]]:
     """Resolve each provider's output file, parsing what exists and saying what did not.
 
@@ -207,7 +224,9 @@ def _load_annotation_providers(
     )
 
     if paths["interproscan"] == "auto":
-        fasta = _protein_fasta(m1_dir)
+        # Prefer the cleaned, deduplicated FASTA this module wrote: InterProScan rejects stop
+        # characters and its cost scales with unique sequences.
+        fasta = scan_fasta if scan_fasta is not None and scan_fasta.exists() else _protein_fasta(m1_dir)
         if fasta is None:
             notes.append("interproscan auto: no protein FASTA to scan")
             paths["interproscan"] = ""
@@ -397,8 +416,15 @@ def run(args: argparse.Namespace) -> int:
         # they were, so this cannot move the selection (pitfall #12). Wiring surface/membrane
         # into the weights belongs to issue #12 with its own change-log row.
         annotation_run = None
+        tool_fasta = None
         if args.annotate:
-            parsed, ipr_install, annotation_notes = _load_annotation_providers(args, m1_dir, out_dir)
+            # Written before the providers run, because --interproscan auto scans it and
+            # because the two-pass flow (run M2, run the tools, re-run M2 with their output)
+            # needs a FASTA the tools will accept. See docs/02d-lambda-runbook.md.
+            tool_fasta = write_tool_fasta(out_dir / "annotate_all.faa", proteins)
+            parsed, ipr_install, annotation_notes = _load_annotation_providers(
+                args, m1_dir, out_dir, scan_fasta=tool_fasta.path
+            )
             uniprot_results: dict[str, object] = {}
             uniprot_client: UniProtFunctionClient | None = None
             if args.uniprot_function:
@@ -419,8 +445,9 @@ def run(args: argparse.Namespace) -> int:
                 interproscan=parsed.get("interproscan"),
                 uniprot=uniprot_results,
                 use_heuristic=not args.no_heuristic,
-                aliases={fid: [x.uniprot] for fid, x in xrefs_by_id.items() if x.uniprot},
+                aliases=_annotation_aliases(tool_fasta, xrefs_by_id),
             )
+            annotation_run.tool_fasta = tool_fasta
             annotation_run.interproscan = ipr_install
             annotation_run.uniprot_failures = uniprot_client.failures if uniprot_client else []
             annotation_run.notes = annotation_notes
@@ -501,6 +528,15 @@ def run(args: argparse.Namespace) -> int:
                         "afdb_cif_url": model.cif_url if model else "",
                     }
                 )
+        if annotation_run is not None:
+            # The selected set is what the expensive tools should actually be run over:
+            # DeepTMHMM and SignalP 6 over ~50 proteins is minutes, over a proteome is hours.
+            selected_ids = {score.feature_id for score in ranked if score.selected}
+            annotation_run.selected_fasta = write_tool_fasta(
+                out_dir / "annotate_selected.faa",
+                [protein for protein in proteins if protein.feature_id in selected_ids],
+            )
+
         terms_written = 0
         if annotation_run is not None:
             columns += FLAG_COLUMNS
