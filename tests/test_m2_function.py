@@ -760,14 +760,33 @@ def test_annotate_dry_run_sets_flags_for_every_protein(tmp_path):
     assert summary["providers"][SOURCE_DEEPTMHMM] >= 1  # the fixture provider files were read
 
 
-def test_annotation_does_not_change_the_triage_score(tmp_path):
-    """Flags only (issue #12 owns the weights): the ranking must be bit-identical."""
-    plain = {row["feature_id"]: (row["rank"], row["triage_score"]) for row in _dry_run(tmp_path / "plain")}
-    annotated = {
-        row["feature_id"]: (row["rank"], row["triage_score"])
-        for row in _dry_run(tmp_path / "annotated", "--annotate")
-    }
-    assert plain == annotated
+def test_annotation_now_feeds_the_triage_score(tmp_path):
+    """Issue #12 took the weights up: surface_exposed and membrane_penalty are scored.
+
+    This test asserted the opposite while #10 was flags-only. The change is deliberate and
+    logged in docs/02a-m2-pdb-evidence.md; what must stay true is that annotation moves the
+    score *only* through those two components, never any of the others.
+    """
+    plain = {row["feature_id"]: row for row in _dry_run(tmp_path / "plain")}
+    annotated = {row["feature_id"]: row for row in _dry_run(tmp_path / "annotated", "--annotate")}
+
+    assert set(plain) == set(annotated)
+    untouched = (
+        "pdb_evidence", "virulence_amr", "essential", "drug_target",
+        "annotation_gap", "human_homolog_penalty",
+    )
+    for feature_id, before in plain.items():
+        after = annotated[feature_id]
+        for component in untouched:
+            assert before[component] == after[component], f"{component} moved for {feature_id}"
+        # Without --annotate nothing measured localization, so both components are 0 and the
+        # score is whatever the other components gave.
+        assert float(before["surface_bonus"]) == 0.0
+        assert float(before["membrane_penalty"]) == 0.0
+        expected = float(after["triage_score"]) - (
+            0.10 * float(after["surface_bonus"]) - 0.15 * float(after["membrane_penalty"])
+        )
+        assert abs(expected - float(before["triage_score"])) < 1e-6
 
 
 def test_report_flags_are_null_when_nobody_called_them():

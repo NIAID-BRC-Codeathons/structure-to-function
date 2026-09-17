@@ -22,6 +22,7 @@ LOCUS_ALIASES = ("refseq_locus_tag", "locus_tag", "alt_locus_tag")
 PGFAM_ALIASES = ("pgfam_id", "pgfam", "pgfams")
 PLFAM_ALIASES = ("plfam_id", "plfam", "plfams")
 PROPERTY_ALIASES = ("property", "specialty_gene_property", "type")
+CLASSIFICATION_ALIASES = ("classification", "amr_classification", "assertion")
 SOURCE_ALIASES = ("source", "database", "specialty_source")
 IDENTITY_ALIASES = ("identity", "pct_identity", "percent_identity")
 COVERAGE_ALIASES = ("query_coverage", "coverage", "query_cov")
@@ -41,6 +42,19 @@ UNCHARACTERIZED = re.compile(
 )
 
 
+#: An "Antibiotic Resistance" row does not always mean resistance. BV-BRC classifies most of
+#: them as "antibiotic target in susceptible species" — gyrA and rpoB are the *targets* of
+#: fluoroquinolones and rifamycins, not resistance genes (issue #30). Scoring those as
+#: resistance evidence is the specific mistake cmmann21 flagged, and on G37 it would apply to
+#: 10 of 14 AMR rows.
+TARGET_IN_SUSCEPTIBLE = "antibiotic target in susceptible species"
+RESISTANCE_MARKERS = (
+    "conferring antibiotic resistance", "antibiotic efflux", "antibiotic inactivation",
+    "efflux pump", "antibiotic target alteration", "antibiotic target replacement",
+    "antibiotic target protection", "resistance via absence", "reduced permeability",
+)
+
+
 @dataclass
 class SpecialtyHit:
     """One row of the specialty-gene table."""
@@ -50,6 +64,16 @@ class SpecialtyHit:
     product: str
     identity: float | None
     query_coverage: float | None
+    classification: str = ""
+
+    @property
+    def is_resistance_mechanism(self) -> bool:
+        text = (self.classification or "").lower()
+        return any(marker in text for marker in RESISTANCE_MARKERS)
+
+    @property
+    def is_target_in_susceptible_species(self) -> bool:
+        return TARGET_IN_SUSCEPTIBLE in (self.classification or "").lower()
 
 
 @dataclass
@@ -77,12 +101,42 @@ class Protein:
         return bool(self._properties() & (VIRULENCE_PROPERTIES | AMR_PROPERTIES))
 
     @property
+    def is_virulence_factor(self) -> bool:
+        return bool(self._properties() & VIRULENCE_PROPERTIES)
+
+    def _amr_rows(self) -> list[SpecialtyHit]:
+        return [h for h in self.specialty if h.property_name.strip().lower() in AMR_PROPERTIES]
+
+    @property
+    def amr_evidence(self) -> tuple[float, str]:
+        """How much an AMR row supports *resistance*, and on what basis.
+
+        1.0 a classified resistance mechanism; 0.5 an AMR row whose classification is missing,
+        so the export cannot say which it is; 0.0 rows that are only "antibiotic target in
+        susceptible species" — those are drug targets and are scored as such instead.
+        """
+        rows = self._amr_rows()
+        if not rows:
+            return 0.0, ""
+        if any(hit.is_resistance_mechanism for hit in rows):
+            mechanisms = sorted({h.classification for h in rows if h.is_resistance_mechanism})
+            return 1.0, "; ".join(mechanisms)[:120]
+        if all(hit.is_target_in_susceptible_species for hit in rows):
+            return 0.0, TARGET_IN_SUSCEPTIBLE
+        return 0.5, "AMR row with no classification recorded"
+
+    @property
+    def is_antibiotic_target(self) -> bool:
+        """Target of an antibiotic in a susceptible species — a drug target, not resistance."""
+        return any(hit.is_target_in_susceptible_species for hit in self._amr_rows())
+
+    @property
     def is_essential_ortholog(self) -> bool:
         return bool(self._properties() & ESSENTIAL_PROPERTIES)
 
     @property
     def is_drug_target(self) -> bool:
-        return bool(self._properties() & DRUG_TARGET_PROPERTIES)
+        return bool(self._properties() & DRUG_TARGET_PROPERTIES) or self.is_antibiotic_target
 
     @property
     def is_transporter(self) -> bool:
@@ -305,6 +359,7 @@ def load_input(m1_dir: Path) -> InputBundle:
                     product=_pick(row, PRODUCT_ALIASES),
                     identity=_float_or_none(_pick(row, IDENTITY_ALIASES)),
                     query_coverage=_float_or_none(_pick(row, COVERAGE_ALIASES)),
+                    classification=_pick(row, CLASSIFICATION_ALIASES),
                 )
             )
 

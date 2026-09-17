@@ -61,6 +61,8 @@ from .pdb_evidence import (
 )
 from .score import (
     ANNOTATION_BONUS,
+    OPTIONAL_COMPONENTS,
+    best_hit,
     WEIGHTS_VERSION,
     LIGAND_BONUS,
     MIN_EVALUE,
@@ -83,7 +85,9 @@ HIT_COLUMNS = [
 PROTEIN_COLUMNS = [
     "rank", "feature_id", "product", "gene", "locus_tag", "pgfam", "triage_score",
     "pdb_evidence", "virulence_amr", "essential", "drug_target", "annotation_gap",
-    "human_homolog_penalty", "retrieval_status", "best_entity_id", "best_identity",
+    "surface_bonus", "membrane_penalty", "human_homolog_penalty",
+    "amr_basis", "antibiotic_target_not_resistance",
+    "surface_exposed_measured", "membrane_measured", "retrieval_status", "best_entity_id", "best_identity",
     "best_coverage", "best_resolution", "best_method", "qualifying_hits", "distinct_entries",
     "has_ligand_in_entry", "holo_homolog", "metals_in_entry", "human_pdb_hit",
     "human_homolog_identity", "close_human_homolog", "human_homolog_source", "essential_source",
@@ -154,6 +158,12 @@ def _protein_row(score: ProteinScore, protein_meta: dict[str, str]) -> dict[str,
     }
     row.update({name: round(value, 6) for name, value in components.items()})
     row.update(score.flags)
+    row.update(
+        {
+            "surface_exposed_measured": score.components_available.get("surface_bonus", False),
+            "membrane_measured": score.components_available.get("membrane_penalty", False),
+        }
+    )
     return row
 
 
@@ -385,58 +395,30 @@ def run(args: argparse.Namespace) -> int:
                 essentiality_summary = {"enabled": False, "error": str(exc)}
                 print(f"Warning: essentiality transfer skipped — {exc}")
 
-        scores: list[ProteinScore] = []
-        hit_rows: list[dict[str, object]] = []
-        meta_by_id: dict[str, dict[str, str]] = {}
-        for digest, members in groups.items():
-            result = results.get(digest)
-            for protein in members:
-                status = result.status if result else "query-failed"
-                error = result.error if result else "sequence was not searched"
-                hits = list(result.hits) if result else []
-                human = human_hits.get(protein.feature_id)
-                scores.append(
-                    score_protein(
-                        protein,
-                        hits,
-                        status,
-                        error=error if status == "query-failed" else "",
-                        human_identity=(human.identity if human is not None and human.counted else None),
-                        human_homolog_source="diamond_human_proteome" if human is not None else "",
-                        essential=(
-                            essential_calls[protein.feature_id].essential
-                            if protein.feature_id in essential_calls
-                            else None
-                        ),
-                        essential_source=(
-                            "ortholog_of_fba_essential" if protein.feature_id in essential_calls else ""
-                        ),
-                    )
-                )
-                hit_rows.extend(_hit_rows(protein.feature_id, hits, hit_score))
-                meta_by_id[protein.feature_id] = {
-                    "gene": protein.gene,
-                    "locus_tag": protein.locus_tag,
-                    "pgfam": protein.pgfam,
-                }
-
         xrefs_by_id: dict[str, object] = {}
         afdb_by_accession: dict[str, object] = {}
         mapper: IdMapper | None = None
         if args.map_ids:
             # One mapper for the whole pipeline (pitfall #11): this module never maps its own IDs.
             mapper = IdMapper(client, taxon_id=args.taxon or None)
-            by_feature = {p.feature_id: p for p in proteins}
+            # The homolog accessions come straight from the search results rather than from
+            # ProteinScore: mapping has to finish before functional annotation, which has to
+            # finish before scoring, so this step cannot depend on scores existing yet.
+            best_hit_accessions: dict[str, tuple[str, ...]] = {}
+            for digest, members in groups.items():
+                result = results.get(digest)
+                top = best_hit(result.hits) if result and result.hits else None
+                accessions = tuple(top.uniprot_ids) if top is not None else ()
+                for member in members:
+                    best_hit_accessions[member.feature_id] = accessions
             requests_ = [
                 {
-                    "feature_id": score.feature_id,
-                    "sequence": by_feature[score.feature_id].sequence,
-                    "locus_tag": by_feature[score.feature_id].locus_tag or None,
-                    "pdb_hit_uniprot_ids": (
-                        score.best_hit.uniprot_ids if score.best_hit is not None else ()
-                    ),
+                    "feature_id": protein.feature_id,
+                    "sequence": protein.sequence,
+                    "locus_tag": protein.locus_tag or None,
+                    "pdb_hit_uniprot_ids": best_hit_accessions.get(protein.feature_id, ()),
                 }
-                for score in scores
+                for protein in proteins
             ]
             xrefs_by_id = mapper.map_many(requests_, workers=args.workers)
 
@@ -447,9 +429,10 @@ def run(args: argparse.Namespace) -> int:
                 (x.uniprot for x in xrefs_by_id.values() if x.uniprot), workers=args.workers
             )
 
-        # Functional annotation (issue #10). Flags only: the score components stay exactly as
-        # they were, so this cannot move the selection (pitfall #12). Wiring surface/membrane
-        # into the weights belongs to issue #12 with its own change-log row.
+        # Functional annotation (issue #10). Runs *before* scoring, because #12 now scores
+        # surface_exposed and membrane from these flags; it used to run after, when it was
+        # flags-only and could not move the selection. The weight change is logged in
+        # docs/02a-m2-pdb-evidence.md, per pitfall #12.
         annotation_run = None
         tool_fasta = None
         if args.annotate:
@@ -487,6 +470,46 @@ def run(args: argparse.Namespace) -> int:
             annotation_run.interproscan = ipr_install
             annotation_run.uniprot_failures = uniprot_client.failures if uniprot_client else []
             annotation_run.notes = annotation_notes
+
+        scores: list[ProteinScore] = []
+        hit_rows: list[dict[str, object]] = []
+        meta_by_id: dict[str, dict[str, str]] = {}
+        for digest, members in groups.items():
+            result = results.get(digest)
+            for protein in members:
+                status = result.status if result else "query-failed"
+                error = result.error if result else "sequence was not searched"
+                hits = list(result.hits) if result else []
+                human = human_hits.get(protein.feature_id)
+                scores.append(
+                    score_protein(
+                        protein,
+                        hits,
+                        status,
+                        error=error if status == "query-failed" else "",
+                        human_identity=(human.identity if human is not None and human.counted else None),
+                        human_homolog_source="diamond_human_proteome" if human is not None else "",
+                        essential=(
+                            essential_calls[protein.feature_id].essential
+                            if protein.feature_id in essential_calls
+                            else None
+                        ),
+                        essential_source=(
+                            "ortholog_of_fba_essential" if protein.feature_id in essential_calls else ""
+                        ),
+                        annotation=(
+                            annotation_run.annotations.get(protein.feature_id)
+                            if annotation_run is not None
+                            else None
+                        ),
+                    )
+                )
+                hit_rows.extend(_hit_rows(protein.feature_id, hits, hit_score))
+                meta_by_id[protein.feature_id] = {
+                    "gene": protein.gene,
+                    "locus_tag": protein.locus_tag,
+                    "pgfam": protein.pgfam,
+                }
 
         foldseek_results: dict[str, object] = {}
         foldseek_summary: dict[str, object] = {"enabled": False}
@@ -747,6 +770,21 @@ def run(args: argparse.Namespace) -> int:
                 },
             },
             "weights": WEIGHTS,
+            # Which components actually had evidence behind them. A component that measured
+            # nothing contributed 0 to every protein, which is indistinguishable from "absent"
+            # in the score alone — so a reader can tell a genome with no membrane proteins from
+            # a run where nothing looked (pitfall #12).
+            "components_available": {
+                name: {
+                    "measured_for": sum(1 for s_ in ranked if s_.components_available.get(name)),
+                    "of": len(ranked),
+                }
+                for name in OPTIONAL_COMPONENTS
+            },
+            "components_nonzero": {
+                name: sum(1 for s_ in ranked if s_.components.as_dict().get(name))
+                for name in WEIGHTS
+            },
             "counts": {
                 "proteins_loaded": len(bundle.proteins),
                 "proteins_scored": len(ranked),
