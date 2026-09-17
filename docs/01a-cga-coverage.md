@@ -162,3 +162,57 @@ Downstream consequences:
 Conclusion: taxon and genetic code must come from Minhash before CGA runs, and
 the M1 parser should refuse a run whose genome quality is Poor or whose quality
 flags are non-empty.
+
+## USA300 versus M. genitalium (2026-09-17, issue #33)
+
+Everything that came back empty for *M. genitalium* populates for *S. aureus*
+USA300_FPR3757, so the analyses run for every genome — the smoke-test organism
+simply has little to find. Blinded contigs, taxon called by Minhash at species
+level (1280), genetic code 11, genome 1280.69637.
+
+| Analysis | USA300 (2.92 Mb) | M. genitalium (580 kb) |
+| --- | --- | --- |
+| CDS | 2767 | 530 |
+| CGA compute | **682 s** | 252 s |
+| Specialty rows, total | 375 | 17 |
+| Virulence: VFDB | 89 | none |
+| Virulence: Victors | 35 | none |
+| AMR: PATRIC k-mer | 41 | 14 |
+| AMR: CARD via RGI (homolog + variant models) | 24 | none |
+| AMR: NDARO via AMRFinderPlus | 10 | none |
+| AMR phenotype (`genome_amr`, MIC/SIR) | **15** | none |
+| Transporter: TCDB | 140 | 2 |
+| Drug target: TTD | 27 | 1 |
+| Metal resistance: BacMet | 9 | none |
+| cgMLST, loci called | **96.35%** | 0% |
+| MLST sequence type | **none called** | none called |
+| Subsystem rows | 1417 | 340 |
+| Pathway rows | 1287 | 225 |
+
+Consequences:
+
+1. **`pipeline.md` is correct about virulence and AMR sources**, but their yield is
+   organism-dependent. A poorly-characterized organism returns nothing from VFDB,
+   Victors, CARD or AMRFinderPlus, and that is a real absence of evidence, not a
+   broken pipeline. M2 and M5 must distinguish "no hits" from "not run" — the
+   specialty summary in `quality.json` says which analyses executed.
+
+2. **AMR phenotype data will exist for the real test genome.** `genome_amr` carries
+   15 MIC/SIR prediction rows for USA300 and none for *M. genitalium*, so M5 can
+   rely on it for USA300 while treating it as optional in general.
+
+3. **Human homolog is still missing.** BV-BRC's public record for 451515.3 has 648
+   specialty rows including 21 human-homolog rows and 34 DrugBank rows; a fresh CGA
+   run gives 375 and neither category. So the finding above holds even for a
+   well-characterized pathogen: M2 has to compute human homology itself. (DrugBank
+   is not shippable anyway.)
+
+4. **MLST is unreliable.** `p3x-compute-mlst` ran and called no sequence type, even
+   though cgMLST called 96.35% of loci and BV-BRC's public record types this genome
+   as ST8. Do not depend on MLST.
+
+5. **Runtime scales sub-linearly with CDS count**: 5.2x the CDS for 2.7x the compute.
+   Queue time still dominates wall-clock.
+
+`scripts/cga_coverage_report.py` regenerates this table from two retrieved CGA
+directories.
