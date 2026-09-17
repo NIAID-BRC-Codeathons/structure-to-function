@@ -1,0 +1,234 @@
+[
+ {
+  "taxon_id": "243273",
+  "aa_length": 836,
+  "annotation": "PATRIC",
+  "prediction_method": "prodigal",
+  "feature_type": "CDS",
+  "pgfam_id": "PGF_03272313",
+  "plfam_id": "PLF_2093_00001144",
+  "sequence_id": "243273.147.con.0001",
+  "na_length": 2511,
+  "na_sequence_md5": "9cb74e15d224d48ef9f45fc9a44c915a",
+  "feature_id": "PATRIC.243273.147.243273.147.con.0001.CDS.4812.7322.fwd",
+  "patric_id": "fig|243273.147.peg.4",
+  "aa_sequence_md5": "f92bc4b44c4f2d5989364788f6845074",
+  "end": "7322",
+  "owner": "USER@bvbrc",
+  "property": [
+   "EC number",
+   "Subsystem"
+  ],
+  "location": "4812..7322",
+  "start": "4812",
+  "genome_name": "Mycoplasma genitalium",
+  "public": 0,
+  "segments": [
+   "4812..7322"
+  ],
+  "go": [
+   "GO:0003918|DNA topoisomerase type II (ATP-hydrolyzing) activity"
+  ],
+  "strand": "+",
+  "product": "DNA gyrase subunit A (EC 5.99.1.3)",
+  "genome_id": "243273.147",
+  "accession": "243273.147.con.0001"
+ },
+ {
+  "na_sequence_md5": "13c7b783abbeac926b7f7ddcafe9559b",
+  "feature_id": "PATRIC.243273.147.243273.147.con.0001.CDS.12701.13564.rev",
+  "patric_id": "fig|243273.147.peg.11",
+  "owner": "USER@bvbrc",
+  "end": "13564",
+  "aa_sequence_md5": "55175f34466a3fab6bdd83e003d5a1fa",
+  "aa_length": 287,
+  "taxon_id": "243273",
+  "pgfam_id": "PGF_00098790",
+  "annotation": "PATRIC",
+  "feature_type": "CDS",
+  "prediction_method": "prodigal",
+  "na_length": 864,
+  "plfam_id": "PLF_2093_00004476",
+  "sequence_id": "243273.147.con.0001",
+  "segments": [
+   "12701..13564"
+  ],
+  "strand": "-",
+  "accession": "243273.147.con.0001",
+  "genome_id": "243273.147",
+  "product": "hypothetical protein",
+  "start": "12701",
+  "location": "complement(12701..13564)",
+  "genome_name": "Mycoplasma genitalium",
+  "public": 0
+ },
+ {
+  "strand": "+",
+  "genome_id": "243273.147",
+  "accession": "243273.147.con.0001",
+  "product": "SSU ribosomal protein S12p (S23e)",
+  "segments": [
+   "113895..114314"
+  ],
+  "public": 0,
+  "start": "113895",
+  "location": "113895..114314",
+  "genome_name": "Mycoplasma genitalium",
+  "owner": "USER@bvbrc",
+  "aa_sequence_md5": "15b51a4caebf9e021f3072bb40f6189b",
+  "end": "114314",
+  "property": [
+   "Subsystem"
+  ],
+  "na_sequence_md5": "89baee3e40639105246a2f0899f42b83",
+  "feature_id": "PATRIC.243273.147.243273.147.con.0001.CDS.113895.114314.fwd",
+  "patric_id": "fig|243273.147.peg.94",
+  "pgfam_id": "PGF_06941403",
+  "annotation": "PATRIC",
+  "feature_type": "CDS",
+  "prediction_method": "prodigal",
+  "na_length": 420,
+  "plfam_id": "PLF_2093_00000006",
+  "sequence_id": "243273.147.con.0001",
+  "aa_length": 139,
+  "taxon_id": "243273"
+ },
+ {
+  "strand": "+",
+  "owner": "USER@bvbrc",
+  "end": "171532",
+  "accession": "243273.147.con.0001",
+  "genome_id": "243273.147",
+  "property": [
+   "Subsystem"
+  ],
+  "product": "SSU rRNA ## 16S rRNA, small subunit ribosomal RNA",
+  "na_sequence_md5": "91986e905323b6d99c0d6f6028d15f37",
+  "segments": [
+   "170005..171532"
+  ],
+  "feature_id": "PATRIC.243273.147.243273.147.con.0001.rRNA.170005.171532.fwd",
+  "patric_id": "fig|243273.147.rna.4",
+  "public": 0,
+  "annotation": "PATRIC",
+  "prediction_method": "RNA_reps_SSU_rRNA",
+  "feature_type": "rRNA",
+  "na_length": 1528,
+  "sequence_id": "243273.147.con.0001",
+  "start": "170005",
+  "location": "170005..171532",
+  "genome_name": "Mycoplasma genitalium",
+  "taxon_id": "243273"
+ },
+ {
+  "sequence_id": "243273.147.con.0001",
+  "na_length": 2916,
+  "annotation": "PATRIC",
+  "prediction_method": "RNA_reps_LSU_rRNA",
+  "feature_type": "rRNA",
+  "public": 0,
+  "taxon_id": "243273",
+  "genome_name": "Mycoplasma genitalium",
+  "location": "171727..174642",
+  "start": "171727",
+  "product": "LSU rRNA ## 23S rRNA, large subunit ribosomal RNA",
+  "genome_id": "243273.147",
+  "accession": "243273.147.con.0001",
+  "property": [
+   "Subsystem"
+  ],
+  "end": "174642",
+  "strand": "+",
+  "owner": "USER@bvbrc",
+  "feature_id": "PATRIC.243273.147.243273.147.con.0001.rRNA.171727.174642.fwd",
+  "patric_id": "fig|243273.147.rna.5",
+  "segments": [
+   "171727..174642"
+  ],
+  "na_sequence_md5": "91ea9159c6a02369fd142c0e69c48fef"
+ },
+ {
+  "sequence_id": "243273.147.con.0001",
+  "na_length": 112,
+  "annotation": "PATRIC",
+  "prediction_method": "RNA_reps_5S_rRNA",
+  "feature_type": "rRNA",
+  "public": 0,
+  "taxon_id": "243273",
+  "genome_name": "Mycoplasma genitalium",
+  "start": "174683",
+  "location": "174683..174794",
+  "product": "5S rRNA ## 5S ribosomal RNA",
+  "accession": "243273.147.con.0001",
+  "genome_id": "243273.147",
+  "end": "174794",
+  "strand": "+",
+  "owner": "USER@bvbrc",
+  "feature_id": "PATRIC.243273.147.243273.147.con.0001.rRNA.174683.174794.fwd",
+  "patric_id": "fig|243273.147.rna.6",
+  "segments": [
+   "174683..174794"
+  ],
+  "na_sequence_md5": "25acad8d67d3d1522b3fc31bb13b66d6"
+ },
+ {
+  "owner": "USER@bvbrc",
+  "aa_sequence_md5": "2900f2b737a69f4a16118759a5cd7f68",
+  "end": "271874",
+  "na_sequence_md5": "cd367181d3c55cf227e569676d45a2d8",
+  "patric_id": "fig|243273.147.peg.254",
+  "feature_id": "PATRIC.243273.147.243273.147.con.0001.CDS.270405.271874.fwd",
+  "pgfam_id": "PGF_00778630",
+  "prediction_method": "prodigal",
+  "feature_type": "CDS",
+  "annotation": "PATRIC",
+  "na_length": 1470,
+  "plfam_id": "PLF_2093_00003459",
+  "sequence_id": "243273.147.con.0001",
+  "aa_length": 489,
+  "taxon_id": "243273",
+  "strand": "+",
+  "accession": "243273.147.con.0001",
+  "genome_id": "243273.147",
+  "product": "Uncharacterized amino acid permease, GabP family",
+  "segments": [
+   "270405..271874"
+  ],
+  "public": 0,
+  "location": "270405..271874",
+  "start": "270405",
+  "genome_name": "Mycoplasma genitalium"
+ },
+ {
+  "na_length": 1524,
+  "plfam_id": "PLF_2093_00005111",
+  "sequence_id": "243273.147.con.0001",
+  "pgfam_id": "PGF_00021217",
+  "annotation": "PATRIC",
+  "prediction_method": "prodigal",
+  "feature_type": "CDS",
+  "aa_length": 507,
+  "taxon_id": "243273",
+  "property": [
+   "EC number",
+   "Subsystem"
+  ],
+  "owner": "USER@bvbrc",
+  "aa_sequence_md5": "097c042439f6da10ae27224b1b6e3ca6",
+  "end": "537564",
+  "feature_id": "PATRIC.243273.147.243273.147.con.0001.CDS.536041.537564.rev",
+  "patric_id": "fig|243273.147.peg.485",
+  "na_sequence_md5": "6687f89e7e5871939da792822238df48",
+  "public": 0,
+  "genome_name": "Mycoplasma genitalium",
+  "location": "complement(536041..537564)",
+  "start": "536041",
+  "accession": "243273.147.con.0001",
+  "genome_id": "243273.147",
+  "product": "2,3-bisphosphoglycerate-independent phosphoglycerate mutase (EC 5.4.2.12)",
+  "strand": "-",
+  "segments": [
+   "536041..537564"
+  ]
+ }
+]
