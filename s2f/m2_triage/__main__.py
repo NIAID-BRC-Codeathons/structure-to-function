@@ -450,7 +450,7 @@ def run(args: argparse.Namespace) -> int:
         if args.annotate:
             # Written before the providers run, because --interproscan auto scans it and
             # because the two-pass flow (run M2, run the tools, re-run M2 with their output)
-            # needs a FASTA the tools will accept. See docs/02d-lambda-runbook.md.
+            # needs a FASTA the tools will accept. See docs/02d-remote-runbook.md.
             tool_fasta = write_tool_fasta(out_dir / "annotate_all.faa", proteins)
             parsed, ipr_install, annotation_notes = _load_annotation_providers(
                 args, m1_dir, out_dir, scan_fasta=tool_fasta.path
