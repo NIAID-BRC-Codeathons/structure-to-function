@@ -330,6 +330,23 @@ def run(args: argparse.Namespace) -> int:
     clock = time.monotonic()
 
     bundle = load_input(m1_dir)
+
+    # Where the query organism came from, so an undetermined one is never mistaken for a
+    # determination. The p3-CLI/web export carries no organism in its FASTA headers, and on
+    # that layout the same-organism flags below are all False for want of anything to compare
+    # against — which reads exactly like "every hit is a genuine cross-organism transfer".
+    # Say so instead of implying it.
+    if args.organism:
+        query_organism, query_organism_source = args.organism, "cli"
+    elif bundle.organism:
+        query_organism, query_organism_source = bundle.organism, "fasta_header"
+    else:
+        query_organism, query_organism_source = "", "undetermined"
+        print(
+            "Warning: no query organism in the FASTA headers — same-species and same-genus "
+            "hits cannot be told apart from cross-organism transfers. Pass --organism."
+        )
+
     proteins = bundle.proteins[: args.limit] if args.limit else bundle.proteins
     groups = {}
     for protein in proteins:
@@ -503,7 +520,7 @@ def run(args: argparse.Namespace) -> int:
                             if annotation_run is not None
                             else None
                         ),
-                        query_organism=args.organism or bundle.organism,
+                        query_organism=query_organism,
                     )
                 )
                 hit_rows.extend(_hit_rows(protein.feature_id, hits, hit_score))
@@ -783,7 +800,8 @@ def run(args: argparse.Namespace) -> int:
                 }
                 for name in OPTIONAL_COMPONENTS
             },
-            "query_organism": args.organism or bundle.organism,
+            "query_organism": query_organism,
+            "query_organism_source": query_organism_source,
             # How much of the ranking rests on our own organism already being in the PDB. On a
             # novel genome this is 0; on the smoke-test genome it is most of the top of the list.
             "same_organism_hits": {
@@ -795,10 +813,15 @@ def run(args: argparse.Namespace) -> int:
                     1 for s_ in ranked if s_.selected and s_.flags.get("same_genus_hit")
                 ),
                 "same_genus_total": sum(1 for s_ in ranked if s_.flags.get("same_genus_hit")),
+                # Zeros mean two different things, and only one of them is a measurement.
+                "measured": bool(query_organism),
                 "note": (
                     "A hit against our own organism or genus is not a cross-organism transfer. "
                     "Weights calibrated on a genome with its own PDB structures will not carry "
                     "to a novel one."
+                    if query_organism
+                    else "Not measured: the query organism is unknown, so these counts are "
+                    "absence of evidence, not evidence of absence. Pass --organism."
                 ),
             },
             "components_nonzero": {
