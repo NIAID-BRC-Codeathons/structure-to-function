@@ -24,6 +24,14 @@ from .human_homology import DEFAULT_MIN_COVERAGE, DiamondMissing, fetch_human_pr
 from .human_homology import search as human_homology_search
 from .essentiality import DEFAULT_REFERENCE_LIMIT, fetch_reference_set
 from .essentiality import search as essentiality_search
+from .foldseek import (
+    DEFAULT_DATABASES,
+    DEFAULT_MAX_EVALUE,
+    DEFAULT_MIN_COVERAGE as FOLDSEEK_MIN_COVERAGE,
+    FoldseekClient,
+    fetch_structure,
+    summarize as foldseek_summarize,
+)
 from .kg import KnowledgeGraphBuilder
 from .bvbrc_input import load_input
 from .function import (
@@ -78,7 +86,9 @@ PROTEIN_COLUMNS = [
     "best_coverage", "best_resolution", "best_method", "qualifying_hits", "distinct_entries",
     "has_ligand_in_entry", "holo_homolog", "metals_in_entry", "human_pdb_hit",
     "human_homolog_identity", "close_human_homolog", "human_homolog_source", "essential_source",
-    "transporter", "metal_resistance", "no_pdb_hit",
+    "foldseek_status", "foldseek_hit", "foldseek_description", "foldseek_evalue",
+    "foldseek_identity", "foldseek_coverage", "foldseek_informative",
+    "transporter", "metal_resistance", "no_pdb_hit", "pdb_search_failed",
     "pdb_hit_organism", "uniprot_of_best_hit", "selected", "reason", "error",
 ]
 
@@ -97,6 +107,25 @@ def _write_tsv(path: Path, columns: list[str], rows: list[dict[str, object]]) ->
         writer.writeheader()
         for row in rows:
             writer.writerow(row)
+
+
+def _failure_kinds(failures: list[dict[str, str]]) -> dict[str, int]:
+    """Group failure messages so a pattern (rate limiting, timeouts) is visible at a glance."""
+    kinds: dict[str, int] = {}
+    for failure in failures:
+        error = str(failure.get("error", ""))
+        if "429" in error or "rate" in error.lower():
+            kind = "rate-limited"
+        elif "TIMEOUT" in error or "ended as" in error:
+            kind = "ticket-not-complete"
+        elif "timed out" in error.lower() or "timeout" in error.lower():
+            kind = "client-timeout"
+        elif "Connection" in error or "connection" in error:
+            kind = "connection"
+        else:
+            kind = error[:60] or "unknown"
+        kinds[kind] = kinds.get(kind, 0) + 1
+    return dict(sorted(kinds.items(), key=lambda kv: -kv[1]))
 
 
 def _protein_row(score: ProteinScore, protein_meta: dict[str, str]) -> dict[str, object]:
@@ -387,6 +416,7 @@ def run(args: argparse.Namespace) -> int:
                 }
 
         xrefs_by_id: dict[str, object] = {}
+        afdb_by_accession: dict[str, object] = {}
         mapper: IdMapper | None = None
         if args.map_ids:
             # One mapper for the whole pipeline (pitfall #11): this module never maps its own IDs.
@@ -452,6 +482,85 @@ def run(args: argparse.Namespace) -> int:
             annotation_run.uniprot_failures = uniprot_client.failures if uniprot_client else []
             annotation_run.notes = annotation_notes
 
+        foldseek_results: dict[str, object] = {}
+        foldseek_summary: dict[str, object] = {"enabled": False}
+        if args.foldseek:
+            # Structure search only helps where a structure exists. The targets are proteins the
+            # sequence search found nothing for but that do have a usable predicted model
+            # (issue #9; the model comes from #8's AlphaFold lookup).
+            fs = FoldseekClient(
+                cache=cache,
+                session=client.session,
+                offline=offline,
+                databases=tuple(args.foldseek_db),
+            )
+            structures_dir = run_dir / "structures"
+            candidates = [
+                score
+                for score in scores
+                if score.flags.get("no_pdb_hit")
+                and afdb_by_accession.get(
+                    (xrefs_by_id.get(score.feature_id).uniprot if xrefs_by_id.get(score.feature_id) else "") or ""
+                )
+            ]
+            if args.foldseek_limit:
+                candidates = candidates[: args.foldseek_limit]
+            for score in candidates:
+                xrefs = xrefs_by_id.get(score.feature_id)
+                model = afdb_by_accession.get(xrefs.uniprot) if xrefs and xrefs.uniprot else None
+                usable, reason = (
+                    model.usable_for_structure_search() if model else (False, "no AlphaFold model")
+                )
+                if not model or not model.found or not usable:
+                    # Recorded, never silently skipped: a protein we could not search is a
+                    # different outcome from one we searched and found nothing for.
+                    foldseek_results[score.feature_id] = fs.search_protein(
+                        score.feature_id,
+                        None,
+                        structure_source="afdb",
+                        structure_id=model.entry_id if model else "",
+                    )
+                    foldseek_results[score.feature_id].note = (
+                        f"model not usable as a search query: {reason}"
+                    )
+                    continue
+                try:
+                    structure = fetch_structure(
+                        client.session, model.cif_url, structures_dir / f"{model.entry_id}.cif"
+                    ) if not offline else (structures_dir / f"{model.entry_id}.cif").read_bytes()
+                except (OSError, Exception) as exc:  # noqa: BLE001 - recorded, never silent
+                    foldseek_results[score.feature_id] = fs.search_protein(
+                        score.feature_id, None, structure_source="afdb", structure_id=model.entry_id
+                    )
+                    fs.failures.append({"feature_id": score.feature_id, "error": f"structure fetch: {exc}"})
+                    continue
+                foldseek_results[score.feature_id] = fs.search_protein(
+                    score.feature_id,
+                    structure,
+                    structure_source="afdb",
+                    structure_id=model.entry_id,
+                    max_evalue=args.foldseek_evalue,
+                    min_coverage=args.foldseek_min_coverage,
+                )
+            foldseek_summary = {
+                "enabled": True,
+                "candidates": len(candidates),
+                **foldseek_summarize(foldseek_results.values()),
+                "failures": len(fs.failures),
+                # The errors themselves, not just a count: a run that failed 121 searches needs
+                # to say why, or the next person cannot tell rate limiting from a broken query.
+                "failure_detail": fs.failures[:20],
+                "failure_kinds": _failure_kinds(fs.failures),
+                "rate_limited": fs.rate_limited,
+                "note": (
+                    "The public Foldseek server rate-limited this run. Searches that completed are "
+                    "cached and will replay; the rest need the local binary with a downloaded "
+                    "database, which is also the only route that yields a TM-score."
+                    if fs.rate_limited or any("429" in f.get("error", "") for f in fs.failures)
+                    else ""
+                ),
+            }
+
         ranked = rank_and_select(scores, top_n=args.top)
 
         kg_summary: dict[str, object] = {"enabled": False}
@@ -503,6 +612,19 @@ def run(args: argparse.Namespace) -> int:
             }
 
         protein_rows = [_protein_row(score, meta_by_id.get(score.feature_id, {})) for score in ranked]
+        if args.foldseek:
+            for row in protein_rows:
+                result = foldseek_results.get(row["feature_id"])
+                hit = result.best_informative or result.best if result else None
+                row.update({
+                    "foldseek_status": result.status if result else "not-queried",
+                    "foldseek_hit": hit.pdb_id if hit else "",
+                    "foldseek_description": (hit.description[:80] if hit else ""),
+                    "foldseek_evalue": hit.evalue if hit else "",
+                    "foldseek_identity": hit.identity if hit else "",
+                    "foldseek_coverage": round(hit.query_coverage, 4) if hit and hit.query_coverage else "",
+                    "foldseek_informative": hit.informative if hit else "",
+                })
         columns = list(PROTEIN_COLUMNS)
         if args.map_ids:
             columns += XREF_COLUMNS
@@ -661,6 +783,7 @@ def run(args: argparse.Namespace) -> int:
                 if args.map_ids
                 else {"enabled": False}
             ),
+            "foldseek": foldseek_summary,
             "human_homology": human_summary,
             "essentiality": essentiality_summary,
             "knowledge_graph": kg_summary,
@@ -726,6 +849,17 @@ def build_parser() -> argparse.ArgumentParser:
         help="minimum query coverage for a hit to count as a homolog",
     )
     parser.add_argument(
+        "--foldseek",
+        action="store_true",
+        help="structure search for proteins the sequence search missed, via the Foldseek web API (issue #9)",
+    )
+    parser.add_argument(
+        "--foldseek-db", action="append", default=[], help="Foldseek database (repeatable; default pdb100)"
+    )
+    parser.add_argument("--foldseek-limit", type=int, default=0, help="search only the first N candidates")
+    parser.add_argument("--foldseek-evalue", type=float, default=DEFAULT_MAX_EVALUE)
+    parser.add_argument("--foldseek-min-coverage", type=float, default=FOLDSEEK_MIN_COVERAGE)
+    parser.add_argument(
         "--essentiality",
         action="store_true",
         help="transfer FBA essentiality from public relatives by orthology (issue #29)",
@@ -787,6 +921,12 @@ def build_parser() -> argparse.ArgumentParser:
 
 def main(argv: list[str] | None = None) -> int:
     args = build_parser().parse_args(argv)
+    if not args.foldseek_db:
+        args.foldseek_db = list(DEFAULT_DATABASES)
+    if args.foldseek and not args.map_ids:
+        # Foldseek searches with AlphaFold models, which are keyed by UniProt accession.
+        print("Error: --foldseek needs --map-ids (structures are found via UniProt accessions).")
+        return 2
     if args.dry_run and args.run == "runs/dev":
         args.run = "runs/dry-run"
     try:
