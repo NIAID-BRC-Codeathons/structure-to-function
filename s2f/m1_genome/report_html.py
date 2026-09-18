@@ -214,6 +214,13 @@ document.addEventListener('DOMContentLoaded',function(){
 def render_tree_svg(tree: dict[str, Any], width: int = 900) -> str:
     """Dendrogram as inline SVG, root left, leaves right, human pathogens flagged."""
     if not tree or not tree.get("ok"):
+        # A CGA run carries a codon tree as newick rather than gene-content dendrogram
+        # coordinates. It is a different tree, not a missing one, so draw it.
+        newick = (tree or {}).get("newick")
+        if newick:
+            return render_newick_svg(newick, width=width,
+                                     focus=str((tree or {}).get("focus") or ""),
+                                     labels=(tree or {}).get("labels") or {})
         reason = esc((tree or {}).get("reason", "not computed"))
         return f'<p class="muted">Phylogeny unavailable: {reason}</p>'
 
@@ -317,6 +324,141 @@ def _wrap_svg_text(text: Any, width_px: float, font_size: float,
     return lines
 
 
+def specialty_counts(report: dict[str, Any], genome: dict[str, Any]) -> dict[str, Any]:
+    """Specialty-gene composition, from the genome section or from the proteins.
+
+    The API route writes `genome.specialty_gene_counts`; the CGA route does not, and its
+    rows live on each protein instead. Counting them here rather than leaving the section
+    empty: a CGA run of M. genitalium carries 17 of them (14 Antibiotic Resistance,
+    2 Transporter, 1 Drug Target) and the panel was reporting none.
+    """
+    counts = _mapping(genome.get("specialty_gene_counts"))
+    if counts:
+        return counts
+    tally: dict[str, int] = {}
+    for protein in _rows(report.get("proteins")):
+        for hit in protein.get("specialty") or []:
+            name = (hit or {}).get("property")
+            if name:
+                tally[str(name)] = tally.get(str(name), 0) + 1
+    return tally
+
+
+def _parse_newick(text: str) -> dict[str, Any] | None:
+    """Minimal newick reader: names, branch lengths, nesting. Support values ignored."""
+    text = (text or "").strip()
+    if not text:
+        return None
+    if text.endswith(";"):
+        text = text[:-1]
+    pos = 0
+
+    def read() -> dict[str, Any]:
+        nonlocal pos
+        children: list[dict[str, Any]] = []
+        if pos < len(text) and text[pos] == "(":
+            pos += 1
+            while True:
+                children.append(read())
+                if pos < len(text) and text[pos] == ",":
+                    pos += 1
+                    continue
+                break
+            if pos < len(text) and text[pos] == ")":
+                pos += 1
+        start = pos
+        while pos < len(text) and text[pos] not in ",():":
+            pos += 1
+        label = text[start:pos].strip()
+        length = 0.0
+        if pos < len(text) and text[pos] == ":":
+            pos += 1
+            start = pos
+            while pos < len(text) and text[pos] not in ",()":
+                pos += 1
+            try:
+                length = float(text[start:pos])
+            except ValueError:
+                length = 0.0
+        # An internal label in a codon tree is a support value, not a taxon name.
+        return {"name": "" if children else label, "length": length,
+                "support": label if children else "", "children": children}
+
+    try:
+        root = read()
+    except (IndexError, ValueError):
+        return None
+    return root if (root.get("children") or root.get("name")) else None
+
+
+def render_newick_svg(newick: str, *, width: int = 900, focus: str = "",
+                      labels: dict[str, str] | None = None) -> str:
+    """Draw a newick tree: root left, leaves right, branch lengths to scale."""
+    root = _parse_newick(newick)
+    if root is None:
+        return '<p class="muted">Phylogeny unavailable: the tree could not be read.</p>'
+    labels = labels or {}
+    leaves: list[tuple[dict[str, Any], float]] = []
+
+    def collect(node: dict[str, Any], depth: float) -> None:
+        here = depth + float(node.get("length") or 0.0)
+        if node.get("children"):
+            for child in node["children"]:
+                collect(child, here)
+        else:
+            leaves.append((node, here))
+
+    collect(root, 0.0)
+    if not leaves:
+        return '<p class="muted">Phylogeny unavailable: the tree has no leaves.</p>'
+
+    row_h, top = 30, 34
+    height = top + row_h * len(leaves) + 30
+    max_depth = max((d for _, d in leaves), default=1.0) or 1.0
+    x_root, x_leaf = 30, max(260, width - 420)
+    y_of: dict[int, float] = {}
+    for index, (leaf, _depth) in enumerate(leaves):
+        y_of[id(leaf)] = top + row_h * index + row_h / 2
+
+    parts = [
+        f'<svg viewBox="0 0 {width} {height}" xmlns="http://www.w3.org/2000/svg" '
+        f'font-family="system-ui,Segoe UI,Arial" role="img" '
+        f'aria-label="Phylogenetic tree of the analysed genome and its relatives">',
+        f'<rect x="0" y="0" width="{width}" height="{height}" fill="#ffffff"/>',
+    ]
+
+    def to_x(depth: float) -> float:
+        return x_root + depth / max_depth * (x_leaf - x_root)
+
+    def draw(node: dict[str, Any], depth: float) -> float:
+        here = depth + float(node.get("length") or 0.0)
+        if node.get("children"):
+            ys = [draw(child, here) for child in node["children"]]
+            y = (min(ys) + max(ys)) / 2
+            parts.append(f'<path d="M{to_x(here):.1f},{min(ys):.1f} V{max(ys):.1f}" '
+                         f'fill="none" stroke="#94a3b8" stroke-width="1.4"/>')
+        else:
+            y = y_of[id(node)]
+            name = str(node.get("name") or "")
+            shown = labels.get(name, name)
+            is_focus = bool(focus) and name == focus
+            colour = "#b91c1c" if is_focus else "#334155"
+            weight = "700" if is_focus else "400"
+            marker = "\u2605 " if is_focus else ""
+            parts.append(f'<circle cx="{to_x(here):.1f}" cy="{y:.1f}" r="3" '
+                         f'fill="{colour}"/>')
+            parts.append(f'<text x="{to_x(here) + 10:.1f}" y="{y + 4:.1f}" '
+                         f'font-size="12" font-weight="{weight}" fill="{colour}">'
+                         f'{marker}{esc(shown)}</text>')
+        parts.append(f'<path d="M{to_x(depth):.1f},{y:.1f} H{to_x(here):.1f}" '
+                     f'fill="none" stroke="#94a3b8" stroke-width="1.4"/>')
+        return y
+
+    draw(root, 0.0)
+    parts.append("</svg>")
+    return "".join(parts)
+
+
 def pathogenesis_flow_svg(priorities: list[dict[str, Any]],
                           disease_profile: dict[str, Any], width: int = 940) -> str:
     """Mechanism -> host effect -> disease, as three linked columns.
@@ -378,7 +520,7 @@ def pathogenesis_flow_svg(priorities: list[dict[str, Any]],
         left, left_h = box(
             col1_x, w1, colour + "20", colour,
             f"{CAT_LABEL[category]} ({counts[category]})",
-            "e.g. " + ", ".join(examples[category][:4]),
+            ", ".join(examples[category][:4]),
             tip="Proteins: " + ", ".join(examples[category]),
         )
         right, right_h = box(
@@ -623,6 +765,18 @@ def build_html(report: dict[str, Any], *, priorities: list[dict[str, Any]],
     w(f"<title>M1 genome report — {esc(name)}</title>")
     w(f"<style>{HTML_CSS}</style></head><body>")
 
+    # Sections fed from the donor record say so in their own lead, not only in the
+    # banner at the top: a reader who lands on the disease panel from the table of
+    # contents must not have to scroll up to learn whose genome it describes.
+    if basis == "relative" and donor_id:
+        borrowed = (f" Metadata in this section comes from {donor_name} "
+                    f"({donor_id}), the closest public match, not from this assembly.")
+    elif basis in ("species", "none"):
+        borrowed = (" This assembly has no public BV-BRC record and no public relative "
+                    "was identified, so only species-wide values are shown.")
+    else:
+        borrowed = ""
+
     w("<header class='hero'>")
     w(f"<h1>{esc(name)}</h1>")
     w(f"<div class='sub'>Module 1 · bacterial genome characterisation · run "
@@ -754,7 +908,7 @@ def build_html(report: dict[str, Any], *, priorities: list[dict[str, Any]],
 
     w("<section id='disease'><h2>Disease, symptoms and host-invasion mechanism</h2>")
     w(f"<p class='lead'>Evidence: {esc(disease_profile.get('source'))}. "
-      f"{esc(disease_profile.get('scope', ''))}.</p>")
+      f"{esc(disease_profile.get('scope', ''))}.{esc(borrowed)}</p>")
     w(pathogenesis_flow_svg(priorities, disease_profile))
     w("<div class='cols' style='margin-top:16px'>")
     for title, key in [("Diseases", "diseases"), ("Symptoms", "symptoms")]:
@@ -776,9 +930,10 @@ def build_html(report: dict[str, Any], *, priorities: list[dict[str, Any]],
 
     w("<section id='amr'><h2>Specialty genes — AMR and virulence</h2>")
     w("<p class='lead'>BV-BRC specialty-gene composition: CARD and NDARO for resistance, "
-      "VFDB and Victors for virulence.</p>")
+      "VFDB and Victors for virulence. These are called on <b>this assembly's own "
+      "proteins</b>, unlike the isolate metadata above.</p>")
     w("<div class='cols'>")
-    w("<div>" + specialty_bar_svg(_mapping(genome.get("specialty_gene_counts"))) + "</div>")
+    w("<div>" + specialty_bar_svg(specialty_counts(report, genome)) + "</div>")
     w("<div><h3 style='margin:4px 0'>Laboratory AMR phenotypes</h3>")
     phenotypes = _rows(genome.get("amr_phenotypes"))
     if phenotypes:
@@ -795,8 +950,10 @@ def build_html(report: dict[str, Any], *, priorities: list[dict[str, Any]],
               f"<td>{esc(row.get('laboratory_typing_method'))}</td></tr>")
         w("</tbody></table>")
     else:
-        w("<div class='muted'>No laboratory AMR phenotypes recorded for this genome. "
-          "Absence of a phenotype record is not evidence of susceptibility.</div>")
+        w("<div class='muted'>No laboratory AMR phenotypes recorded"
+          + (f" for {esc(donor_name)} ({esc(donor_id)}), the closest public match"
+             if basis == "relative" and donor_id else " for this genome")
+          + ". Absence of a phenotype record is not evidence of susceptibility.</div>")
     w("</div></div></section>")
 
     w("<section id='proteins'><h2>Protein explorer</h2>")
@@ -938,9 +1095,15 @@ def render_run(run_dir: str | Path, *, seq_limit: int = 1200,
 
     if tree is None:
         newick = genome.get("tree_newick")
-        tree = ({"ok": False, "reason": "no gene-content tree in this run; "
-                                        "the run carries a CGA codon tree instead",
-                 "newick": newick}
+        tree = ({"ok": False,
+                 "method": "CGA codon tree (gene-content tree not computed for this run)",
+                 "reason": "no gene-content tree in this run; "
+                           "the run carries a CGA codon tree instead",
+                 "newick": newick,
+                 "focus": str(genome.get("genome_id") or ""),
+                 "labels": {str(row.get("genome_id")): str(row.get("name") or "")
+                            for row in (genome.get("closest_genomes") or [])
+                            if row.get("genome_id") and row.get("name")}}
                 if newick else {"ok": False, "reason": "not computed for this run"})
 
     profile_input = {
