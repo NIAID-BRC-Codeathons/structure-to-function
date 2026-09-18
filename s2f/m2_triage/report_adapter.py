@@ -214,6 +214,12 @@ def protein_enrichment(
             "essential_ortholog": bool(score.components.essential),
             "human_homolog": bool(score.flags.get("human_homolog_identity")),
             "human_homolog_identity": score.flags.get("human_homolog_identity") or None,
+            # Whether the best structural hit is our own organism. Without these two, a
+            # 100%-identity self-match reaches the report indistinguishable from a genuine
+            # cross-organism transfer, and M6 cannot say which it is saying (#12).
+            "same_species_hit": bool(score.flags.get("same_species_hit")),
+            "same_genus_hit": bool(score.flags.get("same_genus_hit")),
+            "ligandable_homolog": bool(score.components.ligandable_homolog),
             # Topology and localization (issue #10). Null still means "unknown", not "false":
             # without --annotate, or for a protein no source covered, nobody has called these.
             **functional_flags(functional),
