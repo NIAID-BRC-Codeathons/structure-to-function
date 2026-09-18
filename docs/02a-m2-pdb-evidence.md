@@ -284,6 +284,24 @@ same-species hit in the genome landed in the top 50. The ranking is not wrong �
 hit is the strongest evidence there is — but it is **easy** in a way a blinded or novel genome
 will not be.
 
+**Where the organism comes from.** M1 determines it and writes it to `report.json`; M2 reads
+that (`genome.taxonomy`) rather than guessing. The precedence is `--organism`, then M1's genome
+section, then the FASTA headers, then `undetermined` — and `undetermined` is recorded as such,
+because zero same-species hits and zero measurements are not the same claim.
+
+The lineage settles two things spelling cannot:
+
+- **The current genus.** BV-BRC writes *Mycoplasma genitalium*; NCBI's lineage and the PDB both
+  say *Mycoplasmoides*. Reading the genus from `lineage_names` makes this a plain comparison
+  instead of a stem-similarity test that has to separate *Mycoplasma*/*Mycoplasmoides* (a real
+  renaming) from *Streptococcus*/*Streptomyces* (two unrelated genera).
+- **Identity at a named rank.** `lineage_ids` carries the species taxon (2097) alongside the
+  strain (243273), so a hit annotated at species level matches a strain-level query. ID equality
+  never holds there, which is the case @cmmann21 raised on #12.
+
+The string heuristics remain for the standalone entry point, where M2 runs against an `m1/` file
+drop with no `report.json` to read.
+
 `same_species_hit` and `same_genus_hit` are recorded per protein and summarised in `run.json`;
 the protein's `reason` says "not a cross-organism transfer" in words, so M6 can explain why an
 annotation was easy instead of presenting it as a discovery.
