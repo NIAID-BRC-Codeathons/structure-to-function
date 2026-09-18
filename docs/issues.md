@@ -815,3 +815,82 @@ for single-genome work.
 **Definition of done**
 - [ ] Every command in the doc runs as written on lambda0
 - [ ] Pass-one runtime recorded, closing that part of #10's definition of done
+
+## Runner: --limit means different things to different stages
+
+labels: module:common, priority:p1, type:code
+
+**Goal:** stop one flag silently truncating a run.
+
+**Docs:** `docs/00-architecture.md`
+
+`s2f/run.py` forwards `--limit` to both M2 and M3, where it means different things: to M2
+it caps how many proteins are *scored*, to M3 how many structures are *fetched*. Passing
+it to cap M3's downloads therefore caps M2's whole analysis.
+
+Observed on lambda0, 2026-09-18. `--limit 10` intended for structure collection produced:
+
+```
+10 proteins scored from 10 unique sequences; 10 selected, 3 without a PDB hit.
+```
+
+on a 530-protein proteome. The run completed, wrote a valid `report.json`, and the only
+sign was one line in the stage output. A reader of that report would see a ten-protein
+triage presented exactly like a complete one.
+
+**Scope**
+- Give each stage its own flag — `--limit` keeps its M2 meaning, M3 gets
+  `--structure-limit` or similar — or namespace them (`--m2-limit`, `--m3-limit`).
+- Whichever is chosen, `run.py` should refuse to pass a flag to a stage that did not ask
+  for it, rather than forwarding by coincidence of name.
+- Record the caps that were in force in the `run` manifest, so a truncated run is visible
+  from the report rather than only from the console.
+
+**Definition of done**
+- [ ] Capping structure collection leaves protein scoring untouched
+- [ ] `run` records the per-stage caps actually applied
+- [ ] A test pins that a cap meant for one stage does not reach another
+
+**Watch out for:** a truncated run that still validates is the dangerous shape here. The
+schema cannot tell 10 proteins from 530.
+
+## Runner: --human-homology and --essentiality cannot be reached from the pipeline
+
+labels: module:common, priority:p1, type:code
+
+**Goal:** let a single `python -m s2f.run` invocation produce the same ranking as running
+M2 by hand.
+
+**Docs:** `docs/00-architecture.md`, `docs/02a-m2-pdb-evidence.md`
+
+`run.py` forwards `--annotate`, `--map-ids`, `--kg`, `--offline`, the five provider paths,
+and now `--organism` and `--taxon`. It does **not** forward `--human-homology`,
+`--human-proteome`, `--essentiality` or the four `--essentiality-*` tuning flags.
+
+Those drive two scoring components:
+
+| component | weight | reachable from `s2f.run`? |
+| --- | --- | --- |
+| `human_homolog_penalty` | −0.25 | no |
+| `essential` | +0.15 | no |
+
+That is 0.40 of the weight mass, and `human_homolog_penalty` is the largest negative
+weight in the model. A pipeline run therefore produces a ranking with the selectivity
+filter switched off and no way to switch it on, and the disqualification added in
+`m2/triage-scoring-fixes` never fires. Every full run on 2026-09-18 needed a second,
+hand-written `m2_triage` invocation afterwards, and then a re-render of the report.
+
+**Scope**
+- Forward the flags, or give the runner a single `--full-evidence` switch that turns on
+  the components that need external data and records that it did.
+- Make the absence visible: if a weighted component had no provider behind it, the run
+  manifest already records `components_available`; the runner should say so on the console
+  too, rather than producing a quietly different ranking.
+
+**Definition of done**
+- [ ] One `s2f.run` invocation reproduces a hand-run M2 with the same flags
+- [ ] A run where a weighted component could not be computed says so at the end
+- [ ] A test pins that every M2 flag the runner claims to support actually arrives
+
+**Watch out for:** the two rankings look equally finished. Nothing downstream can tell that
+0.40 of the weight mass was absent.
