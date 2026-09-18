@@ -25,6 +25,8 @@ from pathlib import Path
 STAGES: list[tuple[str, str]] = [
     ("m1", "s2f.m1_genome"),
     ("m2", "s2f.m2_triage"),
+    ("m3", "s2f.m3_fold"),
+    ("m6", "s2f.m6_report"),
 ]
 
 
@@ -148,6 +150,13 @@ def stage_args(stage: str, args: argparse.Namespace) -> list[str]:
         organism = _organism(args.run)
         if organism:
             out += ["--organism", organism]
+        return out
+    if stage == "m3":
+        out = list(common)
+        if args.limit:
+            out += ["--limit", str(args.limit)]
+        if args.offline:
+            out.append("--offline")
         return out
     return common
 
