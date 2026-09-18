@@ -1,0 +1,288 @@
+# Curated host-interaction truth set for Klebsiella pneumoniae (issue #49).
+#
+# Built from gene-family literature, NOT from this genome's annotation text. The scorer
+# under test reads product strings, so a truth set read off the same strings would be
+# scoring a regex against itself (docs/08-evaluation.md, "Leakage").
+#
+# label     positive  host-interaction factor: the thing m1_priority claims to rank
+#           negative  housekeeping or mobile-element machinery that must NOT rank high
+#           excluded  contested in the literature; counted in neither, reason recorded
+#
+# A symbol absent from the genome is reported as not_present and drops out of the recall
+# denominator. That is expected: HS11286 is a ST11 carbapenem-resistant clinical isolate,
+# not a hypervirulent strain, so the rmpA/salmochelin/aerobactin loci may be absent.
+#
+symbol	label	class	basis	note
+#
+# ---------------------------------------------------------------- capsule (K antigen)
+# The dominant K. pneumoniae virulence determinant: anti-phagocytic, anti-complement.
+wza	positive	capsule	capsular polysaccharide export outer-membrane translocon
+wzb	positive	capsule	protein-tyrosine phosphatase of the cps assembly complex
+wzc	positive	capsule	tyrosine autokinase controlling capsule polymerisation
+wzi	positive	capsule	surface lipoprotein anchoring capsule to the cell	named in issue #49
+galF	positive	capsule	UDP-glucose pyrophosphorylase, first gene of the cps cluster
+ugd	positive	capsule	UDP-glucose dehydrogenase, cps cluster	also polymyxin resistance
+wcaJ	positive	capsule	undecaprenyl-phosphate glucose phosphotransferase, cps initiation
+rmpA	positive	capsule	regulator of mucoid phenotype, hypervirulence plasmid	likely absent from ST11
+rmpA2	positive	capsule	second regulator of mucoid phenotype	likely absent from ST11
+#
+# ---------------------------------------------------------------- LPS / O antigen
+wzm	positive	lps	O-antigen ABC transporter permease
+wzt	positive	lps	O-antigen ABC transporter ATPase
+wbbM	positive	lps	O-antigen glycosyltransferase
+wbbN	positive	lps	O-antigen glycosyltransferase
+wbbO	positive	lps	O-antigen glycosyltransferase
+#
+# ---------------------------------------------------------------- siderophores / iron
+# In-host iron piracy. This block is also where the #49 regex trap lives: a bare /ent/
+# matches "TonB-dependent" and "ATP-dependent", so matching is word-boundaried and
+# hyphen-guarded (truthset.standalone_token).
+entA	positive	siderophore	enterobactin biosynthesis, 2,3-dihydroxybenzoate dehydrogenase
+entB	positive	siderophore	enterobactin biosynthesis, isochorismatase
+entC	positive	siderophore	enterobactin biosynthesis, isochorismate synthase
+entD	positive	siderophore	enterobactin biosynthesis, phosphopantetheinyl transferase
+entE	positive	siderophore	enterobactin biosynthesis, DHB-AMP ligase
+entF	positive	siderophore	enterobactin biosynthesis, serine-activating enzyme
+entS	positive	siderophore	enterobactin exporter
+fepA	positive	siderophore	ferric enterobactin outer-membrane receptor
+fepB	positive	siderophore	ferric enterobactin periplasmic binding protein
+fepC	positive	siderophore	ferric enterobactin ABC transporter ATPase
+fepD	positive	siderophore	ferric enterobactin ABC transporter permease
+fepG	positive	siderophore	ferric enterobactin ABC transporter permease
+fes	positive	siderophore	enterobactin esterase, releases iron from the siderophore
+iucA	positive	siderophore	aerobactin biosynthesis
+iucB	positive	siderophore	aerobactin biosynthesis
+iucC	positive	siderophore	aerobactin biosynthesis
+iucD	positive	siderophore	aerobactin biosynthesis
+iutA	positive	siderophore	ferric aerobactin outer-membrane receptor
+ybtA	positive	siderophore	yersiniabactin regulator
+ybtE	positive	siderophore	yersiniabactin biosynthesis, salicyl-AMP ligase
+ybtP	positive	siderophore	yersiniabactin ABC transporter
+ybtQ	positive	siderophore	yersiniabactin ABC transporter
+ybtS	positive	siderophore	yersiniabactin biosynthesis, salicylate synthase
+ybtT	positive	siderophore	yersiniabactin biosynthesis, thioesterase
+ybtU	positive	siderophore	yersiniabactin biosynthesis, reductase
+ybtX	positive	siderophore	yersiniabactin, putative transporter
+irp1	positive	siderophore	yersiniabactin high-molecular-weight polyketide synthase
+irp2	positive	siderophore	yersiniabactin high-molecular-weight peptide synthetase
+fyuA	positive	siderophore	ferric yersiniabactin outer-membrane receptor
+iroB	positive	siderophore	salmochelin glucosyltransferase
+iroC	positive	siderophore	salmochelin ABC transporter
+iroD	positive	siderophore	salmochelin esterase
+iroE	positive	siderophore	salmochelin esterase
+iroN	positive	siderophore	ferric salmochelin outer-membrane receptor
+kfuA	positive	siderophore	Klebsiella ferric uptake periplasmic binding protein
+kfuB	positive	siderophore	Klebsiella ferric uptake permease
+kfuC	positive	siderophore	Klebsiella ferric uptake ATPase
+tonB	positive	siderophore	energises TonB-dependent outer-membrane receptors	NOT the receptors themselves
+exbB	positive	siderophore	TonB system energiser
+exbD	positive	siderophore	TonB system energiser
+#
+# ---------------------------------------------------------------- fimbriae / adhesion
+fimA	positive	fimbriae	type 1 fimbrial major subunit
+fimB	positive	fimbriae	type 1 fimbrial phase-variation recombinase
+fimC	positive	fimbriae	type 1 fimbrial periplasmic chaperone	chaperone, but fimbria-specific
+fimD	positive	fimbriae	type 1 fimbrial outer-membrane usher	named in issue #49 as a correct hit
+fimE	positive	fimbriae	type 1 fimbrial phase-variation recombinase
+fimF	positive	fimbriae	type 1 fimbrial adaptor subunit
+fimG	positive	fimbriae	type 1 fimbrial adaptor subunit
+fimH	positive	fimbriae	type 1 fimbrial mannose-binding tip adhesin
+fimI	positive	fimbriae	type 1 fimbrial minor subunit
+fimK	positive	fimbriae	type 1 fimbrial regulator, Klebsiella-specific
+mrkA	positive	fimbriae	type 3 fimbrial major subunit
+mrkB	positive	fimbriae	type 3 fimbrial periplasmic chaperone	chaperone, but fimbria-specific
+mrkC	positive	fimbriae	type 3 fimbrial outer-membrane usher
+mrkD	positive	fimbriae	type 3 fimbrial adhesin, binds collagen
+mrkF	positive	fimbriae	type 3 fimbrial minor subunit
+mrkH	positive	fimbriae	type 3 fimbriae c-di-GMP-dependent regulator
+mrkI	positive	fimbriae	type 3 fimbriae transcriptional regulator
+mrkJ	positive	fimbriae	type 3 fimbriae phosphodiesterase
+ecpA	positive	fimbriae	common pilus major subunit
+ecpB	positive	fimbriae	common pilus chaperone
+ecpC	positive	fimbriae	common pilus usher
+ecpD	positive	fimbriae	common pilus chaperone
+ecpE	positive	fimbriae	common pilus chaperone
+ecpR	positive	fimbriae	common pilus regulator	in the M1 API fixture
+#
+# ---------------------------------------------------------------- type VI secretion
+# A genuine host/competitor-directed secretion system, unlike the Sec and Tat pathways
+# and unlike plasmid conjugative T4SS. Issue #49 names TssL and TssJ as correct hits.
+tssA	positive	t6ss	type VI secretion baseplate
+tssB	positive	t6ss	type VI secretion contractile sheath
+tssC	positive	t6ss	type VI secretion contractile sheath
+tssD	positive	t6ss	type VI secretion Hcp tube protein
+tssF	positive	t6ss	type VI secretion baseplate
+tssG	positive	t6ss	type VI secretion baseplate
+tssH	positive	t6ss	type VI secretion ClpV sheath recycling ATPase
+tssI	positive	t6ss	type VI secretion VgrG spike
+tssJ	positive	t6ss	type VI secretion membrane complex lipoprotein	named in issue #49
+tssK	positive	t6ss	type VI secretion baseplate
+tssL	positive	t6ss	type VI secretion membrane complex	named in issue #49
+tssM	positive	t6ss	type VI secretion membrane complex
+hcp	positive	t6ss	type VI secretion tube protein, alternative symbol
+vgrG	positive	t6ss	type VI secretion spike, alternative symbol
+clpV	positive	t6ss	type VI secretion sheath ATPase, alternative symbol
+icmF	positive	t6ss	type VI secretion membrane complex, alternative symbol
+#
+# ---------------------------------------------------------------- urease
+ureA	positive	urease	urease gamma subunit
+ureB	positive	urease	urease beta subunit
+ureC	positive	urease	urease alpha subunit
+ureD	positive	urease	urease accessory protein
+ureE	positive	urease	urease nickel chaperone
+ureF	positive	urease	urease accessory protein
+ureG	positive	urease	urease accessory GTPase
+#
+# ---------------------------------------------------------------- porins
+ompA	positive	porin	outer-membrane protein A, immune modulation and adhesion
+ompK35	positive	porin	major porin, loss confers carbapenem resistance
+ompK36	positive	porin	major porin, loss confers carbapenem resistance
+ompK37	positive	porin	minor porin
+#
+# ---------------------------------------------------------------- efflux
+# AMR determinants rather than host-interaction factors, but named in issue #49 as part
+# of the truth set and scored +2 by WEIGHTS["amr"]. See docs/08-evaluation.md, "Axis".
+acrA	positive	efflux	AcrAB-TolC efflux membrane fusion protein	AMR axis, not host-interaction
+acrB	positive	efflux	AcrAB-TolC efflux RND transporter	AMR axis, not host-interaction
+acrD	positive	efflux	aminoglycoside efflux RND transporter	AMR axis, not host-interaction
+acrR	positive	efflux	AcrAB repressor	AMR axis, not host-interaction
+tolC	positive	efflux	outer-membrane channel shared by RND efflux pumps	AMR axis, not host-interaction
+oqxA	positive	efflux	OqxAB efflux, Klebsiella-associated	AMR axis, not host-interaction
+oqxB	positive	efflux	OqxAB efflux, Klebsiella-associated	AMR axis, not host-interaction
+eefA	positive	efflux	EefABC efflux membrane fusion protein	AMR axis, not host-interaction
+eefB	positive	efflux	EefABC efflux RND transporter	AMR axis, not host-interaction
+eefC	positive	efflux	EefABC efflux outer-membrane factor	AMR axis, not host-interaction
+#
+# ================================================================= NEGATIVES
+#
+# ---------------------------------------------------------------- OMP biogenesis
+# The failure mode issue #49 found: the `secretion` rule matches envelope vocabulary
+# ("outer membrane", "periplasmic") rather than secretion-system membership.
+skp	negative	omp_biogenesis	periplasmic chaperone for outer-membrane protein folding	scored 6 in the #49 run
+surA	negative	omp_biogenesis	periplasmic peptidyl-prolyl isomerase and OMP chaperone
+ppiD	negative	omp_biogenesis	periplasmic peptidyl-prolyl cis-trans isomerase	scored 6 in the #49 run
+ppiA	negative	omp_biogenesis	periplasmic peptidyl-prolyl cis-trans isomerase
+fkpA	negative	omp_biogenesis	periplasmic peptidyl-prolyl isomerase and chaperone
+bamA	negative	omp_biogenesis	beta-barrel assembly machinery core, outer membrane
+bamB	negative	omp_biogenesis	beta-barrel assembly machinery lipoprotein
+bamC	negative	omp_biogenesis	beta-barrel assembly machinery lipoprotein
+bamD	negative	omp_biogenesis	beta-barrel assembly machinery lipoprotein
+bamE	negative	omp_biogenesis	beta-barrel assembly machinery lipoprotein
+lolA	negative	omp_biogenesis	periplasmic lipoprotein carrier
+lolB	negative	omp_biogenesis	outer-membrane lipoprotein insertase
+lolC	negative	omp_biogenesis	lipoprotein release ABC permease
+lolD	negative	omp_biogenesis	lipoprotein release ABC ATPase
+lolE	negative	omp_biogenesis	lipoprotein release ABC permease
+yfgM	negative	omp_biogenesis	inner-membrane protein biogenesis partner of PpiD
+#
+# ---------------------------------------------------------------- general secretion
+# Sec and Tat are housekeeping export. Pure "secretion" vocabulary, zero host interaction.
+secA	negative	general_secretion	Sec translocase motor ATPase
+secB	negative	general_secretion	Sec export chaperone
+secD	negative	general_secretion	Sec translocase accessory
+secE	negative	general_secretion	Sec translocase core
+secF	negative	general_secretion	Sec translocase accessory
+secG	negative	general_secretion	Sec translocase accessory
+secM	negative	general_secretion	Sec translocase regulator
+secY	negative	general_secretion	Sec translocase channel
+yajC	negative	general_secretion	Sec translocase accessory
+ffh	negative	general_secretion	signal recognition particle protein
+ftsY	negative	general_secretion	signal recognition particle receptor
+tatA	negative	general_secretion	twin-arginine translocase
+tatB	negative	general_secretion	twin-arginine translocase
+tatC	negative	general_secretion	twin-arginine translocase
+lepB	negative	general_secretion	signal peptidase I
+lspA	negative	general_secretion	lipoprotein signal peptidase II
+#
+# ---------------------------------------------------------------- plasmid conjugation
+# The IncF transfer region. Issue #49 found a "conjugative transfer surface exclusion
+# protein" and a T4SS inner-membrane protein in the top band. traT is NOT here: see
+# the excluded block.
+traB	negative	plasmid_transfer	IncF conjugative transfer
+traC	negative	plasmid_transfer	IncF conjugative transfer ATPase
+traD	negative	plasmid_transfer	IncF coupling protein
+traE	negative	plasmid_transfer	IncF conjugative transfer
+traF	negative	plasmid_transfer	IncF conjugative transfer
+traG	negative	plasmid_transfer	IncF mating-pair stabilisation
+traH	negative	plasmid_transfer	IncF conjugative transfer
+traI	negative	plasmid_transfer	IncF relaxase and helicase
+traJ	negative	plasmid_transfer	IncF transfer regulator
+traK	negative	plasmid_transfer	IncF conjugative transfer
+traL	negative	plasmid_transfer	IncF conjugative transfer
+traM	negative	plasmid_transfer	IncF relaxosome component
+traN	negative	plasmid_transfer	IncF mating-pair stabilisation
+traP	negative	plasmid_transfer	IncF conjugative transfer
+traQ	negative	plasmid_transfer	IncF pilin chaperone
+traR	negative	plasmid_transfer	IncF conjugative transfer
+traS	negative	plasmid_transfer	IncF entry exclusion, inner membrane	the #49 surface-exclusion hit
+traU	negative	plasmid_transfer	IncF conjugative transfer
+traV	negative	plasmid_transfer	IncF conjugative transfer lipoprotein
+traW	negative	plasmid_transfer	IncF conjugative transfer
+traX	negative	plasmid_transfer	IncF pilin acetylase
+traY	negative	plasmid_transfer	IncF relaxosome component
+trbA	negative	plasmid_transfer	IncF conjugative transfer
+trbB	negative	plasmid_transfer	IncF conjugative transfer thiol-disulfide isomerase
+trbC	negative	plasmid_transfer	IncF conjugative transfer
+trbI	negative	plasmid_transfer	IncF conjugative transfer
+finO	negative	plasmid_transfer	fertility inhibition, transfer repressor
+finP	negative	plasmid_transfer	fertility inhibition antisense RNA regulator
+virB1	negative	plasmid_transfer	T4SS conjugation machinery	context-dependent: see note in docs
+virB2	negative	plasmid_transfer	T4SS conjugation machinery	context-dependent: see note in docs
+virB4	negative	plasmid_transfer	T4SS conjugation machinery ATPase	context-dependent: see note in docs
+virB6	negative	plasmid_transfer	T4SS conjugation inner-membrane protein	the #49 T-DNA-named hit
+virB8	negative	plasmid_transfer	T4SS conjugation machinery	context-dependent: see note in docs
+virB9	negative	plasmid_transfer	T4SS conjugation machinery	context-dependent: see note in docs
+virB10	negative	plasmid_transfer	T4SS conjugation machinery	context-dependent: see note in docs
+virB11	negative	plasmid_transfer	T4SS conjugation machinery ATPase	context-dependent: see note in docs
+virD4	negative	plasmid_transfer	T4SS coupling protein	context-dependent: see note in docs
+#
+# ---------------------------------------------------------------- plasmid maintenance
+parA	negative	plasmid_maintenance	plasmid partition ATPase
+parB	negative	plasmid_maintenance	plasmid partition centromere-binding protein
+parM	negative	plasmid_maintenance	plasmid partition actin homolog
+stbA	negative	plasmid_maintenance	plasmid stability
+stbB	negative	plasmid_maintenance	plasmid stability
+sopA	negative	plasmid_maintenance	plasmid partition ATPase
+sopB	negative	plasmid_maintenance	plasmid partition centromere-binding protein
+repA	negative	plasmid_maintenance	plasmid replication initiator
+repB	negative	plasmid_maintenance	plasmid replication
+repC	negative	plasmid_maintenance	plasmid replication initiator
+repE	negative	plasmid_maintenance	plasmid replication initiator
+korB	negative	plasmid_maintenance	plasmid partition and transcriptional repressor
+mobA	negative	plasmid_maintenance	plasmid mobilisation relaxase
+mobB	negative	plasmid_maintenance	plasmid mobilisation
+mobC	negative	plasmid_maintenance	plasmid mobilisation
+#
+# ---------------------------------------------------------------- toxin-antitoxin
+# Plasmid addiction systems. These match MECHANISM_RULES["toxin"] on the word "toxin"
+# while having nothing to do with host cells: a pure product-text false positive.
+ccdA	negative	toxin_antitoxin	plasmid addiction antitoxin	matches the toxin rule
+ccdB	negative	toxin_antitoxin	plasmid addiction toxin, gyrase poison	matches the toxin rule
+pemI	negative	toxin_antitoxin	plasmid addiction antitoxin	matches the toxin rule
+pemK	negative	toxin_antitoxin	plasmid addiction toxin, endoribonuclease	matches the toxin rule
+vagC	negative	toxin_antitoxin	plasmid addiction antitoxin	matches the toxin rule
+vagD	negative	toxin_antitoxin	plasmid addiction toxin	matches the toxin rule
+hok	negative	toxin_antitoxin	plasmid addiction host-killing protein	matches the toxin rule
+mok	negative	toxin_antitoxin	plasmid addiction modulator
+phd	negative	toxin_antitoxin	prophage addiction antitoxin
+doc	negative	toxin_antitoxin	prophage addiction toxin	matches the toxin rule
+#
+# ---------------------------------------------------------------- mobile elements
+tnpA	negative	mobile_element	transposase
+tnpR	negative	mobile_element	resolvase
+intI1	negative	mobile_element	class 1 integron integrase
+#
+# ================================================================= EXCLUDED
+# Contested in the literature. Counted in neither precision nor recall, but reported, so
+# that a reviewer can see the calls that were deliberately not made.
+traT	excluded	plasmid_transfer	entry exclusion AND complement/serum resistance	issue #49 calls this a false positive; the serum-resistance literature disagrees
+degP	excluded	omp_biogenesis	periplasmic protease-chaperone, virulence-associated in several species
+htrA	excluded	omp_biogenesis	alternative symbol for degP
+dsbA	excluded	omp_biogenesis	periplasmic disulfide oxidoreductase; folds several virulence factors
+lpp	excluded	omp_biogenesis	Braun lipoprotein, structural but strongly immunostimulatory
+relB	excluded	toxin_antitoxin	chromosomal antitoxin; persister-formation literature is unsettled
+relE	excluded	toxin_antitoxin	chromosomal toxin; persister-formation literature is unsettled
+mazE	excluded	toxin_antitoxin	chromosomal antitoxin; persister-formation literature is unsettled
+mazF	excluded	toxin_antitoxin	chromosomal toxin; persister-formation literature is unsettled
+higA	excluded	toxin_antitoxin	chromosomal antitoxin; persister-formation literature is unsettled
+higB	excluded	toxin_antitoxin	chromosomal toxin; persister-formation literature is unsettled

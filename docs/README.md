@@ -14,6 +14,7 @@ NIAID-BRCs AI Codeathon 2.0 · Argonne National Laboratory · Sept 16–18, 2026
 | [pitfalls.md](pitfalls.md) | Before trusting any result, and before designing a scoring or docking step. |
 | [common-ids.md](common-ids.md) | Mapping any identifier — feature_id, UniProt, PDB, ChEMBL. Never write your own mapping. |
 | [07-decisions-and-risks.md](07-decisions-and-risks.md) | Open decisions, thread dependencies, non-negotiables. |
+| [08-evaluation.md](08-evaluation.md) | Before quoting any ranking as a shortlist, and before changing a scoring weight. |
 
 ## Modules
 
@@ -33,6 +34,7 @@ Each module doc carries scope, inputs, outputs, tools, steps, acceptance checks,
 | M4 ligands | [04-m4-ligands.md](04-m4-ligands.md) | `ligands`, `docking` |
 | M5 disease | [05-m5-disease.md](05-m5-disease.md) | `disease` |
 | M6 report | [06-m6-report.md](06-m6-report.md) | `report` |
+| Evaluation | [08-evaluation.md](08-evaluation.md) | nothing — it reads a finished run and writes `runs/<id>/eval/` |
 
 ## Ground rules
 

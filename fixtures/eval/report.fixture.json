@@ -1,0 +1,1529 @@
+{
+  "schema_version": "0.1.0",
+  "run": {
+    "run_id": "eval-fixture",
+    "created_at": "2026-09-17T23:00:00+00:00",
+    "schema_version": "0.1.0",
+    "input": "fixtures/eval/report.fixture.json"
+  },
+  "genome": {
+    "genome_id": "1125630.4",
+    "genome_name": "Klebsiella pneumoniae subsp. pneumoniae HS11286 (trimmed fixture)",
+    "taxon_id": 1125630,
+    "resolution": "species"
+  },
+  "proteins": [
+    {
+      "feature_id": "fig|1125630.4.peg.997",
+      "locus_tag": null,
+      "gene": "fimD",
+      "product": "Type 1 fimbriae outer membrane usher protein FimD",
+      "aa_length": 878,
+      "m1_priority": {
+        "score": 7,
+        "breakdown": [
+          {
+            "points": 3,
+            "reason": "Virulence factor (VFDB / Victors)"
+          },
+          {
+            "points": 2,
+            "reason": "Host-interaction mechanism: Adhesion & attachment"
+          },
+          {
+            "points": 1,
+            "reason": "Predicted surface or secreted (antibody-accessible)"
+          },
+          {
+            "points": 1,
+            "reason": "Named / characterised gene"
+          }
+        ],
+        "categories": [
+          "adhesion"
+        ],
+        "specialty_types": [
+          "virulence"
+        ],
+        "mechanism_hypothesis": "Adhesion & attachment: the product 'Type 1 fimbriae outer membrane usher protein FimD' likely attaches to host epithelium and initiates colonisation.",
+        "selected": true,
+        "weights": {
+          "virulence": 3,
+          "drug_target": 3,
+          "amr": 2,
+          "essential": 2,
+          "mechanism": 2,
+          "transporter": 1,
+          "surface": 1,
+          "named_gene": 1,
+          "human_homolog": -2
+        },
+        "rank": 1
+      }
+    },
+    {
+      "feature_id": "fig|1125630.4.peg.1937",
+      "locus_tag": null,
+      "gene": "iutA",
+      "product": "Ferric aerobactin receptor IutA, outer membrane",
+      "aa_length": 731,
+      "m1_priority": {
+        "score": 7,
+        "breakdown": [
+          {
+            "points": 3,
+            "reason": "Virulence factor (VFDB / Victors)"
+          },
+          {
+            "points": 2,
+            "reason": "Host-interaction mechanism: Nutrient / iron acquisition"
+          },
+          {
+            "points": 1,
+            "reason": "Predicted surface or secreted (antibody-accessible)"
+          },
+          {
+            "points": 1,
+            "reason": "Named / characterised gene"
+          }
+        ],
+        "categories": [
+          "iron"
+        ],
+        "specialty_types": [
+          "virulence"
+        ],
+        "mechanism_hypothesis": "Nutrient / iron acquisition: the product 'Ferric aerobactin receptor IutA, outer membrane' likely scavenges host iron and nutrients to sustain in-host replication.",
+        "selected": true,
+        "weights": {
+          "virulence": 3,
+          "drug_target": 3,
+          "amr": 2,
+          "essential": 2,
+          "mechanism": 2,
+          "transporter": 1,
+          "surface": 1,
+          "named_gene": 1,
+          "human_homolog": -2
+        },
+        "rank": 2
+      }
+    },
+    {
+      "feature_id": "fig|1125630.4.peg.3382",
+      "locus_tag": null,
+      "gene": "fyuA",
+      "product": "Pesticin/yersiniabactin outermembrane receptor FyuA",
+      "aa_length": 673,
+      "m1_priority": {
+        "score": 7,
+        "breakdown": [
+          {
+            "points": 3,
+            "reason": "Virulence factor (VFDB / Victors)"
+          },
+          {
+            "points": 2,
+            "reason": "Host-interaction mechanism: Nutrient / iron acquisition"
+          },
+          {
+            "points": 1,
+            "reason": "Predicted surface or secreted (antibody-accessible)"
+          },
+          {
+            "points": 1,
+            "reason": "Named / characterised gene"
+          }
+        ],
+        "categories": [
+          "iron"
+        ],
+        "specialty_types": [
+          "virulence"
+        ],
+        "mechanism_hypothesis": "Nutrient / iron acquisition: the product 'Pesticin/yersiniabactin outermembrane receptor FyuA' likely scavenges host iron and nutrients to sustain in-host replication.",
+        "selected": true,
+        "weights": {
+          "virulence": 3,
+          "drug_target": 3,
+          "amr": 2,
+          "essential": 2,
+          "mechanism": 2,
+          "transporter": 1,
+          "surface": 1,
+          "named_gene": 1,
+          "human_homolog": -2
+        },
+        "rank": 3
+      }
+    },
+    {
+      "feature_id": "fig|1125630.4.peg.2211",
+      "locus_tag": null,
+      "gene": "tssL",
+      "product": "Type VI secretion system membrane protein TssL",
+      "aa_length": 372,
+      "m1_priority": {
+        "score": 7,
+        "breakdown": [
+          {
+            "points": 3,
+            "reason": "Virulence factor (VFDB / Victors)"
+          },
+          {
+            "points": 2,
+            "reason": "Host-interaction mechanism: Secretion & effectors"
+          },
+          {
+            "points": 1,
+            "reason": "Predicted surface or secreted (antibody-accessible)"
+          },
+          {
+            "points": 1,
+            "reason": "Named / characterised gene"
+          }
+        ],
+        "categories": [
+          "secretion"
+        ],
+        "specialty_types": [
+          "virulence"
+        ],
+        "mechanism_hypothesis": "Secretion & effectors: the product 'Type VI secretion system membrane protein TssL' likely injects effector proteins into host cells and reprograms host signalling.",
+        "selected": true,
+        "weights": {
+          "virulence": 3,
+          "drug_target": 3,
+          "amr": 2,
+          "essential": 2,
+          "mechanism": 2,
+          "transporter": 1,
+          "surface": 1,
+          "named_gene": 1,
+          "human_homolog": -2
+        },
+        "rank": 4
+      }
+    },
+    {
+      "feature_id": "fig|1125630.4.peg.1104",
+      "locus_tag": null,
+      "gene": "mrkD",
+      "product": "Type 3 fimbrial adhesin MrkD, collagen binding",
+      "aa_length": 336,
+      "m1_priority": {
+        "score": 7,
+        "breakdown": [
+          {
+            "points": 3,
+            "reason": "Virulence factor (VFDB / Victors)"
+          },
+          {
+            "points": 2,
+            "reason": "Host-interaction mechanism: Adhesion & attachment, Secretion & effectors"
+          },
+          {
+            "points": 1,
+            "reason": "Predicted surface or secreted (antibody-accessible)"
+          },
+          {
+            "points": 1,
+            "reason": "Named / characterised gene"
+          }
+        ],
+        "categories": [
+          "adhesion",
+          "secretion"
+        ],
+        "specialty_types": [
+          "virulence"
+        ],
+        "mechanism_hypothesis": "Adhesion & attachment: the product 'Type 3 fimbrial adhesin MrkD, collagen binding' likely attaches to host epithelium and initiates colonisation; injects effector proteins into host cells and reprograms host signalling.",
+        "selected": true,
+        "weights": {
+          "virulence": 3,
+          "drug_target": 3,
+          "amr": 2,
+          "essential": 2,
+          "mechanism": 2,
+          "transporter": 1,
+          "surface": 1,
+          "named_gene": 1,
+          "human_homolog": -2
+        },
+        "rank": 5
+      }
+    },
+    {
+      "feature_id": "fig|1125630.4.peg.998",
+      "locus_tag": null,
+      "gene": "fimH",
+      "product": "Type 1 fimbrial adhesin FimH, D-mannose specific",
+      "aa_length": 300,
+      "m1_priority": {
+        "score": 7,
+        "breakdown": [
+          {
+            "points": 3,
+            "reason": "Virulence factor (VFDB / Victors)"
+          },
+          {
+            "points": 2,
+            "reason": "Host-interaction mechanism: Adhesion & attachment"
+          },
+          {
+            "points": 1,
+            "reason": "Predicted surface or secreted (antibody-accessible)"
+          },
+          {
+            "points": 1,
+            "reason": "Named / characterised gene"
+          }
+        ],
+        "categories": [
+          "adhesion"
+        ],
+        "specialty_types": [
+          "virulence"
+        ],
+        "mechanism_hypothesis": "Adhesion & attachment: the product 'Type 1 fimbrial adhesin FimH, D-mannose specific' likely attaches to host epithelium and initiates colonisation.",
+        "selected": true,
+        "weights": {
+          "virulence": 3,
+          "drug_target": 3,
+          "amr": 2,
+          "essential": 2,
+          "mechanism": 2,
+          "transporter": 1,
+          "surface": 1,
+          "named_gene": 1,
+          "human_homolog": -2
+        },
+        "rank": 6
+      }
+    },
+    {
+      "feature_id": "fig|1125630.4.peg.4701",
+      "locus_tag": null,
+      "gene": "traT",
+      "product": "Conjugative transfer surface exclusion and serum resistance protein TraT",
+      "aa_length": 244,
+      "m1_priority": {
+        "score": 7,
+        "breakdown": [
+          {
+            "points": 3,
+            "reason": "Virulence factor (VFDB / Victors)"
+          },
+          {
+            "points": 2,
+            "reason": "Host-interaction mechanism: Immune evasion"
+          },
+          {
+            "points": 1,
+            "reason": "Predicted surface or secreted (antibody-accessible)"
+          },
+          {
+            "points": 1,
+            "reason": "Named / characterised gene"
+          }
+        ],
+        "categories": [
+          "immune_evasion"
+        ],
+        "specialty_types": [
+          "virulence"
+        ],
+        "mechanism_hypothesis": "Immune evasion: the product 'Conjugative transfer surface exclusion and serum resistance protein TraT' likely resists complement or immune clearance and promotes persistence.",
+        "selected": true,
+        "weights": {
+          "virulence": 3,
+          "drug_target": 3,
+          "amr": 2,
+          "essential": 2,
+          "mechanism": 2,
+          "transporter": 1,
+          "surface": 1,
+          "named_gene": 1,
+          "human_homolog": -2
+        },
+        "rank": 7
+      }
+    },
+    {
+      "feature_id": "fig|1125630.4.peg.2212",
+      "locus_tag": null,
+      "gene": "tssJ",
+      "product": "Type VI secretion system lipoprotein TssJ",
+      "aa_length": 165,
+      "m1_priority": {
+        "score": 7,
+        "breakdown": [
+          {
+            "points": 3,
+            "reason": "Virulence factor (VFDB / Victors)"
+          },
+          {
+            "points": 2,
+            "reason": "Host-interaction mechanism: Secretion & effectors"
+          },
+          {
+            "points": 1,
+            "reason": "Predicted surface or secreted (antibody-accessible)"
+          },
+          {
+            "points": 1,
+            "reason": "Named / characterised gene"
+          }
+        ],
+        "categories": [
+          "secretion"
+        ],
+        "specialty_types": [
+          "virulence"
+        ],
+        "mechanism_hypothesis": "Secretion & effectors: the product 'Type VI secretion system lipoprotein TssJ' likely injects effector proteins into host cells and reprograms host signalling.",
+        "selected": true,
+        "weights": {
+          "virulence": 3,
+          "drug_target": 3,
+          "amr": 2,
+          "essential": 2,
+          "mechanism": 2,
+          "transporter": 1,
+          "surface": 1,
+          "named_gene": 1,
+          "human_homolog": -2
+        },
+        "rank": 8
+      }
+    },
+    {
+      "feature_id": "fig|1125630.4.peg.1105",
+      "locus_tag": null,
+      "gene": "mrkA",
+      "product": "Type 3 fimbrial major subunit MrkA",
+      "aa_length": 202,
+      "m1_priority": {
+        "score": 6,
+        "breakdown": [
+          {
+            "points": 3,
+            "reason": "Virulence factor (VFDB / Victors)"
+          },
+          {
+            "points": 2,
+            "reason": "Host-interaction mechanism: Adhesion & attachment, Secretion & effectors"
+          },
+          {
+            "points": 1,
+            "reason": "Named / characterised gene"
+          }
+        ],
+        "categories": [
+          "adhesion",
+          "secretion"
+        ],
+        "specialty_types": [
+          "virulence"
+        ],
+        "mechanism_hypothesis": "Adhesion & attachment: the product 'Type 3 fimbrial major subunit MrkA' likely attaches to host epithelium and initiates colonisation; injects effector proteins into host cells and reprograms host signalling.",
+        "selected": true,
+        "weights": {
+          "virulence": 3,
+          "drug_target": 3,
+          "amr": 2,
+          "essential": 2,
+          "mechanism": 2,
+          "transporter": 1,
+          "surface": 1,
+          "named_gene": 1,
+          "human_homolog": -2
+        },
+        "rank": 9
+      }
+    },
+    {
+      "feature_id": "fig|1125630.4.peg.6002",
+      "locus_tag": null,
+      "gene": "rpoB",
+      "product": "DNA-directed RNA polymerase subunit beta",
+      "aa_length": 1342,
+      "m1_priority": {
+        "score": 4,
+        "breakdown": [
+          {
+            "points": 3,
+            "reason": "Known drug target"
+          },
+          {
+            "points": 1,
+            "reason": "Named / characterised gene"
+          }
+        ],
+        "categories": [],
+        "specialty_types": [
+          "drug_target"
+        ],
+        "mechanism_hypothesis": "Housekeeping or metabolic function; not implicated in host interaction by this annotation.",
+        "selected": true,
+        "weights": {
+          "virulence": 3,
+          "drug_target": 3,
+          "amr": 2,
+          "essential": 2,
+          "mechanism": 2,
+          "transporter": 1,
+          "surface": 1,
+          "named_gene": 1,
+          "human_homolog": -2
+        },
+        "rank": 10
+      }
+    },
+    {
+      "feature_id": "fig|1125630.4.peg.602",
+      "locus_tag": null,
+      "gene": "wzi",
+      "product": "Capsule anchoring surface lipoprotein Wzi",
+      "aa_length": 484,
+      "m1_priority": {
+        "score": 4,
+        "breakdown": [
+          {
+            "points": 2,
+            "reason": "Host-interaction mechanism: Immune evasion"
+          },
+          {
+            "points": 1,
+            "reason": "Predicted surface or secreted (antibody-accessible)"
+          },
+          {
+            "points": 1,
+            "reason": "Named / characterised gene"
+          }
+        ],
+        "categories": [
+          "immune_evasion"
+        ],
+        "specialty_types": [],
+        "mechanism_hypothesis": "Immune evasion: the product 'Capsule anchoring surface lipoprotein Wzi' likely resists complement or immune clearance and promotes persistence.",
+        "selected": true,
+        "weights": {
+          "virulence": 3,
+          "drug_target": 3,
+          "amr": 2,
+          "essential": 2,
+          "mechanism": 2,
+          "transporter": 1,
+          "surface": 1,
+          "named_gene": 1,
+          "human_homolog": -2
+        },
+        "rank": 11
+      }
+    },
+    {
+      "feature_id": "fig|1125630.4.peg.5100",
+      "locus_tag": null,
+      "gene": "acrA",
+      "product": "Multidrug efflux RND transporter membrane fusion protein AcrA",
+      "aa_length": 397,
+      "m1_priority": {
+        "score": 4,
+        "breakdown": [
+          {
+            "points": 2,
+            "reason": "Antibiotic-resistance determinant (CARD / NDARO)"
+          },
+          {
+            "points": 1,
+            "reason": "Predicted surface or secreted (antibody-accessible)"
+          },
+          {
+            "points": 1,
+            "reason": "Named / characterised gene"
+          }
+        ],
+        "categories": [],
+        "specialty_types": [
+          "amr"
+        ],
+        "mechanism_hypothesis": "Housekeeping or metabolic function; not implicated in host interaction by this annotation.",
+        "selected": true,
+        "weights": {
+          "virulence": 3,
+          "drug_target": 3,
+          "amr": 2,
+          "essential": 2,
+          "mechanism": 2,
+          "transporter": 1,
+          "surface": 1,
+          "named_gene": 1,
+          "human_homolog": -2
+        },
+        "rank": 12
+      }
+    },
+    {
+      "feature_id": "fig|1125630.4.peg.601",
+      "locus_tag": null,
+      "gene": "wza",
+      "product": "Polysaccharide capsule export outer membrane lipoprotein Wza",
+      "aa_length": 379,
+      "m1_priority": {
+        "score": 4,
+        "breakdown": [
+          {
+            "points": 2,
+            "reason": "Host-interaction mechanism: Immune evasion"
+          },
+          {
+            "points": 1,
+            "reason": "Predicted surface or secreted (antibody-accessible)"
+          },
+          {
+            "points": 1,
+            "reason": "Named / characterised gene"
+          }
+        ],
+        "categories": [
+          "immune_evasion"
+        ],
+        "specialty_types": [],
+        "mechanism_hypothesis": "Immune evasion: the product 'Polysaccharide capsule export outer membrane lipoprotein Wza' likely resists complement or immune clearance and promotes persistence.",
+        "selected": true,
+        "weights": {
+          "virulence": 3,
+          "drug_target": 3,
+          "amr": 2,
+          "essential": 2,
+          "mechanism": 2,
+          "transporter": 1,
+          "surface": 1,
+          "named_gene": 1,
+          "human_homolog": -2
+        },
+        "rank": 13
+      }
+    },
+    {
+      "feature_id": "fig|1125630.4.peg.4502",
+      "locus_tag": null,
+      "gene": "virB6",
+      "product": "Inner membrane protein of type IV secretion of T-DNA complex VirB6",
+      "aa_length": 295,
+      "m1_priority": {
+        "score": 4,
+        "breakdown": [
+          {
+            "points": 2,
+            "reason": "Host-interaction mechanism: Secretion & effectors"
+          },
+          {
+            "points": 1,
+            "reason": "Predicted surface or secreted (antibody-accessible)"
+          },
+          {
+            "points": 1,
+            "reason": "Named / characterised gene"
+          }
+        ],
+        "categories": [
+          "secretion"
+        ],
+        "specialty_types": [],
+        "mechanism_hypothesis": "Secretion & effectors: the product 'Inner membrane protein of type IV secretion of T-DNA complex VirB6' likely injects effector proteins into host cells and reprograms host signalling.",
+        "selected": true,
+        "weights": {
+          "virulence": 3,
+          "drug_target": 3,
+          "amr": 2,
+          "essential": 2,
+          "mechanism": 2,
+          "transporter": 1,
+          "surface": 1,
+          "named_gene": 1,
+          "human_homolog": -2
+        },
+        "rank": 14
+      }
+    },
+    {
+      "feature_id": "fig|1125630.4.peg.1500",
+      "locus_tag": null,
+      "gene": "tonB",
+      "product": "TonB protein, energy transducer for outer membrane transport",
+      "aa_length": 239,
+      "m1_priority": {
+        "score": 4,
+        "breakdown": [
+          {
+            "points": 2,
+            "reason": "Host-interaction mechanism: Nutrient / iron acquisition"
+          },
+          {
+            "points": 1,
+            "reason": "Predicted surface or secreted (antibody-accessible)"
+          },
+          {
+            "points": 1,
+            "reason": "Named / characterised gene"
+          }
+        ],
+        "categories": [
+          "iron"
+        ],
+        "specialty_types": [],
+        "mechanism_hypothesis": "Nutrient / iron acquisition: the product 'TonB protein, energy transducer for outer membrane transport' likely scavenges host iron and nutrients to sustain in-host replication.",
+        "selected": true,
+        "weights": {
+          "virulence": 3,
+          "drug_target": 3,
+          "amr": 2,
+          "essential": 2,
+          "mechanism": 2,
+          "transporter": 1,
+          "surface": 1,
+          "named_gene": 1,
+          "human_homolog": -2
+        },
+        "rank": 15
+      }
+    },
+    {
+      "feature_id": "fig|1125630.4.peg.3010",
+      "locus_tag": null,
+      "gene": "skp",
+      "product": "Periplasmic chaperone of outer membrane proteins Skp",
+      "aa_length": 161,
+      "m1_priority": {
+        "score": 4,
+        "breakdown": [
+          {
+            "points": 2,
+            "reason": "Host-interaction mechanism: Secretion & effectors"
+          },
+          {
+            "points": 1,
+            "reason": "Predicted surface or secreted (antibody-accessible)"
+          },
+          {
+            "points": 1,
+            "reason": "Named / characterised gene"
+          }
+        ],
+        "categories": [
+          "secretion"
+        ],
+        "specialty_types": [],
+        "mechanism_hypothesis": "Secretion & effectors: the product 'Periplasmic chaperone of outer membrane proteins Skp' likely injects effector proteins into host cells and reprograms host signalling.",
+        "selected": true,
+        "weights": {
+          "virulence": 3,
+          "drug_target": 3,
+          "amr": 2,
+          "essential": 2,
+          "mechanism": 2,
+          "transporter": 1,
+          "surface": 1,
+          "named_gene": 1,
+          "human_homolog": -2
+        },
+        "rank": 16
+      }
+    },
+    {
+      "feature_id": "fig|1125630.4.peg.4501",
+      "locus_tag": null,
+      "gene": "traS",
+      "product": "IncF plasmid conjugative transfer surface exclusion protein TraS",
+      "aa_length": 148,
+      "m1_priority": {
+        "score": 4,
+        "breakdown": [
+          {
+            "points": 2,
+            "reason": "Host-interaction mechanism: Secretion & effectors"
+          },
+          {
+            "points": 1,
+            "reason": "Predicted surface or secreted (antibody-accessible)"
+          },
+          {
+            "points": 1,
+            "reason": "Named / characterised gene"
+          }
+        ],
+        "categories": [
+          "secretion"
+        ],
+        "specialty_types": [],
+        "mechanism_hypothesis": "Secretion & effectors: the product 'IncF plasmid conjugative transfer surface exclusion protein TraS' likely injects effector proteins into host cells and reprograms host signalling.",
+        "selected": true,
+        "weights": {
+          "virulence": 3,
+          "drug_target": 3,
+          "amr": 2,
+          "essential": 2,
+          "mechanism": 2,
+          "transporter": 1,
+          "surface": 1,
+          "named_gene": 1,
+          "human_homolog": -2
+        },
+        "rank": 17
+      }
+    },
+    {
+      "feature_id": "fig|1125630.4.peg.5099",
+      "locus_tag": null,
+      "gene": "acrB",
+      "product": "Multidrug efflux RND transporter permease subunit AcrB",
+      "aa_length": 1049,
+      "m1_priority": {
+        "score": 3,
+        "breakdown": [
+          {
+            "points": 2,
+            "reason": "Antibiotic-resistance determinant (CARD / NDARO)"
+          },
+          {
+            "points": 1,
+            "reason": "Named / characterised gene"
+          }
+        ],
+        "categories": [],
+        "specialty_types": [
+          "amr"
+        ],
+        "mechanism_hypothesis": "Housekeeping or metabolic function; not implicated in host interaction by this annotation.",
+        "selected": true,
+        "weights": {
+          "virulence": 3,
+          "drug_target": 3,
+          "amr": 2,
+          "essential": 2,
+          "mechanism": 2,
+          "transporter": 1,
+          "surface": 1,
+          "named_gene": 1,
+          "human_homolog": -2
+        },
+        "rank": 18
+      }
+    },
+    {
+      "feature_id": "fig|1125630.4.peg.605",
+      "locus_tag": null,
+      "gene": "wzc",
+      "product": "Tyrosine-protein kinase Wzc, capsule polymerisation",
+      "aa_length": 720,
+      "m1_priority": {
+        "score": 3,
+        "breakdown": [
+          {
+            "points": 2,
+            "reason": "Host-interaction mechanism: Immune evasion"
+          },
+          {
+            "points": 1,
+            "reason": "Named / characterised gene"
+          }
+        ],
+        "categories": [
+          "immune_evasion"
+        ],
+        "specialty_types": [],
+        "mechanism_hypothesis": "Immune evasion: the product 'Tyrosine-protein kinase Wzc, capsule polymerisation' likely resists complement or immune clearance and promotes persistence.",
+        "selected": true,
+        "weights": {
+          "virulence": 3,
+          "drug_target": 3,
+          "amr": 2,
+          "essential": 2,
+          "mechanism": 2,
+          "transporter": 1,
+          "surface": 1,
+          "named_gene": 1,
+          "human_homolog": -2
+        },
+        "rank": 19
+      }
+    },
+    {
+      "feature_id": "fig|1125630.4.peg.3011",
+      "locus_tag": null,
+      "gene": "ppiD",
+      "product": "Periplasmic chaperone and peptidyl-prolyl cis-trans isomerase PpiD",
+      "aa_length": 623,
+      "m1_priority": {
+        "score": 3,
+        "breakdown": [
+          {
+            "points": 2,
+            "reason": "Host-interaction mechanism: Secretion & effectors"
+          },
+          {
+            "points": 1,
+            "reason": "Named / characterised gene"
+          }
+        ],
+        "categories": [
+          "secretion"
+        ],
+        "specialty_types": [],
+        "mechanism_hypothesis": "Secretion & effectors: the product 'Periplasmic chaperone and peptidyl-prolyl cis-trans isomerase PpiD' likely injects effector proteins into host cells and reprograms host signalling.",
+        "selected": true,
+        "weights": {
+          "virulence": 3,
+          "drug_target": 3,
+          "amr": 2,
+          "essential": 2,
+          "mechanism": 2,
+          "transporter": 1,
+          "surface": 1,
+          "named_gene": 1,
+          "human_homolog": -2
+        },
+        "rank": 20
+      }
+    },
+    {
+      "feature_id": "fig|1125630.4.peg.2801",
+      "locus_tag": null,
+      "gene": "ureC",
+      "product": "Urease alpha subunit UreC",
+      "aa_length": 567,
+      "m1_priority": {
+        "score": 3,
+        "breakdown": [
+          {
+            "points": 2,
+            "reason": "Host-interaction mechanism: Tissue degradation"
+          },
+          {
+            "points": 1,
+            "reason": "Named / characterised gene"
+          }
+        ],
+        "categories": [
+          "degradation"
+        ],
+        "specialty_types": [],
+        "mechanism_hypothesis": "Tissue degradation: the product 'Urease alpha subunit UreC' likely degrades host matrix to facilitate invasion and spread.",
+        "selected": true,
+        "weights": {
+          "virulence": 3,
+          "drug_target": 3,
+          "amr": 2,
+          "essential": 2,
+          "mechanism": 2,
+          "transporter": 1,
+          "surface": 1,
+          "named_gene": 1,
+          "human_homolog": -2
+        },
+        "rank": 21
+      }
+    },
+    {
+      "feature_id": "fig|1125630.4.peg.4503",
+      "locus_tag": null,
+      "gene": "traB",
+      "product": "IncF plasmid conjugative transfer protein TraB",
+      "aa_length": 475,
+      "m1_priority": {
+        "score": 3,
+        "breakdown": [
+          {
+            "points": 2,
+            "reason": "Host-interaction mechanism: Secretion & effectors"
+          },
+          {
+            "points": 1,
+            "reason": "Named / characterised gene"
+          }
+        ],
+        "categories": [
+          "secretion"
+        ],
+        "specialty_types": [],
+        "mechanism_hypothesis": "Secretion & effectors: the product 'IncF plasmid conjugative transfer protein TraB' likely injects effector proteins into host cells and reprograms host signalling.",
+        "selected": true,
+        "weights": {
+          "virulence": 3,
+          "drug_target": 3,
+          "amr": 2,
+          "essential": 2,
+          "mechanism": 2,
+          "transporter": 1,
+          "surface": 1,
+          "named_gene": 1,
+          "human_homolog": -2
+        },
+        "rank": 22
+      }
+    },
+    {
+      "feature_id": "fig|1125630.4.peg.3012",
+      "locus_tag": null,
+      "gene": "surA",
+      "product": "Survival protein SurA, periplasmic chaperone and PPIase",
+      "aa_length": 428,
+      "m1_priority": {
+        "score": 3,
+        "breakdown": [
+          {
+            "points": 2,
+            "reason": "Host-interaction mechanism: Secretion & effectors"
+          },
+          {
+            "points": 1,
+            "reason": "Named / characterised gene"
+          }
+        ],
+        "categories": [
+          "secretion"
+        ],
+        "specialty_types": [],
+        "mechanism_hypothesis": "Secretion & effectors: the product 'Survival protein SurA, periplasmic chaperone and PPIase' likely injects effector proteins into host cells and reprograms host signalling.",
+        "selected": true,
+        "weights": {
+          "virulence": 3,
+          "drug_target": 3,
+          "amr": 2,
+          "essential": 2,
+          "mechanism": 2,
+          "transporter": 1,
+          "surface": 1,
+          "named_gene": 1,
+          "human_homolog": -2
+        },
+        "rank": 23
+      }
+    },
+    {
+      "feature_id": "fig|1125630.4.peg.6003",
+      "locus_tag": null,
+      "gene": "murA",
+      "product": "UDP-N-acetylglucosamine 1-carboxyvinyltransferase MurA",
+      "aa_length": 419,
+      "m1_priority": {
+        "score": 3,
+        "breakdown": [
+          {
+            "points": 2,
+            "reason": "Essential-gene homolog"
+          },
+          {
+            "points": 1,
+            "reason": "Named / characterised gene"
+          }
+        ],
+        "categories": [],
+        "specialty_types": [
+          "essential"
+        ],
+        "mechanism_hypothesis": "Housekeeping or metabolic function; not implicated in host interaction by this annotation.",
+        "selected": false,
+        "weights": {
+          "virulence": 3,
+          "drug_target": 3,
+          "amr": 2,
+          "essential": 2,
+          "mechanism": 2,
+          "transporter": 1,
+          "surface": 1,
+          "named_gene": 1,
+          "human_homolog": -2
+        },
+        "rank": 24
+      }
+    },
+    {
+      "feature_id": "fig|1125630.4.peg.4601",
+      "locus_tag": null,
+      "gene": "pemK",
+      "product": "Plasmid maintenance system killer protein PemK, toxin",
+      "aa_length": 110,
+      "m1_priority": {
+        "score": 3,
+        "breakdown": [
+          {
+            "points": 2,
+            "reason": "Host-interaction mechanism: Toxins & cytolysins"
+          },
+          {
+            "points": 1,
+            "reason": "Named / characterised gene"
+          }
+        ],
+        "categories": [
+          "toxin"
+        ],
+        "specialty_types": [],
+        "mechanism_hypothesis": "Toxins & cytolysins: the product 'Plasmid maintenance system killer protein PemK, toxin' likely damages host membranes and tissue, causing cell death and inflammation.",
+        "selected": true,
+        "weights": {
+          "virulence": 3,
+          "drug_target": 3,
+          "amr": 2,
+          "essential": 2,
+          "mechanism": 2,
+          "transporter": 1,
+          "surface": 1,
+          "named_gene": 1,
+          "human_homolog": -2
+        },
+        "rank": 25
+      }
+    },
+    {
+      "feature_id": "fig|1125630.4.peg.4602",
+      "locus_tag": null,
+      "gene": "ccdB",
+      "product": "Cytotoxic protein CcdB, plasmid addiction toxin",
+      "aa_length": 101,
+      "m1_priority": {
+        "score": 3,
+        "breakdown": [
+          {
+            "points": 2,
+            "reason": "Host-interaction mechanism: Toxins & cytolysins"
+          },
+          {
+            "points": 1,
+            "reason": "Named / characterised gene"
+          }
+        ],
+        "categories": [
+          "toxin"
+        ],
+        "specialty_types": [],
+        "mechanism_hypothesis": "Toxins & cytolysins: the product 'Cytotoxic protein CcdB, plasmid addiction toxin' likely damages host membranes and tissue, causing cell death and inflammation.",
+        "selected": true,
+        "weights": {
+          "virulence": 3,
+          "drug_target": 3,
+          "amr": 2,
+          "essential": 2,
+          "mechanism": 2,
+          "transporter": 1,
+          "surface": 1,
+          "named_gene": 1,
+          "human_homolog": -2
+        },
+        "rank": 26
+      }
+    },
+    {
+      "feature_id": "fig|1125630.4.peg.1502",
+      "locus_tag": null,
+      "gene": null,
+      "product": "ATP-dependent protease ATPase subunit ClpC",
+      "aa_length": 821,
+      "m1_priority": {
+        "score": 2,
+        "breakdown": [
+          {
+            "points": 2,
+            "reason": "Host-interaction mechanism: Tissue degradation"
+          }
+        ],
+        "categories": [
+          "degradation"
+        ],
+        "specialty_types": [],
+        "mechanism_hypothesis": "Tissue degradation: the product 'ATP-dependent protease ATPase subunit ClpC' likely degrades host matrix to facilitate invasion and spread.",
+        "selected": true,
+        "weights": {
+          "virulence": 3,
+          "drug_target": 3,
+          "amr": 2,
+          "essential": 2,
+          "mechanism": 2,
+          "transporter": 1,
+          "surface": 1,
+          "named_gene": 1,
+          "human_homolog": -2
+        },
+        "rank": 27
+      }
+    },
+    {
+      "feature_id": "fig|1125630.4.peg.3013",
+      "locus_tag": null,
+      "gene": "bamA",
+      "product": "Outer membrane protein assembly factor BamA",
+      "aa_length": 810,
+      "m1_priority": {
+        "score": 2,
+        "breakdown": [
+          {
+            "points": 1,
+            "reason": "Predicted surface or secreted (antibody-accessible)"
+          },
+          {
+            "points": 1,
+            "reason": "Named / characterised gene"
+          }
+        ],
+        "categories": [],
+        "specialty_types": [],
+        "mechanism_hypothesis": "Housekeeping or metabolic function; not implicated in host interaction by this annotation.",
+        "selected": false,
+        "weights": {
+          "virulence": 3,
+          "drug_target": 3,
+          "amr": 2,
+          "essential": 2,
+          "mechanism": 2,
+          "transporter": 1,
+          "surface": 1,
+          "named_gene": 1,
+          "human_homolog": -2
+        },
+        "rank": 28
+      }
+    },
+    {
+      "feature_id": "fig|1125630.4.peg.1501",
+      "locus_tag": null,
+      "gene": null,
+      "product": "TonB-dependent siderophore receptor, putative",
+      "aa_length": 712,
+      "m1_priority": {
+        "score": 2,
+        "breakdown": [
+          {
+            "points": 2,
+            "reason": "Host-interaction mechanism: Nutrient / iron acquisition"
+          }
+        ],
+        "categories": [
+          "iron"
+        ],
+        "specialty_types": [],
+        "mechanism_hypothesis": "Nutrient / iron acquisition: the product 'TonB-dependent siderophore receptor, putative' likely scavenges host iron and nutrients to sustain in-host replication.",
+        "selected": true,
+        "weights": {
+          "virulence": 3,
+          "drug_target": 3,
+          "amr": 2,
+          "essential": 2,
+          "mechanism": 2,
+          "transporter": 1,
+          "surface": 1,
+          "named_gene": 1,
+          "human_homolog": -2
+        },
+        "rank": 29
+      }
+    },
+    {
+      "feature_id": "fig|1125630.4.peg.410",
+      "locus_tag": null,
+      "gene": "ompA",
+      "product": "Outer membrane protein A precursor",
+      "aa_length": 348,
+      "m1_priority": {
+        "score": 2,
+        "breakdown": [
+          {
+            "points": 1,
+            "reason": "Predicted surface or secreted (antibody-accessible)"
+          },
+          {
+            "points": 1,
+            "reason": "Named / characterised gene"
+          }
+        ],
+        "categories": [],
+        "specialty_types": [],
+        "mechanism_hypothesis": "Housekeeping or metabolic function; not implicated in host interaction by this annotation.",
+        "selected": false,
+        "weights": {
+          "virulence": 3,
+          "drug_target": 3,
+          "amr": 2,
+          "essential": 2,
+          "mechanism": 2,
+          "transporter": 1,
+          "surface": 1,
+          "named_gene": 1,
+          "human_homolog": -2
+        },
+        "rank": 30
+      }
+    },
+    {
+      "feature_id": "fig|1125630.4.peg.4001",
+      "locus_tag": null,
+      "gene": "secA",
+      "product": "Preprotein translocase subunit SecA, protein secretion ATPase",
+      "aa_length": 901,
+      "m1_priority": {
+        "score": 1,
+        "breakdown": [
+          {
+            "points": 1,
+            "reason": "Named / characterised gene"
+          }
+        ],
+        "categories": [],
+        "specialty_types": [],
+        "mechanism_hypothesis": "Housekeeping or metabolic function; not implicated in host interaction by this annotation.",
+        "selected": false,
+        "weights": {
+          "virulence": 3,
+          "drug_target": 3,
+          "amr": 2,
+          "essential": 2,
+          "mechanism": 2,
+          "transporter": 1,
+          "surface": 1,
+          "named_gene": 1,
+          "human_homolog": -2
+        },
+        "rank": 31
+      }
+    },
+    {
+      "feature_id": "fig|1125630.4.peg.6005",
+      "locus_tag": null,
+      "gene": "thrA",
+      "product": "Aspartokinase I / homoserine dehydrogenase I",
+      "aa_length": 820,
+      "m1_priority": {
+        "score": 1,
+        "breakdown": [
+          {
+            "points": 1,
+            "reason": "Named / characterised gene"
+          }
+        ],
+        "categories": [],
+        "specialty_types": [],
+        "mechanism_hypothesis": "Housekeeping or metabolic function; not implicated in host interaction by this annotation.",
+        "selected": false,
+        "weights": {
+          "virulence": 3,
+          "drug_target": 3,
+          "amr": 2,
+          "essential": 2,
+          "mechanism": 2,
+          "transporter": 1,
+          "surface": 1,
+          "named_gene": 1,
+          "human_homolog": -2
+        },
+        "rank": 32
+      }
+    },
+    {
+      "feature_id": "fig|1125630.4.peg.4002",
+      "locus_tag": null,
+      "gene": "secY",
+      "product": "Preprotein translocase subunit SecY, secretion channel",
+      "aa_length": 443,
+      "m1_priority": {
+        "score": 1,
+        "breakdown": [
+          {
+            "points": 1,
+            "reason": "Named / characterised gene"
+          }
+        ],
+        "categories": [],
+        "specialty_types": [],
+        "mechanism_hypothesis": "Housekeeping or metabolic function; not implicated in host interaction by this annotation.",
+        "selected": false,
+        "weights": {
+          "virulence": 3,
+          "drug_target": 3,
+          "amr": 2,
+          "essential": 2,
+          "mechanism": 2,
+          "transporter": 1,
+          "surface": 1,
+          "named_gene": 1,
+          "human_homolog": -2
+        },
+        "rank": 33
+      }
+    },
+    {
+      "feature_id": "fig|1125630.4.peg.6001",
+      "locus_tag": null,
+      "gene": "gapA",
+      "product": "Glyceraldehyde-3-phosphate dehydrogenase A",
+      "aa_length": 331,
+      "m1_priority": {
+        "score": 1,
+        "breakdown": [
+          {
+            "points": 1,
+            "reason": "Named / characterised gene"
+          }
+        ],
+        "categories": [],
+        "specialty_types": [],
+        "mechanism_hypothesis": "Housekeeping or metabolic function; not implicated in host interaction by this annotation.",
+        "selected": false,
+        "weights": {
+          "virulence": 3,
+          "drug_target": 3,
+          "amr": 2,
+          "essential": 2,
+          "mechanism": 2,
+          "transporter": 1,
+          "surface": 1,
+          "named_gene": 1,
+          "human_homolog": -2
+        },
+        "rank": 34
+      }
+    },
+    {
+      "feature_id": "fig|1125630.4.peg.3014",
+      "locus_tag": null,
+      "gene": null,
+      "product": "Outer membrane protein",
+      "aa_length": 210,
+      "m1_priority": {
+        "score": 1,
+        "breakdown": [
+          {
+            "points": 1,
+            "reason": "Predicted surface or secreted (antibody-accessible)"
+          }
+        ],
+        "categories": [],
+        "specialty_types": [],
+        "mechanism_hypothesis": "Housekeeping or metabolic function; not implicated in host interaction by this annotation.",
+        "selected": false,
+        "weights": {
+          "virulence": 3,
+          "drug_target": 3,
+          "amr": 2,
+          "essential": 2,
+          "mechanism": 2,
+          "transporter": 1,
+          "surface": 1,
+          "named_gene": 1,
+          "human_homolog": -2
+        },
+        "rank": 35
+      }
+    },
+    {
+      "feature_id": "fig|1125630.4.peg.6004",
+      "locus_tag": null,
+      "gene": null,
+      "product": "Cobalamin biosynthesis protein CobN",
+      "aa_length": 1249,
+      "m1_priority": {
+        "score": 0,
+        "breakdown": [],
+        "categories": [],
+        "specialty_types": [],
+        "mechanism_hypothesis": "Housekeeping or metabolic function; not implicated in host interaction by this annotation.",
+        "selected": false,
+        "weights": {
+          "virulence": 3,
+          "drug_target": 3,
+          "amr": 2,
+          "essential": 2,
+          "mechanism": 2,
+          "transporter": 1,
+          "surface": 1,
+          "named_gene": 1,
+          "human_homolog": -2
+        },
+        "rank": 36
+      }
+    },
+    {
+      "feature_id": "fig|1125630.4.peg.5522",
+      "locus_tag": null,
+      "gene": null,
+      "product": "hypothetical protein",
+      "aa_length": 402,
+      "m1_priority": {
+        "score": 0,
+        "breakdown": [],
+        "categories": [],
+        "specialty_types": [],
+        "mechanism_hypothesis": "Uncharacterised (hypothetical) protein; candidate for structure-based functional inference in Module 2.",
+        "selected": false,
+        "weights": {
+          "virulence": 3,
+          "drug_target": 3,
+          "amr": 2,
+          "essential": 2,
+          "mechanism": 2,
+          "transporter": 1,
+          "surface": 1,
+          "named_gene": 1,
+          "human_homolog": -2
+        },
+        "rank": 37
+      }
+    },
+    {
+      "feature_id": "fig|1125630.4.peg.5521",
+      "locus_tag": null,
+      "gene": null,
+      "product": "hypothetical protein",
+      "aa_length": 141,
+      "m1_priority": {
+        "score": 0,
+        "breakdown": [],
+        "categories": [],
+        "specialty_types": [],
+        "mechanism_hypothesis": "Uncharacterised (hypothetical) protein; candidate for structure-based functional inference in Module 2.",
+        "selected": false,
+        "weights": {
+          "virulence": 3,
+          "drug_target": 3,
+          "amr": 2,
+          "essential": 2,
+          "mechanism": 2,
+          "transporter": 1,
+          "surface": 1,
+          "named_gene": 1,
+          "human_homolog": -2
+        },
+        "rank": 38
+      }
+    },
+    {
+      "feature_id": "fig|1125630.4.peg.5518",
+      "locus_tag": null,
+      "gene": null,
+      "product": "hypothetical protein",
+      "aa_length": 96,
+      "m1_priority": {
+        "score": 0,
+        "breakdown": [],
+        "categories": [],
+        "specialty_types": [],
+        "mechanism_hypothesis": "Uncharacterised (hypothetical) protein; candidate for structure-based functional inference in Module 2.",
+        "selected": false,
+        "weights": {
+          "virulence": 3,
+          "drug_target": 3,
+          "amr": 2,
+          "essential": 2,
+          "mechanism": 2,
+          "transporter": 1,
+          "surface": 1,
+          "named_gene": 1,
+          "human_homolog": -2
+        },
+        "rank": 39
+      }
+    }
+  ]
+}
