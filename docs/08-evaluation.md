@@ -384,8 +384,56 @@ been developed against — and on *E. coli* and most Enterobacteriaceae. Chlamyd
 charter's named target at roughly 900 CDS, is also safe. Latent, but real, and it will bite
 the first larger genome.
 
+### What the cap actually costs, measured
+
+The 58% figure above is a fact about the *population*. It does not by itself say what the
+cap costs the shortlist, and the two are very different numbers. Measured directly, by
+re-running M1 with `--seq-cap 6000` (above the 5,523-protein proteome) and M2 unchanged
+into a separate run:
+
+| | capped at 4,000 | cap raised |
+| --- | ---: | ---: |
+| proteins scored | 4,000 | 5,523 |
+| uncharacterised reaching M2 | 560 of 1,333 | 1,333 of 1,333 |
+| uncharacterised in the top 50 | 33 | 37 |
+| **top-50 proteins the capped run never scored** | — | **6 of 50 (12%)** |
+
+The two shortlists overlap 44 of 50. All six proteins the cap costs are uncharacterised,
+and the highest of them ranks 11th: *Uncharacterized protein STM4317*, score 0.776. So the
+cap does have a real and specific cost, it is just an order of magnitude smaller than the
+population figure suggests, because most of the mystery proteins it drops would not have
+made the shortlist anyway.
+
+### A hypothesis this experiment refuted
+
+`docs/02a-m2-pdb-evidence.md` records `annotation_gap` being raised 0.10 → 0.30 **after
+seeing a run**, a deliberate pitfall #12 violation logged rather than hidden, because "the
+HS11286 run selected 0 uncharacterized proteins out of 1,338". That denominator is
+genome-wide, and only 560 of those 1,333 ever reach M2, so the obvious hypothesis was that
+the cap caused the shortfall and the weight change was treating a symptom.
+
+**It did not.** Holding `annotation_gap` at 0.10 and raising the cap changes the count of
+uncharacterised proteins in the top 50 not at all:
+
+| annotation_gap | capped at 4,000 | cap raised |
+| ---: | ---: | ---: |
+| 0.10 (original) | 7 of 50 | 7 of 50 |
+| 0.30 (shipped) | 33 of 50 | 37 of 50 |
+
+The weight change is doing the work; the cap is not the binding constraint on this outcome.
+The decision recorded in the weight log stands, and the seam is a separate, smaller problem
+that happens to affect the same population.
+
+One caveat on the left-hand column: it is a counterfactual on **today's** nine-component
+score with only `annotation_gap` dialled back, not a replay of the scorer as it stood on
+2026-09-16. `ligandable_homolog`, the `virulence_amr` reclassification, orthology-based
+`essential` and DIAMOND-based `human_homolog_penalty` all landed on 09-17. That is why this
+gives 7 of 50 where the original diagnostic recorded 0 of 1,338 at best rank 57, and why
+the two numbers should not be read as a disagreement about the same measurement.
+
 The fix is small and the choice is the team's: rank for the cap by something that does not
-zero the hypotheticals, exempt gap-like products from truncation, or raise the default.
+zero the hypotheticals, exempt gap-like products from truncation, or raise the default. On
+this genome it buys back 6 of the top 50; on a larger proteome the cap bites harder.
 `rankings.population_stages` is what measures it, and `GAP_LIKE` there is a *population*
 definition kept deliberately separate from M2's `annotation_gap` scoring component.
 

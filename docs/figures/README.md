@@ -6,7 +6,7 @@ full analysis are in [`../08-evaluation.md`](../08-evaluation.md).
 
 | file | panel | claim |
 | --- | --- | --- |
-| `seq_cap_loss.pdf` | A | M1's `--seq-cap` retains 72% of all CDS but only 42% of the hypothetical ones |
+| `seq_cap_loss.pdf` | A | M1's `--seq-cap` retains 72% of all CDS but only 42% of the hypothetical ones. Measured cost to the shortlist: 6 of the top 50 (`docs/08-evaluation.md`). |
 | `score_disagreement.pdf` | B | `m1_priority` rank against `triage` rank; 6 of 50 shared at the cut |
 | `triage_ablation.pdf` | C | 5 of 9 triage components move the top 50; four move nothing |
 | `outcome_lift.pdf` | D | precision 100% against a 99.3% base rate — the label is not a test |
