@@ -338,10 +338,23 @@ def specialty_counts(report: dict[str, Any], genome: dict[str, Any]) -> dict[str
     tally: dict[str, int] = {}
     for protein in _rows(report.get("proteins")):
         for hit in protein.get("specialty") or []:
-            name = (hit or {}).get("property")
+            # The two routes name this field differently: the CGA parse writes `type`,
+            # the API seed writes `property`. Reading only one of them tallied 17 rows
+            # as `None` and drew an empty panel.
+            name = (hit or {}).get("type") or (hit or {}).get("property")
             if name:
                 tally[str(name)] = tally.get(str(name), 0) + 1
     return tally
+
+
+def specialty_labels(protein: dict[str, Any]) -> list[str]:
+    """Specialty categories on one protein, from whichever key the route used."""
+    seen: list[str] = []
+    for hit in protein.get("specialty") or []:
+        name = (hit or {}).get("type") or (hit or {}).get("property")
+        if name and str(name) not in seen:
+            seen.append(str(name))
+    return seen
 
 
 def _parse_newick(text: str) -> dict[str, Any] | None:
@@ -475,14 +488,15 @@ def pathogenesis_flow_svg(priorities: list[dict[str, Any]],
                 continue
             counts[category] = counts.get(category, 0) + 1
             bucket = examples.setdefault(category, [])
-            if len(bucket) < 6:
-                bucket.append(record.get("label") or record["feature_id"])
+            bucket.append(record.get("label") or record["feature_id"])
 
     present = [key for key, *_ in CATEGORIES if counts.get(key)]
     if not present:
         return ('<p class="muted">No host-interaction mechanisms were detected from this '
                 'annotation.</p>')
 
+    #: members listed in full before a mechanism box starts scrolling
+    SCROLL_AFTER = 5
     col1_x, col2_x, col3_x = 40, 330, 630
     w1, w2, w3 = 250, 240, 270
     top, row_gap = 70, 24
@@ -514,14 +528,42 @@ def pathogenesis_flow_svg(priorities: list[dict[str, Any]],
             cursor += sub_leading
         return out + "</g>", height
 
+    def mechanism_box(x: int, w: int, colour: str, title: str,
+                      members: list[str]) -> tuple[str, int]:
+        """Mechanism box as HTML inside the SVG, so long member lists can scroll.
+
+        Up to `SCROLL_AFTER` members are shown in full and the box grows to fit; beyond
+        that the box stops growing and scrolls, because a diagram whose first column is
+        three times the height of the other two stops being a diagram.
+        """
+        line_h, head_h, pad = 16, 24, 12
+        shown = len(members)
+        content_h = head_h + line_h * shown + pad * 2
+        max_h = head_h + line_h * SCROLL_AFTER + pad * 2
+        height = min(content_h, max_h)
+        scroll = "auto" if content_h > max_h else "hidden"
+        items = "".join(
+            f'<div style="white-space:nowrap;overflow:hidden;text-overflow:ellipsis">'
+            f'{esc(member)}</div>' for member in members)
+        more = ("" if scroll == "hidden" else
+                f'<div style="color:#64748b;padding-top:2px">scroll for all {shown}</div>')
+        return (
+            f'<foreignObject x="{x}" y="0" width="{w}" height="{height}">'
+            f'<div xmlns="http://www.w3.org/1999/xhtml" style="box-sizing:border-box;'
+            f'height:{height}px;overflow-y:{scroll};border:1.5px solid {colour};'
+            f'border-radius:9px;background:{colour}20;padding:{pad}px;'
+            f'font:13px system-ui,Segoe UI,Arial;color:#0f172a">'
+            f'<div style="font-weight:600;padding-bottom:4px">{esc(title)}</div>'
+            f'<div style="font-size:11px;color:#475569;line-height:{line_h}px">'
+            f'{items}{more}</div></div></foreignObject>'), height
+
     rows = []
     for category in present:
         colour = CAT_COLOR[category]
-        left, left_h = box(
-            col1_x, w1, colour + "20", colour,
+        left, left_h = mechanism_box(
+            col1_x, w1, colour,
             f"{CAT_LABEL[category]} ({counts[category]})",
-            ", ".join(examples[category][:4]),
-            tip="Proteins: " + ", ".join(examples[category]),
+            examples[category],
         )
         right, right_h = box(
             col2_x, w2, "#f1f5f9", "#94a3b8",

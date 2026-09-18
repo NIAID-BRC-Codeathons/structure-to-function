@@ -20,7 +20,7 @@ from typing import Any
 
 from ..m1_genome.report_html import (
     _mapping, _rows, collect_priorities, esc, pathogenesis_flow_svg,
-    render_tree_svg, specialty_bar_svg, specialty_counts,
+    render_tree_svg, specialty_bar_svg, specialty_counts, specialty_labels,
 )
 from ..m1_genome.pathogens import resolve_disease_profile
 
@@ -307,6 +307,9 @@ def tab_genes(report: dict[str, Any]) -> str:
         return ""
     total = len(priorities)
     shown = priorities[:PROTEIN_ROWS]
+    # Specialty categories live on the protein record, not on the priority record.
+    by_id = {protein.get("feature_id"): specialty_labels(protein)
+             for protein in _rows(report.get("proteins"))}
     out = ["<div class='card'><h2>Genes and proteins</h2>",
            f"<p class='lead'>All <b>{total}</b> protein-coding genes, ranked by the "
            f"annotation-driven pathogenesis priority score. Showing the first "
@@ -320,10 +323,7 @@ def tab_genes(report: dict[str, Any]) -> str:
            "<th>Product / function</th><th>aa</th><th>Mechanism</th>"
            "<th>Specialty</th></tr></thead><tbody>"]
     for record in shown:
-        specialty = ", ".join(sorted({str(s.get("property")) for s in
-                                      (record.get("specialty_types") or [])
-                                      if isinstance(s, dict) and s.get("property")})) \
-            or ", ".join(str(s) for s in (record.get("specialty_types") or []))
+        specialty = ", ".join(by_id.get(record.get("feature_id"), []))
         out.append(
             f"<tr{' class=sel' if record.get('selected') else ''}>"
             f"<td>{esc(record.get('rank'))}</td>"
