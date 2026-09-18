@@ -1,0 +1,371 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Structure to Function</title>
+<style>
+:root{
+  --bg:#fbfaf8; --fg:#1a1916; --dim:#6b6660; --rule:#ddd8d0;
+  --accent:#8a4b2a; --mark:#f0ece5; --warn:#7a5c12;
+}
+:root:not([data-theme="light"]){ @media (prefers-color-scheme:dark){
+  --bg:#16161a; --fg:#e8e6e1; --dim:#9a958d; --rule:#33323a;
+  --accent:#d39268; --mark:#232329; --warn:#d9b45c;
+}}
+:root[data-theme="dark"]{
+  --bg:#16161a; --fg:#e8e6e1; --dim:#9a958d; --rule:#33323a;
+  --accent:#d39268; --mark:#232329; --warn:#d9b45c;
+}
+*{box-sizing:border-box}
+html,body{margin:0;padding:0}
+body{
+  background:var(--bg); color:var(--fg);
+  font:16px/1.55 ui-sans-serif,system-ui,-apple-system,"Segoe UI",Helvetica,Arial,sans-serif;
+  -webkit-text-size-adjust:100%;
+}
+main{max-width:56rem;margin:0 auto;padding:0 16px}
+section{display:none;min-height:100vh;padding:7vh 0 9vh;flex-direction:column;justify-content:center}
+section.on{display:flex}
+h1{font-size:clamp(1.9rem,5vw,3rem);line-height:1.12;margin:0 0 .6rem;letter-spacing:-.02em}
+h2{font-size:clamp(1.4rem,3.6vw,2.1rem);line-height:1.2;margin:0 0 1.1rem;letter-spacing:-.015em}
+p,li{font-size:clamp(1rem,1.9vw,1.2rem);margin:0 0 .85rem}
+ul{margin:0 0 1rem;padding-left:1.2em} li{margin-bottom:.5rem}
+.lede{color:var(--dim);font-size:clamp(1rem,2vw,1.25rem)}
+.kicker{color:var(--accent);font-weight:600;letter-spacing:.09em;text-transform:uppercase;
+  font-size:.74rem;margin:0 0 1rem}
+strong{font-weight:650}
+em{color:var(--dim)}
+code,pre{font-family:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace}
+pre{background:var(--mark);border:1px solid var(--rule);border-radius:8px;
+  padding:.85rem 1rem;overflow-x:auto;font-size:.86rem;line-height:1.5;margin:0 0 1rem}
+code{background:var(--mark);padding:.1em .34em;border-radius:4px;font-size:.88em}
+pre code{background:none;padding:0}
+table{border-collapse:collapse;width:100%;margin:0 0 1rem;font-size:clamp(.92rem,1.7vw,1.05rem)}
+th,td{text-align:left;padding:.5rem .6rem;border-bottom:1px solid var(--rule)}
+th{color:var(--dim);font-weight:600;font-size:.8em;text-transform:uppercase;letter-spacing:.05em}
+td.n,th.n{text-align:right;font-variant-numeric:tabular-nums}
+.big{font-size:clamp(2.2rem,7vw,3.4rem);font-weight:650;letter-spacing:-.03em;
+  line-height:1.05;color:var(--accent);margin:0 0 .3rem}
+.note{border-left:3px solid var(--accent);padding:.15rem 0 .15rem .9rem;color:var(--dim);
+  margin:0 0 1rem}
+.flag{color:var(--warn);font-weight:600}
+.grid{display:grid;gap:.9rem 1.6rem;grid-template-columns:repeat(auto-fit,minmax(13rem,1fr))}
+.card{border:1px solid var(--rule);border-radius:8px;padding:.85rem 1rem}
+.card h3{margin:0 0 .3rem;font-size:1rem}
+.card p{margin:0;font-size:.95rem;color:var(--dim)}
+nav{position:fixed;right:14px;bottom:12px;display:flex;gap:6px;align-items:center;
+  font-size:.8rem;color:var(--dim);background:var(--bg);padding:4px 6px;border-radius:6px}
+nav button{font:inherit;color:var(--fg);background:var(--mark);border:1px solid var(--rule);
+  border-radius:5px;padding:2px 9px;cursor:pointer;line-height:1.5}
+nav button:hover{border-color:var(--accent)}
+svg.flow{width:100%;height:auto;display:block;margin:.3rem 0 1rem}
+svg.flow text{font-family:inherit;fill:var(--fg)}
+svg.flow .t{font-size:13px;font-weight:650}
+svg.flow .s{font-size:10.5px;fill:var(--dim)}
+svg.flow .io{font-size:10.5px;fill:var(--accent);font-weight:600}
+svg.flow .box{fill:var(--mark);stroke:var(--rule);stroke-width:1.5}
+svg.flow .box.done{stroke:var(--accent)}
+svg.flow .box.todo{stroke-dasharray:5 4;opacity:.55}
+svg.flow .arr{stroke:var(--dim);stroke-width:1.5;fill:none}
+.two{display:grid;gap:.5rem 1.5rem;grid-template-columns:1fr 1fr;align-items:start}
+@media(max-width:46rem){.two{grid-template-columns:1fr}}
+.two h3{margin:0 0 .35rem;font-size:.82rem;text-transform:uppercase;letter-spacing:.06em;color:var(--accent)}
+.two ul{margin:0 0 .6rem;font-size:.95rem} .two li{margin-bottom:.3rem;font-size:.95rem}
+pre.sm{font-size:.76rem;line-height:1.45}
+table.sm{font-size:.88rem} table.sm td,table.sm th{padding:.34rem .5rem}
+.st{color:var(--accent);font-weight:650} .no{color:var(--dim)}
+@media print{
+  nav{display:none}
+  section{display:flex!important;min-height:auto;page-break-after:always;padding:1.5rem 0}
+  body{background:#fff;color:#000}
+}
+</style>
+</head>
+<body>
+<main>
+
+<section class="on">
+  <p class="kicker">NIAID-BRCs AI Codeathon 2.0 · Argonne · 18 September 2026</p>
+  <h1>Structure to function</h1>
+  <p class="lede">From a bacterial genome to a ranked, structure-backed shortlist of drug
+  targets — and to the evidence behind every row.</p>
+  <p class="lede">Project 9</p>
+</section>
+
+<section>
+  <p class="kicker">The problem</p>
+  <h2>A new genome gives you thousands of proteins and no priorities</h2>
+  <p>Roughly a quarter to a third of them are annotated <em>hypothetical protein</em> — which
+  means nobody knows what they do, so nobody studies them, so nobody finds out.</p>
+  <p>The useful question is not <em>what is every protein</em>. It is
+  <strong>which fifty are worth a structural and chemical look</strong>, and why.</p>
+</section>
+
+
+<section>
+  <p class="kicker">Workflow</p>
+  <h2>Six modules, one shared contract</h2>
+  <svg class="flow" viewBox="0 0 880 250" role="img" aria-label="Pipeline flow chart">
+  <text class="io" x="8" y="16">INPUT — BV-BRC Comprehensive Genome Analysis</text>
+  <path class="arr" d="M70 24 L70 46" marker-end="url(#a)"/>
+  <defs><marker id="a" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="6" markerHeight="6"
+    orient="auto"><path d="M0 0 L10 5 L0 10 z" fill="var(--dim)"/></marker></defs>
+  <g>
+    <rect class="box done" x="8"   y="50" width="128" height="62" rx="7"/>
+    <text class="t" x="20" y="72">M1 · genome</text>
+    <text class="s" x="20" y="90">annotate, AMR,</text><text class="s" x="20" y="103">phylogeny</text>
+    <rect class="box done" x="156" y="50" width="128" height="62" rx="7"/>
+    <text class="t" x="168" y="72">M2 · triage</text>
+    <text class="s" x="168" y="90">PDB evidence,</text><text class="s" x="168" y="103">score, select 50</text>
+    <rect class="box done" x="304" y="50" width="128" height="62" rx="7"/>
+    <text class="t" x="316" y="72">M3 · fold</text>
+    <text class="s" x="316" y="90">collect + quality</text><text class="s" x="316" y="103">gate structures</text>
+    <rect class="box todo" x="452" y="50" width="128" height="62" rx="7"/>
+    <text class="t" x="464" y="72">M4 · ligands</text>
+    <text class="s" x="464" y="90">dock, score,</text><text class="s" x="464" y="103">co-fold</text>
+    <rect class="box todo" x="600" y="50" width="128" height="62" rx="7"/>
+    <text class="t" x="612" y="72">M5 · disease</text>
+    <text class="s" x="612" y="90">evidence, RAG</text><text class="s" x="612" y="103">synthesis</text>
+    <rect class="box todo" x="748" y="50" width="128" height="62" rx="7"/>
+    <text class="t" x="760" y="72">M6 · report</text>
+    <text class="s" x="760" y="90">one HTML</text><text class="s" x="760" y="103">deliverable</text>
+  </g>
+  <path class="arr" d="M136 81 L152 81" marker-end="url(#a)"/>
+  <path class="arr" d="M284 81 L300 81" marker-end="url(#a)"/>
+  <path class="arr" d="M432 81 L448 81" marker-end="url(#a)"/>
+  <path class="arr" d="M580 81 L596 81" marker-end="url(#a)"/>
+  <path class="arr" d="M728 81 L744 81" marker-end="url(#a)"/>
+  <text class="io" x="8" y="140">BUILT</text>
+  <line x1="52" y1="136" x2="432" y2="136" stroke="var(--accent)" stroke-width="2"/>
+  <text class="io" x="452" y="140" fill="var(--dim)">NOT BUILT</text>
+  <line x1="528" y1="136" x2="876" y2="136" stroke="var(--dim)" stroke-width="2" stroke-dasharray="5 4"/>
+  <text class="s" x="8" y="170">proteins.faa</text><text class="s" x="8" y="184">genes_proteins.csv</text>
+  <text class="s" x="8" y="198">specialty_genes_all.csv</text>
+  <text class="s" x="156" y="170">proteins.tsv · top50.tsv</text><text class="s" x="156" y="184">hits.tsv · kg.json</text>
+  <text class="s" x="156" y="198">no_pdb_hit.tsv</text>
+  <text class="s" x="304" y="170">structures/*.cif</text><text class="s" x="304" y="184">quality decisions</text>
+  <text class="io" x="8" y="232">report.json — one shared contract, each module owns exactly one key</text>
+  <rect x="4" y="216" width="872" height="24" rx="5" fill="none" stroke="var(--rule)" stroke-width="1.5"/>
+</svg>
+  <p class="note">Data flows one way. M2 may read M1; M4 may read M1&ndash;M3; nothing writes
+  upstream. Every module is a CLI with a <code>--dry-run</code> that works offline.</p>
+</section>
+
+<section>
+  <p class="kicker">Input</p>
+  <h2>What actually goes in</h2>
+  <p>BV-BRC Comprehensive Genome Analysis output, joined on <code>patric_id</code>. For
+  HS11286 that is 5,523 proteins and 2,592 specialty rows:</p>
+  <pre class="sm"><code>&gt;fig|1125630.4.peg.5196  DNA replication protein
+MLSAVNDMLSAVRYMLPTVLCMLSAVIDVCCQRLEPKGIHMSTKNKKESEIKEIPEDNEI…
+
+patric_id,refseq_locus_tag,gene,product,aa_length,start,end,strand,plfam_id,pgfam_id
+fig|1125630.4.peg.5196,KPHS_p100010,,DNA replication protein,405,201,1418,+,PLF_…
+
+property,gene,product,source,classification,antibiotics_class,identity,…
+Antibiotic Resistance,,Two-component regulator BasR/PmrA,PATRIC,['regulator…'],polymixins,…</code></pre>
+  <p class="note">Column names are matched through aliases — BV-BRC's web export and its
+  <code>p3-</code> CLI disagree on spelling, and both are in circulation.</p>
+</section>
+
+<section>
+  <p class="kicker">M1 · genome</p>
+  <h2>Genome in, annotated proteins out</h2>
+  <div class="two">
+    <div>
+      <h3>APIs</h3>
+      <ul><li>BV-BRC CGA (submit / poll / parse)</li>
+      <li><code>www.bv-brc.org/api</code> — features, genomes</li>
+      <li>Minhash Similar Genome Finder</li>
+      <li><code>p3-</code> CLI fallback path</li></ul>
+    </div>
+    <div>
+      <h3>Filters</h3>
+      <ul><li>Genome-quality gate — <em>poor</em> is not handed downstream without a decision</li>
+      <li>Codon-tree ingroup chosen from sequence, not taxonomy</li></ul>
+    </div>
+  </div>
+  <table class="sm"><tr><th>In</th><th>Out</th></tr>
+  <tr><td>contigs, or a CGA job directory</td>
+      <td><code>m1/</code> three files · <code>report.json</code> keys <code>run</code>,
+      <code>genome</code>, <code>proteins</code> · offline HTML report</td></tr></table>
+</section>
+
+<section>
+  <p class="kicker">M2 · triage</p>
+  <h2>Every protein searched, then filtered hard</h2>
+  <div class="two">
+    <div>
+      <h3>APIs</h3>
+      <ul><li>RCSB <code>search/v2</code> sequence search + <code>data</code> GraphQL for entity metadata</li>
+      <li>AlphaFold DB prediction API</li>
+      <li>Foldseek web API (3Di+AA)</li>
+      <li>UniProt / UniParc, ChEMBL, STRING</li>
+      <li>DIAMOND locally — human proteome and essentiality references</li></ul>
+    </div>
+    <div>
+      <h3>Filters</h3>
+      <ul><li>Search: e-value &lt; 1e-3, identity &ge; 25%, 25 rows</li>
+      <li>Counts as evidence: e-value &lt; 1e-5 <em>and</em> coverage &ge; 50%</li>
+      <li>Foldseek: e-value &lt; 1e-4, coverage &ge; 40%</li>
+      <li>Human homolog: DIAMOND 1e-5, coverage 50%; close at &ge; 40% identity</li>
+      <li>Essential ortholog: identity &ge; 40%, coverage &ge; 70%, e-value 1e-10</li></ul>
+    </div>
+  </div>
+  <table class="sm"><tr><th>In</th><th>Out</th></tr>
+  <tr><td><code>m1/</code> three files</td>
+      <td><code>proteins.tsv</code> (all 542) · <code>top50.tsv</code> ·
+      <code>hits.tsv</code> · <code>kg.json</code> · <code>no_pdb_hit.tsv</code> ·
+      <code>run.json</code></td></tr></table>
+</section>
+
+<section>
+  <p class="kicker">M2 · triage</p>
+  <h2>A transparent score, not a black box</h2>
+  <pre><code>0.40·pdb_evidence  + 0.20·virulence_amr + 0.15·essential
++ 0.15·drug_target + 0.30·annotation_gap + 0.10·surface_bonus
++ 0.10·ligandable_homolog
+− 0.15·membrane_penalty − 0.25·(human_identity/100)</code></pre>
+  <p>The first full HS11286 run selected <strong>0 uncharacterized proteins out of 1,338</strong>
+  — a known target collects 0.50 from virulence, essentiality and drug-target evidence where a
+  hypothetical earns 0.10. So <code>annotation_gap</code> went 0.10 &rarr; 0.30, with the
+  sensitivity recorded rather than tuned quietly: 0.20&rarr;6, 0.25&rarr;9,
+  <strong>0.30&rarr;10</strong>, 0.35&rarr;15, 0.40&rarr;26 uncharacterized in the top 50.</p>
+  <p class="note">Changed <em>after</em> seeing a run — so it is in the decision log, with the
+  numbers, rather than quietly applied.</p>
+</section>
+<section>
+  <p class="kicker">M3 · fold</p>
+  <h2>Reuse a structure before predicting one</h2>
+  <div class="two">
+    <div>
+      <h3>APIs</h3>
+      <ul><li><code>files.rcsb.org</code> — experimental structures</li>
+      <li>AlphaFold DB — predicted models</li>
+      <li>153 <code>.cif</code> collected for G37</li></ul>
+    </div>
+    <div>
+      <h3>Quality gate</h3>
+      <ul><li>PDB: identity &ge; 25%, coverage &ge; 50%, resolution &le; 3.5 &Aring;</li>
+      <li>AFDB: mean pLDDT &ge; 70, coverage &ge; 80%</li>
+      <li>Local pLDDT &lt; 70 masked as low-confidence regions</li></ul>
+    </div>
+  </div>
+  <table class="sm"><tr><th>In</th><th>Out</th></tr>
+  <tr><td><code>report.json</code> proteins + M2 xrefs</td>
+      <td><code>structures/</code> · per-structure pass/fail with the evidence behind it</td></tr></table>
+</section>
+
+<section>
+  <p class="kicker">Output</p>
+  <h2>What comes out — one row, fully shown</h2>
+  <pre class="sm"><code>rank              1
+feature_id        fig|243273.25.peg.503
+product           hypothetical protein
+triage_score      0.65
+  pdb_evidence      0.875
+  annotation_gap    1.0
+best_entity_id    1YDX_1     identity 1.0   coverage 1.0   2.3 A   X-ray
+pdb_hit_organism  Mycoplasmoides genitalium
+uniprot_of_best   Q49434
+selected          True
+reason            PDB 1YDX_1 identity 100%, coverage 100%, 2.30 A;
+                  uncharacterized product</code></pre>
+  <p><strong>50 columns, written for all 542 proteins</strong> — not just the chosen fifty. The
+  <code>reason</code> is a sentence a human can check, and the score recomputes from the
+  recorded components alone.</p>
+</section>
+
+
+
+
+<section>
+  <p class="kicker">The finding</p>
+  <h2>Our top hit was the genome matching itself</h2>
+  <p>The top-ranked G37 protein was a hypothetical, matched at <strong>100% identity</strong> to
+  PDB <code>1Q8C_1</code> — <em>Mycoplasmoides genitalium</em> P47. The same organism.</p>
+  <table>
+    <tr><th>Best hit is the…</th><th class="n">Top 50</th><th class="n">Whole genome</th></tr>
+    <tr><td>same species</td><td class="n"><strong>30</strong></td><td class="n">34</td></tr>
+    <tr><td>same genus</td><td class="n"><strong>47</strong></td><td class="n">108</td></tr>
+  </table>
+  <p><strong>88% of every same-species hit in the genome landed in our top 50.</strong> The
+  ranking is not wrong — a 100% identity hit is the strongest evidence there is — but it is
+  <em>easy</em> in a way a novel genome will not be.</p>
+</section>
+
+<section>
+  <p class="kicker">The finding</p>
+  <h2>What we did about it</h2>
+  <p><strong>Flags, not penalties.</strong> The score is unchanged; what changes is what the
+  report is allowed to claim. Each protein now says so in words, so a reader is told when an
+  annotation was easy instead of being sold it as a discovery.</p>
+  <p><strong>Do not calibrate the weights on this genome.</strong> Written into the docs as a
+  standing rule, because this identity distribution does not exist elsewhere.</p>
+  <p class="note">One detail that decided it: BV-BRC writes <em>Mycoplasma genitalium</em> where
+  the PDB says <em>Mycoplasmoides genitalium</em>. Compare genus strings naively and every
+  self-match is marked foreign — <span class="flag">the exact opposite of the truth,
+  silently</span>.</p>
+</section>
+
+
+<section>
+  <p class="kicker">Status</p>
+  <h2>What we have, and what is left</h2>
+  <table class="sm">
+    <tr><th>Module</th><th>State</th><th>What exists / what is missing</th></tr>
+    <tr><td>M1 genome</td><td class="st">built</td><td>CGA parse, AMR, phylogeny, offline HTML report</td></tr>
+    <tr><td>M2 triage</td><td class="st">built</td><td>PDB + Foldseek evidence, 9-component score, 50 selected</td></tr>
+    <tr><td>M3 fold</td><td class="st">partial</td><td>collection and quality gate done; pocket detection open</td></tr>
+    <tr><td>M4 ligands</td><td class="no">not built</td><td>candidates, docking, caps, co-folding</td></tr>
+    <tr><td>M5 disease</td><td class="no">not built</td><td>evidence gathering, RAG synthesis, claim checks</td></tr>
+    <tr><td>M6 report</td><td class="no">not built</td><td>this deck stands in for it</td></tr>
+  </table>
+  <p class="note">No docking, no literature synthesis, nothing experimentally validated, and no
+  clinical claim. Scores are rankings, not affinities; predicted structures lack cofactors.</p>
+</section>
+<section>
+  <p class="kicker">Demo</p>
+  <h2>Offline, from committed fixtures</h2>
+  <pre><code>python -m s2f.m2_triage --dry-run --run runs/demo --report</code></pre>
+  <p>No network, no credentials. We will open one protein and read its score, its components,
+  its flags and its reason — including, where it applies:</p>
+  <p class="note">best structural hit is the same species — not a cross-organism transfer</p>
+</section>
+
+<section>
+  <p class="kicker">Next</p>
+  <h2>A reproducible front half, and one result worth carrying</h2>
+  <p>M1, M2 and M3 run end to end, offline, on two genomes. M4, M5 and M6 are scoped and
+  documented for whoever picks them up.</p>
+  <p>The same-organism artifact is the part to take to the next genome: it is the kind of
+  thing that looks like a triumph in a demo and like a bug in production, and the difference
+  is only ever whether somebody checked.</p>
+</section>
+
+</main>
+<nav>
+  <button id="p" aria-label="Previous slide">←</button>
+  <span id="c">1 / 14</span>
+  <button id="n" aria-label="Next slide">→</button>
+</nav>
+<script>
+(function(){
+  var s = [].slice.call(document.querySelectorAll('section')), i = 0, c = document.getElementById('c');
+  function go(k){ s[i].classList.remove('on'); i = Math.max(0, Math.min(s.length-1, k));
+    s[i].classList.add('on'); c.textContent = (i+1)+' / '+s.length; window.scrollTo(0,0);
+    try{ location.hash = i ? '#'+(i+1) : ''; }catch(e){} }
+  document.getElementById('n').onclick = function(){ go(i+1); };
+  document.getElementById('p').onclick = function(){ go(i-1); };
+  document.addEventListener('keydown', function(e){
+    if(e.key==='ArrowRight'||e.key==='PageDown'||e.key===' ') { e.preventDefault(); go(i+1); }
+    else if(e.key==='ArrowLeft'||e.key==='PageUp') { e.preventDefault(); go(i-1); }
+    else if(e.key==='Home') go(0); else if(e.key==='End') go(s.length-1);
+  });
+  var h = parseInt((location.hash||'').slice(1), 10);
+  go(isNaN(h) ? 0 : h-1);
+})();
+</script>
+</body>
+</html>
