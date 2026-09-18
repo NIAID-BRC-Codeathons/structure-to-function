@@ -7,7 +7,7 @@ import json
 from pathlib import Path
 
 from s2f.m2_triage.__main__ import main
-from s2f.m2_triage.score import TriageComponents, triage_score_from_components
+from s2f.m2_triage.score import WEIGHTS, TriageComponents, triage_score_from_components
 
 
 def _read_tsv(path: Path) -> list[dict[str, str]]:
@@ -33,16 +33,24 @@ def test_dry_run_produces_a_ranked_package(tmp_path: Path) -> None:
     assert all(p["reason"] for p in proteins)
 
 
-def test_dry_run_ranks_the_sars_cov_2_rbd_first_with_a_6m0j_hit(tmp_path: Path) -> None:
+def test_dry_run_finds_the_sars_cov_2_rbd_against_6m0j(tmp_path: Path) -> None:
+    """End-to-end sanity: the RBD fixture must recover its own structure at identity 1.0.
+
+    It is no longer rank 1. Since `ligandable_homolog` landed, the lysozyme fixture outranks it:
+    lysozyme's best hit has a real ligand bound, while 6M0J's only non-polymer components are a
+    glycan, a metal and an additive — correctly excluded from `ligands`. The pipeline check here
+    is the hit, not the position.
+    """
     run_dir = tmp_path / "run"
     main(["--dry-run", "--run", str(run_dir), "--top", "2"])
-    proteins = _read_tsv(run_dir / "m2_pdb" / "proteins.tsv")
+    proteins = {row["feature_id"]: row for row in _read_tsv(run_dir / "m2_pdb" / "proteins.tsv")}
 
-    top = proteins[0]
-    assert top["feature_id"] == "fig|999999.1.peg.1"
-    assert float(top["best_identity"]) == 1.0
-    assert top["best_entity_id"].startswith("6M0J")
-    assert top["retrieval_status"] == "found"
+    rbd = proteins["fig|999999.1.peg.1"]
+    assert float(rbd["best_identity"]) == 1.0
+    assert rbd["best_entity_id"].startswith("6M0J")
+    assert rbd["retrieval_status"] == "found"
+    assert rbd["selected"] == "True"
+    assert float(rbd["ligandable_homolog"]) == 0.0  # NAG/ZN/CL are not functional ligands
 
 
 def test_dry_run_scores_are_reproducible_from_the_written_components(tmp_path: Path) -> None:
@@ -50,14 +58,10 @@ def test_dry_run_scores_are_reproducible_from_the_written_components(tmp_path: P
     main(["--dry-run", "--run", str(run_dir)])
 
     for row in _read_tsv(run_dir / "m2_pdb" / "proteins.tsv"):
-        components = TriageComponents(
-            pdb_evidence=float(row["pdb_evidence"]),
-            virulence_amr=float(row["virulence_amr"]),
-            essential=float(row["essential"]),
-            drug_target=float(row["drug_target"]),
-            annotation_gap=float(row["annotation_gap"]),
-            human_homolog_penalty=float(row["human_homolog_penalty"]),
-        )
+        # Every weighted component, read back from the TSV. Building this from WEIGHTS rather
+        # than a hand-written list means a new component cannot be added without the
+        # reproducibility claim covering it.
+        components = TriageComponents(**{name: float(row[name]) for name in WEIGHTS})
         assert triage_score_from_components(components) == float(row["triage_score"])
 
 
