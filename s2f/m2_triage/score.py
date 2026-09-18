@@ -21,7 +21,7 @@ MIN_EVALUE = 1e-5
 MIN_QUERY_COVERAGE = 0.5
 
 #: Bump with any weight change, alongside a dated row in docs/02a-m2-pdb-evidence.md.
-WEIGHTS_VERSION = "2026-09-16"
+WEIGHTS_VERSION = "2026-09-18"
 
 WEIGHTS = {
     "pdb_evidence": 0.40,
@@ -54,6 +54,48 @@ HUMAN_TAXONOMY_ID = 9606
 #: Identity at or above which a human homolog is a selectivity risk worth reporting (pitfall #4).
 #: The penalty itself is continuous; this only drives the flag M6 states and M4 reads.
 CLOSE_HUMAN_HOMOLOG_IDENTITY = 40.0
+
+#: A human homolog at or above this identity disqualifies a protein from selection outright.
+#: Selectivity is a requirement, not a preference: a compound that hits our target and its human
+#: counterpart is a toxicity problem, not a slightly weaker candidate. The continuous
+#: ``human_homolog_penalty`` still ranks, but it can be outvoted — in the 2026-09-18 lambda0 run
+#: ``essential`` (+0.15) beat a 50.6%-identity penalty (-0.127) and returned ribosomal protein
+#: S12p to the top 50, whose human mitochondrial counterpart MRPS12 is an established
+#: aminoglycoside liability. Coverage is gated upstream by ``--human-min-coverage`` (default
+#: 0.5), so an identity reaching this check has already passed a coverage floor.
+DISQUALIFYING_HUMAN_HOMOLOG_IDENTITY = 40.0
+
+#: Term kinds that amount to a functional assignment, versus a domain match alone.
+FUNCTION_TERM_KINDS = ("ec", "ko", "cog", "go")
+DOMAIN_TERM_KINDS = ("pfam", "interpro", "signature")
+PARTIAL_ANNOTATION_GAP = 0.5
+
+
+def annotation_gap_value(protein: Protein, annotation: Any = None) -> float:
+    """How much of this protein's function is unknown, judged on evidence rather than wording.
+
+    ``is_uncharacterized`` reads the BV-BRC product string, which is written before any
+    annotation provider runs. Scoring the gap from that alone ignores the annotation layer
+    entirely: in the 2026-09-18 lambda0 run, 91 of the 178 proteins collecting a full
+    ``annotation_gap`` had InterProScan terms, and 17 of the 34 uncharacterized proteins in the
+    top 50 did. A protein whose product says "hypothetical" but which InterProScan assigns an EC
+    number is not an annotation gap.
+
+    1.0  uncharacterized product, no functional terms at all
+    0.5  uncharacterized product with a domain match but no EC/KO/COG/GO assignment
+    0.0  a characterized product, or terms that name the function
+    """
+    if not protein.is_uncharacterized:
+        return 0.0
+    terms_of = getattr(annotation, "terms_of", None)
+    if terms_of is None:
+        # No annotation layer ran for this protein, so the product string is all we have.
+        return 1.0
+    if any(terms_of(kind) for kind in FUNCTION_TERM_KINDS):
+        return 0.0
+    if any(terms_of(kind) for kind in DOMAIN_TERM_KINDS):
+        return PARTIAL_ANNOTATION_GAP
+    return 1.0
 
 
 def hit_qualifies(hit: SequenceHit) -> bool:
@@ -137,6 +179,8 @@ class ProteinScore:
     rank: int = 0
     selected: bool = False
     reason: str = ""
+    #: Why this protein may never be selected, whatever it scored. Empty when it is eligible.
+    disqualified: str = ""
     error: str = ""
 
 
@@ -208,7 +252,18 @@ def score_protein(
     ligandable_known = False
     if top is not None:
         ligandable_known = True
-        if top.ligands:
+        if top.ligands and top.has_partner:
+            # Entry-level ligand presence is not evidence that *our* chain is ligandable. A
+            # ribosomal protein's best hit is a ribosome, and ribosome entries routinely carry
+            # antibiotics that survive the additive/glycan/metal filter, so every subunit would
+            # inherit credit for a ligand bound to the rRNA or to another chain. Measured on
+            # 2026-09-18: this promoted L33p and L16p to ranks 13-14. Attributing the ligand
+            # properly needs per-entity contacts we do not fetch, so withhold rather than guess.
+            ligandable_basis = (
+                f"ligand in {top.entry_id} not credited: entry has partner entities, so the "
+                "ligand cannot be attributed to this chain"
+            )
+        elif top.ligands:
             ligandable = 1.0
             ligandable_basis = f"ligand bound in {top.entry_id}: {','.join(top.ligands[:3])}"
     if chembl_targets:
@@ -226,7 +281,7 @@ def score_protein(
         virulence_amr=virulence_amr,
         essential=1.0 if essential else 0.0,
         drug_target=1.0 if protein.is_drug_target else 0.0,
-        annotation_gap=1.0 if protein.is_uncharacterized else 0.0,
+        annotation_gap=annotation_gap_value(protein, annotation),
         surface_bonus=surface_value,
         ligandable_homolog=ligandable,
         membrane_penalty=membrane_value,
@@ -342,11 +397,31 @@ def _reason(score: ProteinScore) -> str:
         parts.append("best structural hit is the same genus")
     if score.flags.get("antibiotic_target_not_resistance"):
         parts.append("antibiotic target in a susceptible species, not a resistance gene")
+    if score.disqualified:
+        parts.append(f"DISQUALIFIED: {score.disqualified}")
     return "; ".join(parts)
 
 
+def human_homolog_disqualification(score: ProteinScore) -> str:
+    """Empty when the protein may be selected; otherwise the reason it may not be."""
+    try:
+        identity = float(score.flags.get("human_homolog_identity"))
+    except (TypeError, ValueError):
+        return ""
+    if identity < DISQUALIFYING_HUMAN_HOMOLOG_IDENTITY:
+        return ""
+    source = score.flags.get("human_homolog_source") or "unknown source"
+    return f"human homolog {identity:.1f}% identity ({source})"
+
+
 def rank_and_select(scores: list[ProteinScore], *, top_n: int = 50) -> list[ProteinScore]:
-    """Rank all proteins, mark the top N selected, and give every protein a reason."""
+    """Rank every protein, mark the top N *eligible* ones, and give each one a reason.
+
+    A disqualified protein keeps its rank and its score — the ranking still records what the
+    evidence was worth, and the report can show what was removed and why — but it can never be
+    selected, and its slot passes to the next eligible protein so the caller still receives
+    ``top_n`` candidates.
+    """
     ordered = sorted(
         scores,
         key=lambda s: (
@@ -356,8 +431,16 @@ def rank_and_select(scores: list[ProteinScore], *, top_n: int = 50) -> list[Prot
             s.feature_id,
         ),
     )
+    selected = 0
     for index, score in enumerate(ordered, start=1):
         score.rank = index
-        score.selected = index <= top_n
+        score.disqualified = human_homolog_disqualification(score)
+        if score.disqualified:
+            score.selected = False
+        elif selected < top_n:
+            score.selected = True
+            selected += 1
+        else:
+            score.selected = False
         score.reason = _reason(score)
     return ordered

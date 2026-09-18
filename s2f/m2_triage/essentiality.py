@@ -127,6 +127,11 @@ class EssentialitySearch:
             "diamond_version": self.diamond_version,
             "essential_calls": sum(1 for c in self.calls.values() if c.essential),
             "no_call": sum(1 for c in self.calls.values() if c.status == STATUS_NO_CALL),
+            # Distinguishes "we searched and found no ortholog" from "the search never ran".
+            # Without this an empty reference set reports all-zero and reads as a completed
+            # transfer that found nothing (observed on lambda0, 2026-09-18, with an empty
+            # --essentiality-keyword sending `keyword()` to BV-BRC).
+            "not_run": sum(1 for c in self.calls.values() if c.status == STATUS_NOT_RUN),
             "elapsed_seconds": round(self.elapsed_seconds, 2),
             "caveat": (
                 "FBA essentiality is a metabolic-model prediction, transferred here by homology. "
@@ -203,6 +208,35 @@ def fetch_reference_set(
             )
         )
     return reference
+
+
+def resolve_reference_set(
+    client,
+    *,
+    keyword: str = "",
+    taxonomy: Any = None,
+    limit: int = DEFAULT_REFERENCE_LIMIT,
+) -> tuple[str, list[ReferenceProtein]]:
+    """Find a keyword that actually returns relatives, and the set it returns.
+
+    An explicit ``keyword`` is used as given. Otherwise walk the query genome's lineage outwards
+    from the nearest rank, because the caller does not know what the organism is — that is the
+    premise of the pipeline — and because BV-BRC's keyword index does not track NCBI's current
+    names. Measured 2026-09-18: this genome resolves to genus *Mycoplasmoides*, which returns 0
+    rows, while its former genus *Mycoplasma* returns 12,742 rows across 96 genomes.
+    """
+    if keyword:
+        return keyword, fetch_reference_set(client, keyword=keyword, limit=limit)
+    names = [name for name in reversed(list(getattr(taxonomy, "lineage_names", None) or [])) if name]
+    candidates = names[:4]
+    scientific = (getattr(taxonomy, "scientific_name", "") or "").strip()
+    if scientific and scientific not in candidates:
+        candidates.insert(0, scientific)
+    for candidate in candidates:
+        reference = fetch_reference_set(client, keyword=candidate, limit=limit)
+        if reference:
+            return candidate, reference
+    return (candidates[0] if candidates else ""), []
 
 
 def parse_calls(

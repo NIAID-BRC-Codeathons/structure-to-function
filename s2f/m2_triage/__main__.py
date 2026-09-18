@@ -22,7 +22,7 @@ from .report_adapter import kg_section, protein_enrichment, seed_proteins
 from .afdb import AlphaFoldClient
 from .human_homology import DEFAULT_MIN_COVERAGE, DiamondMissing, fetch_human_proteome
 from .human_homology import search as human_homology_search
-from .essentiality import DEFAULT_REFERENCE_LIMIT, fetch_reference_set
+from .essentiality import DEFAULT_REFERENCE_LIMIT, resolve_reference_set
 from .essentiality import search as essentiality_search
 from .foldseek import (
     DEFAULT_DATABASES,
@@ -402,13 +402,21 @@ def run(args: argparse.Namespace) -> int:
             # BV-BRC's FBA essentiality exists for public genomes only, so transfer it from
             # public relatives and record which one justified each call (issue #29).
             try:
-                reference = fetch_reference_set(
-                    client, keyword=args.essentiality_keyword, limit=args.essentiality_limit
+                keyword, reference = resolve_reference_set(
+                    client,
+                    keyword=args.essentiality_keyword,
+                    taxonomy=query_taxonomy,
+                    limit=args.essentiality_limit,
                 )
+                if not reference:
+                    print(
+                        f"Warning: essentiality found no reference set (keyword {keyword!r}); "
+                        "every protein is recorded as not-run, not as non-essential."
+                    )
                 found = essentiality_search(
                     [(p.feature_id, p.sequence) for p in proteins],
                     reference,
-                    reference_query=args.essentiality_keyword,
+                    reference_query=keyword,
                     min_identity=args.essentiality_min_identity,
                     min_coverage=args.essentiality_min_coverage,
                     threads=args.workers,
@@ -848,6 +856,7 @@ def run(args: argparse.Namespace) -> int:
                 "hits_retained": len(hit_rows),
                 "entities_with_metadata": len(metadata),
                 "selected": sum(1 for r in protein_rows if r["selected"]),
+                "disqualified_human_homolog": sum(1 for s in ranked if s.disqualified),
                 "no_pdb_hit": sum(1 for r in protein_rows if r["no_pdb_hit"]),
                 "retrieval_status": status_counts,
                 "specialty_rows_without_protein": len(bundle.specialty_without_protein),
