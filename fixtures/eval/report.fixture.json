@@ -59,6 +59,27 @@
           "human_homolog": -2
         },
         "rank": 1
+      },
+      "triage": {
+        "score": 0.628,
+        "components": {
+          "pdb_evidence": 0.82,
+          "virulence_amr": 1.0,
+          "essential": 0.0,
+          "drug_target": 0.0,
+          "annotation_gap": 0.0,
+          "surface_bonus": 1.0,
+          "membrane_penalty": 0.0,
+          "human_homolog_penalty": 0.0
+        },
+        "components_available": {
+          "surface_bonus": true,
+          "membrane_penalty": false
+        },
+        "weights_version": "2026-09-16",
+        "rank": 5,
+        "selected": true,
+        "reason": "pdb_evidence 0.82; virulence_amr 1; surface_bonus 1"
       }
     },
     {
@@ -107,6 +128,27 @@
           "human_homolog": -2
         },
         "rank": 2
+      },
+      "triage": {
+        "score": 0.564,
+        "components": {
+          "pdb_evidence": 0.66,
+          "virulence_amr": 1.0,
+          "essential": 0.0,
+          "drug_target": 0.0,
+          "annotation_gap": 0.0,
+          "surface_bonus": 1.0,
+          "membrane_penalty": 0.0,
+          "human_homolog_penalty": 0.0
+        },
+        "components_available": {
+          "surface_bonus": true,
+          "membrane_penalty": false
+        },
+        "weights_version": "2026-09-16",
+        "rank": 9,
+        "selected": true,
+        "reason": "pdb_evidence 0.66; virulence_amr 1; surface_bonus 1"
       }
     },
     {
@@ -155,6 +197,27 @@
           "human_homolog": -2
         },
         "rank": 3
+      },
+      "triage": {
+        "score": 0.612,
+        "components": {
+          "pdb_evidence": 0.78,
+          "virulence_amr": 1.0,
+          "essential": 0.0,
+          "drug_target": 0.0,
+          "annotation_gap": 0.0,
+          "surface_bonus": 1.0,
+          "membrane_penalty": 0.0,
+          "human_homolog_penalty": 0.0
+        },
+        "components_available": {
+          "surface_bonus": true,
+          "membrane_penalty": false
+        },
+        "weights_version": "2026-09-16",
+        "rank": 6,
+        "selected": true,
+        "reason": "pdb_evidence 0.78; virulence_amr 1; surface_bonus 1"
       }
     },
     {
@@ -203,6 +266,27 @@
           "human_homolog": -2
         },
         "rank": 4
+      },
+      "triage": {
+        "score": 0.324,
+        "components": {
+          "pdb_evidence": 0.31,
+          "virulence_amr": 1.0,
+          "essential": 0.0,
+          "drug_target": 0.0,
+          "annotation_gap": 0.0,
+          "surface_bonus": 0.0,
+          "membrane_penalty": 0.0,
+          "human_homolog_penalty": 0.0
+        },
+        "components_available": {
+          "surface_bonus": true,
+          "membrane_penalty": false
+        },
+        "weights_version": "2026-09-16",
+        "rank": 22,
+        "selected": true,
+        "reason": "pdb_evidence 0.31; virulence_amr 1"
       }
     },
     {
@@ -252,6 +336,27 @@
           "human_homolog": -2
         },
         "rank": 5
+      },
+      "triage": {
+        "score": 0.584,
+        "components": {
+          "pdb_evidence": 0.71,
+          "virulence_amr": 1.0,
+          "essential": 0.0,
+          "drug_target": 0.0,
+          "annotation_gap": 0.0,
+          "surface_bonus": 1.0,
+          "membrane_penalty": 0.0,
+          "human_homolog_penalty": 0.0
+        },
+        "components_available": {
+          "surface_bonus": true,
+          "membrane_penalty": false
+        },
+        "weights_version": "2026-09-16",
+        "rank": 7,
+        "selected": true,
+        "reason": "pdb_evidence 0.71; virulence_amr 1; surface_bonus 1"
       }
     },
     {
@@ -300,6 +405,27 @@
           "human_homolog": -2
         },
         "rank": 6
+      },
+      "triage": {
+        "score": 0.68,
+        "components": {
+          "pdb_evidence": 0.95,
+          "virulence_amr": 1.0,
+          "essential": 0.0,
+          "drug_target": 0.0,
+          "annotation_gap": 0.0,
+          "surface_bonus": 1.0,
+          "membrane_penalty": 0.0,
+          "human_homolog_penalty": 0.0
+        },
+        "components_available": {
+          "surface_bonus": true,
+          "membrane_penalty": false
+        },
+        "weights_version": "2026-09-16",
+        "rank": 3,
+        "selected": true,
+        "reason": "pdb_evidence 0.95; virulence_amr 1; surface_bonus 1"
       }
     },
     {
@@ -348,6 +474,27 @@
           "human_homolog": -2
         },
         "rank": 7
+      },
+      "triage": {
+        "score": 0.416,
+        "components": {
+          "pdb_evidence": 0.29,
+          "virulence_amr": 1.0,
+          "essential": 0.0,
+          "drug_target": 0.0,
+          "annotation_gap": 0.0,
+          "surface_bonus": 1.0,
+          "membrane_penalty": 0.0,
+          "human_homolog_penalty": 0.0
+        },
+        "components_available": {
+          "surface_bonus": true,
+          "membrane_penalty": false
+        },
+        "weights_version": "2026-09-16",
+        "rank": 20,
+        "selected": true,
+        "reason": "pdb_evidence 0.29; virulence_amr 1; surface_bonus 1"
       }
     },
     {
@@ -396,6 +543,27 @@
           "human_homolog": -2
         },
         "rank": 8
+      },
+      "triage": {
+        "score": 0.532,
+        "components": {
+          "pdb_evidence": 0.58,
+          "virulence_amr": 1.0,
+          "essential": 0.0,
+          "drug_target": 0.0,
+          "annotation_gap": 0.0,
+          "surface_bonus": 1.0,
+          "membrane_penalty": 0.0,
+          "human_homolog_penalty": 0.0
+        },
+        "components_available": {
+          "surface_bonus": true,
+          "membrane_penalty": false
+        },
+        "weights_version": "2026-09-16",
+        "rank": 13,
+        "selected": true,
+        "reason": "pdb_evidence 0.58; virulence_amr 1; surface_bonus 1"
       }
     },
     {
@@ -441,6 +609,27 @@
           "human_homolog": -2
         },
         "rank": 9
+      },
+      "triage": {
+        "score": 0.476,
+        "components": {
+          "pdb_evidence": 0.44,
+          "virulence_amr": 1.0,
+          "essential": 0.0,
+          "drug_target": 0.0,
+          "annotation_gap": 0.0,
+          "surface_bonus": 1.0,
+          "membrane_penalty": 0.0,
+          "human_homolog_penalty": 0.0
+        },
+        "components_available": {
+          "surface_bonus": true,
+          "membrane_penalty": false
+        },
+        "weights_version": "2026-09-16",
+        "rank": 17,
+        "selected": true,
+        "reason": "pdb_evidence 0.44; virulence_amr 1; surface_bonus 1"
       }
     },
     {
@@ -479,6 +668,27 @@
           "human_homolog": -2
         },
         "rank": 10
+      },
+      "triage": {
+        "score": 0.688,
+        "components": {
+          "pdb_evidence": 0.97,
+          "virulence_amr": 0.0,
+          "essential": 1.0,
+          "drug_target": 1.0,
+          "annotation_gap": 0.0,
+          "surface_bonus": 0.0,
+          "membrane_penalty": 0.0,
+          "human_homolog_penalty": 0.0
+        },
+        "components_available": {
+          "surface_bonus": true,
+          "membrane_penalty": false
+        },
+        "weights_version": "2026-09-16",
+        "rank": 2,
+        "selected": true,
+        "reason": "pdb_evidence 0.97; essential 1; drug_target 1"
       }
     },
     {
@@ -521,6 +731,27 @@
           "human_homolog": -2
         },
         "rank": 11
+      },
+      "triage": {
+        "score": 0.172,
+        "components": {
+          "pdb_evidence": 0.18,
+          "virulence_amr": 0.0,
+          "essential": 0.0,
+          "drug_target": 0.0,
+          "annotation_gap": 0.0,
+          "surface_bonus": 1.0,
+          "membrane_penalty": 0.0,
+          "human_homolog_penalty": 0.0
+        },
+        "components_available": {
+          "surface_bonus": true,
+          "membrane_penalty": false
+        },
+        "weights_version": "2026-09-16",
+        "rank": 31,
+        "selected": false,
+        "reason": "pdb_evidence 0.18; surface_bonus 1"
       }
     },
     {
@@ -563,6 +794,27 @@
           "human_homolog": -2
         },
         "rank": 12
+      },
+      "triage": {
+        "score": 0.564,
+        "components": {
+          "pdb_evidence": 0.91,
+          "virulence_amr": 1.0,
+          "essential": 0.0,
+          "drug_target": 0.0,
+          "annotation_gap": 0.0,
+          "surface_bonus": 0.0,
+          "membrane_penalty": 0.0,
+          "human_homolog_penalty": 0.0
+        },
+        "components_available": {
+          "surface_bonus": true,
+          "membrane_penalty": false
+        },
+        "weights_version": "2026-09-16",
+        "rank": 10,
+        "selected": true,
+        "reason": "pdb_evidence 0.91; virulence_amr 1"
       }
     },
     {
@@ -605,6 +857,27 @@
           "human_homolog": -2
         },
         "rank": 13
+      },
+      "triage": {
+        "score": 0.348,
+        "components": {
+          "pdb_evidence": 0.62,
+          "virulence_amr": 0.0,
+          "essential": 0.0,
+          "drug_target": 0.0,
+          "annotation_gap": 0.0,
+          "surface_bonus": 1.0,
+          "membrane_penalty": 0.0,
+          "human_homolog_penalty": 0.0
+        },
+        "components_available": {
+          "surface_bonus": true,
+          "membrane_penalty": false
+        },
+        "weights_version": "2026-09-16",
+        "rank": 21,
+        "selected": true,
+        "reason": "pdb_evidence 0.62; surface_bonus 1"
       }
     },
     {
@@ -647,6 +920,27 @@
           "human_homolog": -2
         },
         "rank": 14
+      },
+      "triage": {
+        "score": 0.234,
+        "components": {
+          "pdb_evidence": 0.21,
+          "virulence_amr": 0.0,
+          "essential": 0.0,
+          "drug_target": 1.0,
+          "annotation_gap": 0.0,
+          "surface_bonus": 0.0,
+          "membrane_penalty": 0.0,
+          "human_homolog_penalty": 0.0
+        },
+        "components_available": {
+          "surface_bonus": true,
+          "membrane_penalty": false
+        },
+        "weights_version": "2026-09-16",
+        "rank": 29,
+        "selected": false,
+        "reason": "pdb_evidence 0.21; drug_target 1"
       }
     },
     {
@@ -689,6 +983,27 @@
           "human_homolog": -2
         },
         "rank": 15
+      },
+      "triage": {
+        "score": 0.096,
+        "components": {
+          "pdb_evidence": 0.24,
+          "virulence_amr": 0.0,
+          "essential": 0.0,
+          "drug_target": 0.0,
+          "annotation_gap": 0.0,
+          "surface_bonus": 0.0,
+          "membrane_penalty": 0.0,
+          "human_homolog_penalty": 0.0
+        },
+        "components_available": {
+          "surface_bonus": true,
+          "membrane_penalty": false
+        },
+        "weights_version": "2026-09-16",
+        "rank": 37,
+        "selected": false,
+        "reason": "pdb_evidence 0.24"
       }
     },
     {
@@ -731,6 +1046,27 @@
           "human_homolog": -2
         },
         "rank": 16
+      },
+      "triage": {
+        "score": 0.576,
+        "components": {
+          "pdb_evidence": 0.69,
+          "virulence_amr": 1.0,
+          "essential": 0.0,
+          "drug_target": 0.0,
+          "annotation_gap": 0.0,
+          "surface_bonus": 1.0,
+          "membrane_penalty": 0.0,
+          "human_homolog_penalty": 0.0
+        },
+        "components_available": {
+          "surface_bonus": true,
+          "membrane_penalty": false
+        },
+        "weights_version": "2026-09-16",
+        "rank": 8,
+        "selected": true,
+        "reason": "pdb_evidence 0.69; virulence_amr 1; surface_bonus 1"
       }
     },
     {
@@ -773,6 +1109,27 @@
           "human_homolog": -2
         },
         "rank": 17
+      },
+      "triage": {
+        "score": 0.148,
+        "components": {
+          "pdb_evidence": 0.12,
+          "virulence_amr": 0.0,
+          "essential": 0.0,
+          "drug_target": 0.0,
+          "annotation_gap": 0.0,
+          "surface_bonus": 1.0,
+          "membrane_penalty": 0.0,
+          "human_homolog_penalty": 0.0
+        },
+        "components_available": {
+          "surface_bonus": true,
+          "membrane_penalty": false
+        },
+        "weights_version": "2026-09-16",
+        "rank": 36,
+        "selected": false,
+        "reason": "pdb_evidence 0.12; surface_bonus 1"
       }
     },
     {
@@ -811,6 +1168,27 @@
           "human_homolog": -2
         },
         "rank": 18
+      },
+      "triage": {
+        "score": 0.742,
+        "components": {
+          "pdb_evidence": 0.98,
+          "virulence_amr": 1.0,
+          "essential": 0.0,
+          "drug_target": 1.0,
+          "annotation_gap": 0.0,
+          "surface_bonus": 0.0,
+          "membrane_penalty": 0.0,
+          "human_homolog_penalty": 0.0
+        },
+        "components_available": {
+          "surface_bonus": true,
+          "membrane_penalty": false
+        },
+        "weights_version": "2026-09-16",
+        "rank": 1,
+        "selected": true,
+        "reason": "pdb_evidence 0.98; virulence_amr 1; drug_target 1"
       }
     },
     {
@@ -849,6 +1227,27 @@
           "human_homolog": -2
         },
         "rank": 19
+      },
+      "triage": {
+        "score": 0.22,
+        "components": {
+          "pdb_evidence": 0.55,
+          "virulence_amr": 0.0,
+          "essential": 0.0,
+          "drug_target": 0.0,
+          "annotation_gap": 0.0,
+          "surface_bonus": 0.0,
+          "membrane_penalty": 0.0,
+          "human_homolog_penalty": 0.0
+        },
+        "components_available": {
+          "surface_bonus": true,
+          "membrane_penalty": false
+        },
+        "weights_version": "2026-09-16",
+        "rank": 30,
+        "selected": false,
+        "reason": "pdb_evidence 0.55"
       }
     },
     {
@@ -887,6 +1286,27 @@
           "human_homolog": -2
         },
         "rank": 20
+      },
+      "triage": {
+        "score": 0.01,
+        "components": {
+          "pdb_evidence": 0.35,
+          "virulence_amr": 0.0,
+          "essential": 0.0,
+          "drug_target": 0.0,
+          "annotation_gap": 0.0,
+          "surface_bonus": 0.0,
+          "membrane_penalty": 0.0,
+          "human_homolog_penalty": 0.52
+        },
+        "components_available": {
+          "surface_bonus": true,
+          "membrane_penalty": false
+        },
+        "weights_version": "2026-09-16",
+        "rank": 39,
+        "selected": false,
+        "reason": "pdb_evidence 0.35; human_homolog_penalty 0.52"
       }
     },
     {
@@ -925,6 +1345,27 @@
           "human_homolog": -2
         },
         "rank": 21
+      },
+      "triage": {
+        "score": 0.502,
+        "components": {
+          "pdb_evidence": 0.88,
+          "virulence_amr": 0.0,
+          "essential": 0.0,
+          "drug_target": 1.0,
+          "annotation_gap": 0.0,
+          "surface_bonus": 0.0,
+          "membrane_penalty": 0.0,
+          "human_homolog_penalty": 0.0
+        },
+        "components_available": {
+          "surface_bonus": true,
+          "membrane_penalty": false
+        },
+        "weights_version": "2026-09-16",
+        "rank": 14,
+        "selected": true,
+        "reason": "pdb_evidence 0.88; drug_target 1"
       }
     },
     {
@@ -963,6 +1404,27 @@
           "human_homolog": -2
         },
         "rank": 22
+      },
+      "triage": {
+        "score": 0.032,
+        "components": {
+          "pdb_evidence": 0.08,
+          "virulence_amr": 0.0,
+          "essential": 0.0,
+          "drug_target": 0.0,
+          "annotation_gap": 0.0,
+          "surface_bonus": 0.0,
+          "membrane_penalty": 0.0,
+          "human_homolog_penalty": 0.0
+        },
+        "components_available": {
+          "surface_bonus": true,
+          "membrane_penalty": false
+        },
+        "weights_version": "2026-09-16",
+        "rank": 38,
+        "selected": false,
+        "reason": "pdb_evidence 0.08"
       }
     },
     {
@@ -1001,6 +1463,27 @@
           "human_homolog": -2
         },
         "rank": 23
+      },
+      "triage": {
+        "score": 0.488,
+        "components": {
+          "pdb_evidence": 0.47,
+          "virulence_amr": 1.0,
+          "essential": 0.0,
+          "drug_target": 0.0,
+          "annotation_gap": 0.0,
+          "surface_bonus": 1.0,
+          "membrane_penalty": 0.0,
+          "human_homolog_penalty": 0.0
+        },
+        "components_available": {
+          "surface_bonus": true,
+          "membrane_penalty": false
+        },
+        "weights_version": "2026-09-16",
+        "rank": 16,
+        "selected": true,
+        "reason": "pdb_evidence 0.47; virulence_amr 1; surface_bonus 1"
       }
     },
     {
@@ -1039,6 +1522,27 @@
           "human_homolog": -2
         },
         "rank": 24
+      },
+      "triage": {
+        "score": 0.676,
+        "components": {
+          "pdb_evidence": 0.94,
+          "virulence_amr": 0.0,
+          "essential": 1.0,
+          "drug_target": 1.0,
+          "annotation_gap": 0.0,
+          "surface_bonus": 0.0,
+          "membrane_penalty": 0.0,
+          "human_homolog_penalty": 0.0
+        },
+        "components_available": {
+          "surface_bonus": true,
+          "membrane_penalty": false
+        },
+        "weights_version": "2026-09-16",
+        "rank": 4,
+        "selected": true,
+        "reason": "pdb_evidence 0.94; essential 1; drug_target 1"
       }
     },
     {
@@ -1077,6 +1581,27 @@
           "human_homolog": -2
         },
         "rank": 25
+      },
+      "triage": {
+        "score": 0.256,
+        "components": {
+          "pdb_evidence": 0.64,
+          "virulence_amr": 0.0,
+          "essential": 0.0,
+          "drug_target": 0.0,
+          "annotation_gap": 0.0,
+          "surface_bonus": 0.0,
+          "membrane_penalty": 0.0,
+          "human_homolog_penalty": 0.0
+        },
+        "components_available": {
+          "surface_bonus": true,
+          "membrane_penalty": false
+        },
+        "weights_version": "2026-09-16",
+        "rank": 28,
+        "selected": false,
+        "reason": "pdb_evidence 0.64"
       }
     },
     {
@@ -1115,6 +1640,27 @@
           "human_homolog": -2
         },
         "rank": 26
+      },
+      "triage": {
+        "score": 0.288,
+        "components": {
+          "pdb_evidence": 0.72,
+          "virulence_amr": 0.0,
+          "essential": 0.0,
+          "drug_target": 0.0,
+          "annotation_gap": 0.0,
+          "surface_bonus": 0.0,
+          "membrane_penalty": 0.0,
+          "human_homolog_penalty": 0.0
+        },
+        "components_available": {
+          "surface_bonus": true,
+          "membrane_penalty": false
+        },
+        "weights_version": "2026-09-16",
+        "rank": 27,
+        "selected": false,
+        "reason": "pdb_evidence 0.72"
       }
     },
     {
@@ -1149,6 +1695,27 @@
           "human_homolog": -2
         },
         "rank": 27
+      },
+      "triage": {
+        "score": 0.16,
+        "components": {
+          "pdb_evidence": 0.4,
+          "virulence_amr": 0.0,
+          "essential": 0.0,
+          "drug_target": 0.0,
+          "annotation_gap": 0.0,
+          "surface_bonus": 0.0,
+          "membrane_penalty": 0.0,
+          "human_homolog_penalty": 0.0
+        },
+        "components_available": {
+          "surface_bonus": true,
+          "membrane_penalty": false
+        },
+        "weights_version": "2026-09-16",
+        "rank": 33,
+        "selected": false,
+        "reason": "pdb_evidence 0.4"
       }
     },
     {
@@ -1185,6 +1752,27 @@
           "human_homolog": -2
         },
         "rank": 28
+      },
+      "triage": {
+        "score": 0.546,
+        "components": {
+          "pdb_evidence": 0.74,
+          "virulence_amr": 0.0,
+          "essential": 1.0,
+          "drug_target": 0.0,
+          "annotation_gap": 0.0,
+          "surface_bonus": 1.0,
+          "membrane_penalty": 0.0,
+          "human_homolog_penalty": 0.0
+        },
+        "components_available": {
+          "surface_bonus": true,
+          "membrane_penalty": false
+        },
+        "weights_version": "2026-09-16",
+        "rank": 11,
+        "selected": true,
+        "reason": "pdb_evidence 0.74; essential 1; surface_bonus 1"
       }
     },
     {
@@ -1219,6 +1807,27 @@
           "human_homolog": -2
         },
         "rank": 29
+      },
+      "triage": {
+        "score": 0.16,
+        "components": {
+          "pdb_evidence": 0.4,
+          "virulence_amr": 0.0,
+          "essential": 0.0,
+          "drug_target": 0.0,
+          "annotation_gap": 0.0,
+          "surface_bonus": 0.0,
+          "membrane_penalty": 0.0,
+          "human_homolog_penalty": 0.0
+        },
+        "components_available": {
+          "surface_bonus": true,
+          "membrane_penalty": false
+        },
+        "weights_version": "2026-09-16",
+        "rank": 34,
+        "selected": false,
+        "reason": "pdb_evidence 0.4"
       }
     },
     {
@@ -1255,6 +1864,27 @@
           "human_homolog": -2
         },
         "rank": 30
+      },
+      "triage": {
+        "score": 0.472,
+        "components": {
+          "pdb_evidence": 0.93,
+          "virulence_amr": 0.0,
+          "essential": 0.0,
+          "drug_target": 0.0,
+          "annotation_gap": 0.0,
+          "surface_bonus": 1.0,
+          "membrane_penalty": 0.0,
+          "human_homolog_penalty": 0.0
+        },
+        "components_available": {
+          "surface_bonus": true,
+          "membrane_penalty": false
+        },
+        "weights_version": "2026-09-16",
+        "rank": 18,
+        "selected": true,
+        "reason": "pdb_evidence 0.93; surface_bonus 1"
       }
     },
     {
@@ -1287,6 +1917,27 @@
           "human_homolog": -2
         },
         "rank": 31
+      },
+      "triage": {
+        "score": 0.4315,
+        "components": {
+          "pdb_evidence": 0.96,
+          "virulence_amr": 0.0,
+          "essential": 1.0,
+          "drug_target": 0.0,
+          "annotation_gap": 0.0,
+          "surface_bonus": 0.0,
+          "membrane_penalty": 0.0,
+          "human_homolog_penalty": 0.41
+        },
+        "components_available": {
+          "surface_bonus": true,
+          "membrane_penalty": false
+        },
+        "weights_version": "2026-09-16",
+        "rank": 19,
+        "selected": true,
+        "reason": "pdb_evidence 0.96; essential 1; human_homolog_penalty 0.41"
       }
     },
     {
@@ -1319,6 +1970,27 @@
           "human_homolog": -2
         },
         "rank": 32
+      },
+      "triage": {
+        "score": 0.32,
+        "components": {
+          "pdb_evidence": 0.8,
+          "virulence_amr": 0.0,
+          "essential": 0.0,
+          "drug_target": 0.0,
+          "annotation_gap": 0.0,
+          "surface_bonus": 0.0,
+          "membrane_penalty": 0.0,
+          "human_homolog_penalty": 0.0
+        },
+        "components_available": {
+          "surface_bonus": true,
+          "membrane_penalty": false
+        },
+        "weights_version": "2026-09-16",
+        "rank": 23,
+        "selected": true,
+        "reason": "pdb_evidence 0.8"
       }
     },
     {
@@ -1351,6 +2023,27 @@
           "human_homolog": -2
         },
         "rank": 33
+      },
+      "triage": {
+        "score": 0.49,
+        "components": {
+          "pdb_evidence": 0.85,
+          "virulence_amr": 0.0,
+          "essential": 1.0,
+          "drug_target": 0.0,
+          "annotation_gap": 0.0,
+          "surface_bonus": 0.0,
+          "membrane_penalty": 0.0,
+          "human_homolog_penalty": 0.0
+        },
+        "components_available": {
+          "surface_bonus": true,
+          "membrane_penalty": false
+        },
+        "weights_version": "2026-09-16",
+        "rank": 15,
+        "selected": true,
+        "reason": "pdb_evidence 0.85; essential 1"
       }
     },
     {
@@ -1383,6 +2076,27 @@
           "human_homolog": -2
         },
         "rank": 34
+      },
+      "triage": {
+        "score": 0.546,
+        "components": {
+          "pdb_evidence": 0.99,
+          "virulence_amr": 0.0,
+          "essential": 1.0,
+          "drug_target": 0.0,
+          "annotation_gap": 0.0,
+          "surface_bonus": 0.0,
+          "membrane_penalty": 0.0,
+          "human_homolog_penalty": 0.0
+        },
+        "components_available": {
+          "surface_bonus": true,
+          "membrane_penalty": false
+        },
+        "weights_version": "2026-09-16",
+        "rank": 12,
+        "selected": true,
+        "reason": "pdb_evidence 0.99; essential 1"
       }
     },
     {
@@ -1415,6 +2129,27 @@
           "human_homolog": -2
         },
         "rank": 35
+      },
+      "triage": {
+        "score": 0.16,
+        "components": {
+          "pdb_evidence": 0.4,
+          "virulence_amr": 0.0,
+          "essential": 0.0,
+          "drug_target": 0.0,
+          "annotation_gap": 0.0,
+          "surface_bonus": 0.0,
+          "membrane_penalty": 0.0,
+          "human_homolog_penalty": 0.0
+        },
+        "components_available": {
+          "surface_bonus": true,
+          "membrane_penalty": false
+        },
+        "weights_version": "2026-09-16",
+        "rank": 35,
+        "selected": false,
+        "reason": "pdb_evidence 0.4"
       }
     },
     {
@@ -1442,6 +2177,27 @@
           "human_homolog": -2
         },
         "rank": 36
+      },
+      "triage": {
+        "score": 0.16,
+        "components": {
+          "pdb_evidence": 0.4,
+          "virulence_amr": 0.0,
+          "essential": 0.0,
+          "drug_target": 0.0,
+          "annotation_gap": 0.0,
+          "surface_bonus": 0.0,
+          "membrane_penalty": 0.0,
+          "human_homolog_penalty": 0.0
+        },
+        "components_available": {
+          "surface_bonus": true,
+          "membrane_penalty": false
+        },
+        "weights_version": "2026-09-16",
+        "rank": 32,
+        "selected": false,
+        "reason": "pdb_evidence 0.4"
       }
     },
     {
@@ -1469,6 +2225,27 @@
           "human_homolog": -2
         },
         "rank": 37
+      },
+      "triage": {
+        "score": 0.3,
+        "components": {
+          "pdb_evidence": 0.0,
+          "virulence_amr": 0.0,
+          "essential": 0.0,
+          "drug_target": 0.0,
+          "annotation_gap": 1.0,
+          "surface_bonus": 0.0,
+          "membrane_penalty": 0.0,
+          "human_homolog_penalty": 0.0
+        },
+        "components_available": {
+          "surface_bonus": true,
+          "membrane_penalty": false
+        },
+        "weights_version": "2026-09-16",
+        "rank": 24,
+        "selected": true,
+        "reason": "annotation_gap 1"
       }
     },
     {
@@ -1496,6 +2273,27 @@
           "human_homolog": -2
         },
         "rank": 38
+      },
+      "triage": {
+        "score": 0.3,
+        "components": {
+          "pdb_evidence": 0.0,
+          "virulence_amr": 0.0,
+          "essential": 0.0,
+          "drug_target": 0.0,
+          "annotation_gap": 1.0,
+          "surface_bonus": 0.0,
+          "membrane_penalty": 0.0,
+          "human_homolog_penalty": 0.0
+        },
+        "components_available": {
+          "surface_bonus": true,
+          "membrane_penalty": false
+        },
+        "weights_version": "2026-09-16",
+        "rank": 25,
+        "selected": true,
+        "reason": "annotation_gap 1"
       }
     },
     {
@@ -1523,7 +2321,348 @@
           "human_homolog": -2
         },
         "rank": 39
+      },
+      "triage": {
+        "score": 0.3,
+        "components": {
+          "pdb_evidence": 0.0,
+          "virulence_amr": 0.0,
+          "essential": 0.0,
+          "drug_target": 0.0,
+          "annotation_gap": 1.0,
+          "surface_bonus": 0.0,
+          "membrane_penalty": 0.0,
+          "human_homolog_penalty": 0.0
+        },
+        "components_available": {
+          "surface_bonus": true,
+          "membrane_penalty": false
+        },
+        "weights_version": "2026-09-16",
+        "rank": 26,
+        "selected": true,
+        "reason": "annotation_gap 1"
       }
+    }
+  ],
+  "structures": [
+    {
+      "feature_id": "fig|1125630.4.peg.998",
+      "source": "pdb",
+      "accession": "FIMH1",
+      "path": null,
+      "confidence": null,
+      "holo_template": null,
+      "pockets": [],
+      "collection_status": "collected",
+      "usable_for_docking": true,
+      "reason": "2.10 A X-ray, identity 0.95, coverage 0.98",
+      "quality": {
+        "policy_version": "provisional-2026-09-17"
+      }
+    },
+    {
+      "feature_id": "fig|1125630.4.peg.5099",
+      "source": "pdb",
+      "accession": "ACRB1",
+      "path": null,
+      "confidence": null,
+      "holo_template": null,
+      "pockets": [],
+      "collection_status": "collected",
+      "usable_for_docking": true,
+      "reason": "3.10 A X-ray, identity 0.98, coverage 0.99",
+      "quality": {
+        "policy_version": "provisional-2026-09-17"
+      }
+    },
+    {
+      "feature_id": "fig|1125630.4.peg.6001",
+      "source": "pdb",
+      "accession": "GAPA1",
+      "path": null,
+      "confidence": null,
+      "holo_template": null,
+      "pockets": [],
+      "collection_status": "collected",
+      "usable_for_docking": true,
+      "reason": "1.75 A X-ray, identity 0.99, coverage 1.00",
+      "quality": {
+        "policy_version": "provisional-2026-09-17"
+      }
+    },
+    {
+      "feature_id": "fig|1125630.4.peg.6002",
+      "source": "pdb",
+      "accession": "RPOB1",
+      "path": null,
+      "confidence": null,
+      "holo_template": null,
+      "pockets": [],
+      "collection_status": "collected",
+      "usable_for_docking": true,
+      "reason": "3.40 A X-ray, identity 0.97, coverage 0.96",
+      "quality": {
+        "policy_version": "provisional-2026-09-17"
+      }
+    },
+    {
+      "feature_id": "fig|1125630.4.peg.6003",
+      "source": "pdb",
+      "accession": "MURA1",
+      "path": null,
+      "confidence": null,
+      "holo_template": null,
+      "pockets": [],
+      "collection_status": "collected",
+      "usable_for_docking": true,
+      "reason": "1.95 A X-ray, identity 0.94, coverage 0.99",
+      "quality": {
+        "policy_version": "provisional-2026-09-17"
+      }
+    },
+    {
+      "feature_id": "fig|1125630.4.peg.4001",
+      "source": "pdb",
+      "accession": "SECA1",
+      "path": null,
+      "confidence": null,
+      "holo_template": null,
+      "pockets": [],
+      "collection_status": "collected",
+      "usable_for_docking": true,
+      "reason": "2.60 A X-ray, identity 0.96, coverage 0.93",
+      "quality": {
+        "policy_version": "provisional-2026-09-17"
+      }
+    },
+    {
+      "feature_id": "fig|1125630.4.peg.410",
+      "source": "pdb",
+      "accession": "OMPA1",
+      "path": null,
+      "confidence": null,
+      "holo_template": null,
+      "pockets": [],
+      "collection_status": "collected",
+      "usable_for_docking": true,
+      "reason": "2.30 A X-ray, identity 0.93, coverage 0.91",
+      "quality": {
+        "policy_version": "provisional-2026-09-17"
+      }
+    },
+    {
+      "feature_id": "fig|1125630.4.peg.4002",
+      "source": "afdb",
+      "accession": "AF-SECY-F1",
+      "path": null,
+      "confidence": null,
+      "holo_template": null,
+      "pockets": [],
+      "collection_status": "collected",
+      "usable_for_docking": true,
+      "reason": "mean pLDDT 91.2, coverage 0.99",
+      "quality": {
+        "policy_version": "provisional-2026-09-17"
+      }
+    },
+    {
+      "feature_id": "fig|1125630.4.peg.2801",
+      "source": "pdb",
+      "accession": "UREC1",
+      "path": null,
+      "confidence": null,
+      "holo_template": null,
+      "pockets": [],
+      "collection_status": "collected",
+      "usable_for_docking": true,
+      "reason": "2.00 A X-ray, identity 0.88, coverage 0.95",
+      "quality": {
+        "policy_version": "provisional-2026-09-17"
+      }
+    },
+    {
+      "feature_id": "fig|1125630.4.peg.3382",
+      "source": "afdb",
+      "accession": "AF-FYUA-F1",
+      "path": null,
+      "confidence": null,
+      "holo_template": null,
+      "pockets": [],
+      "collection_status": "collected",
+      "usable_for_docking": true,
+      "reason": "mean pLDDT 88.4, coverage 0.97",
+      "quality": {
+        "policy_version": "provisional-2026-09-17"
+      }
+    },
+    {
+      "feature_id": "fig|1125630.4.peg.3010",
+      "source": "pdb",
+      "accession": "SKP1",
+      "path": null,
+      "confidence": null,
+      "holo_template": null,
+      "pockets": [],
+      "collection_status": "collected",
+      "usable_for_docking": false,
+      "reason": "resolution 3.90 A exceeds the 3.50 A threshold",
+      "quality": {
+        "policy_version": "provisional-2026-09-17"
+      }
+    },
+    {
+      "feature_id": "fig|1125630.4.peg.1937",
+      "source": "afdb",
+      "accession": "AF-IUTA-F1",
+      "path": null,
+      "confidence": null,
+      "holo_template": null,
+      "pockets": [],
+      "collection_status": "collected",
+      "usable_for_docking": false,
+      "reason": "mean pLDDT 64.7 below the 70.0 threshold",
+      "quality": {
+        "policy_version": "provisional-2026-09-17"
+      }
+    },
+    {
+      "feature_id": "fig|1125630.4.peg.1104",
+      "source": "pdb",
+      "accession": "MRKD1",
+      "path": null,
+      "confidence": null,
+      "holo_template": null,
+      "pockets": [],
+      "collection_status": "collected",
+      "usable_for_docking": true,
+      "reason": "2.45 A X-ray, identity 0.71, coverage 0.84",
+      "quality": {
+        "policy_version": "provisional-2026-09-17"
+      }
+    },
+    {
+      "feature_id": "fig|1125630.4.peg.3012",
+      "source": "pdb",
+      "accession": "SURA1",
+      "path": null,
+      "confidence": null,
+      "holo_template": null,
+      "pockets": [],
+      "collection_status": "collected",
+      "usable_for_docking": true,
+      "reason": "2.80 A X-ray, identity 0.62, coverage 0.88",
+      "quality": {
+        "policy_version": "provisional-2026-09-17"
+      }
+    },
+    {
+      "feature_id": "fig|1125630.4.peg.2212",
+      "source": "afdb",
+      "accession": "AF-TSSJ-F1",
+      "path": null,
+      "confidence": null,
+      "holo_template": null,
+      "pockets": [],
+      "collection_status": "collected",
+      "usable_for_docking": true,
+      "reason": "mean pLDDT 84.9, coverage 0.94",
+      "quality": {
+        "policy_version": "provisional-2026-09-17"
+      }
+    },
+    {
+      "feature_id": "fig|1125630.4.peg.5100",
+      "source": "pdb",
+      "accession": "ACRA1",
+      "path": null,
+      "confidence": null,
+      "holo_template": null,
+      "pockets": [],
+      "collection_status": "collected",
+      "usable_for_docking": true,
+      "reason": "2.70 A X-ray, identity 0.91, coverage 0.90",
+      "quality": {
+        "policy_version": "provisional-2026-09-17"
+      }
+    },
+    {
+      "feature_id": "fig|1125630.4.peg.601",
+      "source": "pdb",
+      "accession": "WZA1",
+      "path": null,
+      "confidence": null,
+      "holo_template": null,
+      "pockets": [],
+      "collection_status": "collected",
+      "usable_for_docking": false,
+      "reason": "resolution 4.20 A exceeds the 3.50 A threshold",
+      "quality": {
+        "policy_version": "provisional-2026-09-17"
+      }
+    },
+    {
+      "feature_id": "fig|1125630.4.peg.997",
+      "source": "pdb",
+      "accession": "FIMD1",
+      "path": null,
+      "confidence": null,
+      "holo_template": null,
+      "pockets": [],
+      "collection_status": "collected",
+      "usable_for_docking": true,
+      "reason": "2.80 A X-ray, identity 0.82, coverage 0.86",
+      "quality": {
+        "policy_version": "provisional-2026-09-17"
+      }
+    },
+    {
+      "feature_id": "fig|1125630.4.peg.2211",
+      "source": "predicted",
+      "accession": null,
+      "path": null,
+      "confidence": null,
+      "holo_template": null,
+      "pockets": [],
+      "collection_status": "prediction_required",
+      "usable_for_docking": null,
+      "reason": "no existing PDB or AlphaFold DB structure; prediction required"
+    },
+    {
+      "feature_id": "fig|1125630.4.peg.1105",
+      "source": "predicted",
+      "accession": null,
+      "path": null,
+      "confidence": null,
+      "holo_template": null,
+      "pockets": [],
+      "collection_status": "prediction_required",
+      "usable_for_docking": null,
+      "reason": "no existing PDB or AlphaFold DB structure; prediction required"
+    },
+    {
+      "feature_id": "fig|1125630.4.peg.6005",
+      "source": "predicted",
+      "accession": null,
+      "path": null,
+      "confidence": null,
+      "holo_template": null,
+      "pockets": [],
+      "collection_status": "prediction_required",
+      "usable_for_docking": null,
+      "reason": "no existing PDB or AlphaFold DB structure; prediction required"
+    },
+    {
+      "feature_id": "fig|1125630.4.peg.3013",
+      "source": "pdb",
+      "accession": "XXXX",
+      "path": null,
+      "confidence": null,
+      "holo_template": null,
+      "pockets": [],
+      "collection_status": "failed",
+      "usable_for_docking": null,
+      "reason": "download returned HTTP 503"
     }
   ]
 }

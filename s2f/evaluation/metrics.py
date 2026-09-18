@@ -70,7 +70,7 @@ BASELINES = ("keyword", "length", "random")
 RANDOM_SEED = 49
 
 
-def weights_fingerprint(weights: dict[str, int] | None = None) -> str:
+def weights_fingerprint(weights: dict[str, Any] | None = None) -> str:
     """Short hash of the scoring weights a measurement was taken under.
 
     Pitfall #12: tuning weights after seeing results invalidates the result. Recording the
@@ -210,10 +210,11 @@ class LeakageAudit:
 class Evaluation:
     """Everything one measurement produced, ready to serialise."""
 
+    score: str
     truthset: str
     truthset_path: str
     truthset_counts: dict[str, int]
-    weights: dict[str, int]
+    weights: dict[str, Any]
     weights_fingerprint: str
     proteins_scored: int
     matched: int
@@ -278,9 +279,13 @@ def leakage_audit(
     return audit
 
 
-def tie_report(ranked: Sequence[dict[str, Any]], k: int) -> TieReport:
+def tie_report(
+    ranked: Sequence[dict[str, Any]], k: int,
+    score_of: Callable[[dict[str, Any]], float | None] | None = None,
+) -> TieReport:
     """The score distribution, and whether the cut at K splits a block of equal scores."""
-    scores = [_score(p) or 0.0 for p in ranked]
+    read = score_of or _score
+    scores = [read(p) or 0.0 for p in ranked]
     distribution: dict[str, int] = {}
     for value in scores:
         key = f"{value:g}"
@@ -311,8 +316,12 @@ def evaluate(
     baselines: Sequence[str] = BASELINES,
     seed: int = RANDOM_SEED,
     ranker: Callable[[Sequence[dict[str, Any]]], list[dict[str, Any]]] = rank_by_priority,
+    score_of: Callable[[dict[str, Any]], float | None] | None = None,
+    score_name: str = "m1_priority",
+    weights: dict[str, Any] | None = None,
 ) -> Evaluation:
     """Measure one ranking against one truth set at one cut."""
+    read = score_of or _score
     by_feature: dict[str, Match] = {m.feature_id: m for m in matches}
     ranked = ranker(proteins)
     k = max(1, min(k, len(ranked)))
@@ -355,7 +364,7 @@ def evaluate(
         (
             {
                 "rank": position.get(match.feature_id),
-                "score": _score(ranked_by_id.get(match.feature_id) or {}),
+                "score": read(ranked_by_id.get(match.feature_id) or {}),
                 "feature_id": match.feature_id,
                 "symbol": match.symbol,
                 "label": match.label,
@@ -371,11 +380,12 @@ def evaluate(
     )
 
     return Evaluation(
+        score=score_name,
         truthset=truthset.name,
         truthset_path=truthset.path,
         truthset_counts=truthset.counts(),
-        weights=dict(WEIGHTS),
-        weights_fingerprint=weights_fingerprint(),
+        weights=dict(weights if weights is not None else WEIGHTS),
+        weights_fingerprint=weights_fingerprint(weights),
         proteins_scored=len(ranked),
         matched=len(by_feature),
         match_tiers=dict(sorted(tiers.items())),
@@ -384,7 +394,7 @@ def evaluate(
         negatives_in_genome=negatives_in_genome,
         measured=measured,
         baselines=baseline_scores,
-        ties=tie_report(ranked, k),
+        ties=tie_report(ranked, k, read),
         leakage=leakage_audit(top_k, by_feature),
         by_class=dict(sorted(by_class.items())),
         rows=rows,

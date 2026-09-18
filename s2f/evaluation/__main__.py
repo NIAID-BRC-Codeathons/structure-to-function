@@ -26,7 +26,12 @@ from datetime import datetime, timezone
 from pathlib import Path
 
 from ..common.io import read_report, report_path, update_section
+from ..m2_triage.score import WEIGHTS as TRIAGE_WEIGHTS
+from . import agreement as agreement_mod
+from .ablation import Ablation, ablate
 from .metrics import BASELINES, RANDOM_SEED, Evaluation, evaluate
+from .outcome import OutcomeSet, coverage_warning, outcomes_from_report
+from .rankings import SCORES, available_scores, build_ranking, score_accessor, triage_components
 from .truthset import TruthSetError, bundled_truthsets, load_truthset, match_proteins
 
 REPO_ROOT = Path(__file__).resolve().parents[2]
@@ -61,6 +66,13 @@ def _pct(value: float | None) -> str:
     return "n/a" if value is None else f"{value * 100:.1f}%"
 
 
+def _signed(value: float | None) -> str:
+    """A precision delta. `-` means the comparison was not available, not zero."""
+    if value is None:
+        return "&mdash;"
+    return "0" if value == 0 else f"{value * 100:+.1f} pp"
+
+
 def _write_matches_tsv(path: Path, result: Evaluation) -> None:
     path.parent.mkdir(parents=True, exist_ok=True)
     columns = [
@@ -74,11 +86,18 @@ def _write_matches_tsv(path: Path, result: Evaluation) -> None:
         writer.writerows(result.rows)
 
 
-def _write_summary(path: Path, result: Evaluation, *, run_id: str, dry_run: bool) -> None:
+def _write_summary(
+    path: Path, result: Evaluation, *, run_id: str, dry_run: bool,
+    ablation: Ablation | None = None,
+    pair: "agreement_mod.Agreement | None" = None,
+    outcomes: OutcomeSet | None = None,
+    outcome_result: Evaluation | None = None,
+    outcome_note: str | None = None,
+) -> None:
     """A markdown summary short enough to paste into the issue as a comment."""
     measured, ties, leak = result.measured, result.ties, result.leakage
     lines = [
-        f"# M1 priority calibration — {result.truthset}",
+        f"# {result.score} calibration — {result.truthset}",
         "",
         f"Run `{run_id}` · {result.proteins_scored} scored proteins · top {measured.k} · "
         f"weights `{result.weights_fingerprint}`",
@@ -166,6 +185,109 @@ def _write_summary(path: Path, result: Evaluation, *, run_id: str, dry_run: bool
     ]
     for klass, counts in result.by_class.items():
         lines.append(f"| {klass} | {counts['in_genome']} | {counts['in_top_k']} |")
+    if outcome_result is not None and outcomes is not None:
+        om = outcome_result.measured
+        lines += [
+            "",
+            "## Against M3's own outcome, no curation involved",
+            "",
+            f"`{result.score}` predicts \"worth folding\"; M3's quality gate reports whether a "
+            "usable structure actually materialised. Same cut, objective label.",
+            "",
+            "| | n |",
+            "| --- | --- |",
+            f"| dockable (positive) | {outcomes.counts.get('dockable', 0)} |",
+            f"| collected but rejected by the gate | {outcomes.counts.get('unusable', 0)} |",
+            f"| no existing structure to reuse | {outcomes.counts.get('no_structure', 0)} |",
+            f"| collection failed (excluded, not a negative) | {outcomes.counts.get('failed', 0)} |",
+            "",
+            f"**precision {_pct(om.precision)}** over the {om.positives + om.negatives} "
+            f"labelled proteins in the top {om.k}: {om.positives} dockable, {om.negatives} not.",
+            "",
+            f"Base rate {_pct(outcomes.base_rate)} — lift "
+            f"{_signed(outcomes.lift(om.precision))}. **Read the precision against the base "
+            "rate, not on its own.**",
+        ]
+        if not outcomes.discriminates():
+            lines += [
+                "",
+                "> **This label cannot discriminate on this run.** M3 passed "
+                f"{outcomes.counts.get('dockable', 0)} of "
+                f"{sum(v for k, v in outcomes.counts.items() if k != 'failed')} proteins, so "
+                "almost any selection scores near-perfectly. That is expected and slightly "
+                "circular: `pdb_evidence` is 0.40 of the triage score, and having a PDB hit "
+                "is most of what makes a structure retrievable. The informative number here "
+                "is the ablation's Δ against this label, not the headline precision.",
+            ]
+        if outcomes.policy_version:
+            lines.append(f"Quality policy `{outcomes.policy_version}`.")
+        if outcome_note:
+            lines += ["", f"> {outcome_note}"]
+        if outcomes.selected_but_uncollected:
+            lines.append(
+                f"> {len(outcomes.selected_but_uncollected)} selected proteins have no M3 "
+                "record at all; M3 has not been re-run since the last M2 pass."
+            )
+
+    if ablation is not None:
+        movers = ablation.load_bearing()
+        lines += [
+            "",
+            f"## Which triage components decide the top {ablation.k}",
+            "",
+            "Leave-one-out: zero a component, re-apply M2's own "
+            "`triage_score_from_components`, re-rank. No weight is changed and nothing is "
+            "refit — this is what a different weight vector *would* have selected.",
+            "",
+            "| component | weight | fires on | moves out of top K | Δ precision vs truth | Δ precision vs M3 |",
+            "| --- | ---: | ---: | ---: | ---: | ---: |",
+        ]
+        for effect in ablation.effects:
+            lines.append(
+                f"| `{effect.component}` | {effect.weight:+.2f} | {effect.nonzero_proteins} | "
+                f"{effect.churn_at_k} | {_signed(effect.truth_delta_precision)} | "
+                f"{_signed(effect.outcome_delta_precision)} |"
+            )
+        lines += [
+            "",
+            "A negative Δ means removing the component made precision *worse*, so it was "
+            "earning its weight. A zero row means it changed nothing at this cut.",
+            "",
+            f"**{len(movers)} of {len(ablation.effects)} components move the selection at all.**",
+        ]
+        for note in ablation.notes:
+            lines.append(f"- {note}")
+
+    if pair is not None:
+        rho = "n/a" if pair.spearman is None else f"{pair.spearman:+.3f}"
+        lines += [
+            "",
+            "## m1_priority vs triage — the disagreement the contract predicts",
+            "",
+            "`00a-data-contract.md` says the two answer different questions and are expected "
+            "to disagree. Measured over the "
+            f"{pair.common} proteins both scored:",
+            "",
+            f"- Spearman rho **{rho}**",
+            f"- **{pair.overlap_at_k} of {pair.k}** shared at the cut "
+            f"(Jaccard {pair.jaccard_at_k:.2f})",
+            f"- {len(pair.only_left)} picked by m1_priority alone, "
+            f"{len(pair.only_right)} by triage alone",
+        ]
+        if pair.biggest_disagreements:
+            lines += [
+                "",
+                "Where they diverge most:",
+                "",
+                "| m1 rank | triage rank | product |",
+                "| ---: | ---: | --- |",
+            ]
+            for row in pair.biggest_disagreements[:8]:
+                product = (row.get("product") or "")[:70]
+                lines.append(
+                    f"| {row['m1_priority_rank']} | {row['triage_rank']} | {product} |"
+                )
+
     lines += [
         "",
         "---",
@@ -280,10 +402,59 @@ def run(args: argparse.Namespace) -> int:
     matches, not_present = match_proteins(
         proteins, truthset, include_product_matches=args.include_product_matches
     )
+
+    present = available_scores(proteins)
+    if not present:
+        raise ValueError(
+            "this report carries neither m1_priority nor triage — run M1, and M2 for triage"
+        )
+    score_name = args.score or present[0]
+    if score_name not in present:
+        raise ValueError(
+            f"{score_name!r} is not in this report; it carries: {', '.join(present)}"
+        )
+    read_score = score_accessor(score_name)
     result = evaluate(
         proteins, truthset, matches, not_present,
         k=args.top_k, baselines=args.baselines, seed=args.seed,
+        ranker=lambda ps, n=score_name: build_ranking(ps, n).scored,
+        score_of=read_score,
+        score_name=score_name,
+        weights=dict(TRIAGE_WEIGHTS) if score_name == "triage" else None,
     )
+
+    # --- the three analyses that only exist once more of the pipeline has run ----------
+    outcomes = outcomes_from_report(report, proteins)
+    outcome_matches = outcomes.by_feature() or None
+    ranking = build_ranking(proteins, score_name)
+    outcome_note = (
+        coverage_warning(outcomes, args.top_k, ranking.top(args.top_k))
+        if outcome_matches else None
+    )
+
+    outcome_result: Evaluation | None = None
+    if outcome_matches:
+        outcome_result = evaluate(
+            proteins, truthset, outcomes.matches, [],
+            k=args.top_k, baselines=(), seed=args.seed,
+            ranker=lambda ps, n=score_name: build_ranking(ps, n).scored,
+            score_of=read_score, score_name=score_name,
+            weights=dict(TRIAGE_WEIGHTS) if score_name == "triage" else None,
+        )
+
+    ablation: Ablation | None = None
+    if any(triage_components(p) is not None for p in proteins):
+        ablation = ablate(
+            proteins,
+            truth_matches={m.feature_id: m for m in matches} or None,
+            outcome_matches=outcome_matches,
+            k=args.top_k,
+        )
+
+    pair = None
+    if len(present) > 1:
+        left, right = build_ranking(proteins, "m1_priority"), build_ranking(proteins, "triage")
+        pair = agreement_mod.compare(left, right, proteins, k=args.top_k)
 
     eval_dir = run_dir / "eval"
     eval_dir.mkdir(parents=True, exist_ok=True)
@@ -291,8 +462,37 @@ def run(args: argparse.Namespace) -> int:
         json.dumps(result.to_dict(), indent=2) + "\n", encoding="utf-8"
     )
     _write_matches_tsv(eval_dir / "truth_matches.tsv", result)
+    if ablation is not None:
+        (eval_dir / "ablation.json").write_text(
+            json.dumps(ablation.to_dict(), indent=2) + "\n", encoding="utf-8"
+        )
+    if pair is not None:
+        (eval_dir / "agreement.json").write_text(
+            json.dumps(pair.to_dict(), indent=2) + "\n", encoding="utf-8"
+        )
+    if outcome_result is not None:
+        (eval_dir / "outcome.json").write_text(
+            json.dumps(
+                {
+                    "counts": outcomes.counts,
+                    "base_rate": outcomes.base_rate,
+                    "lift": outcomes.lift(outcome_result.measured.precision),
+                    "discriminates": outcomes.discriminates(),
+                    "policy_version": outcomes.policy_version,
+                    "covered": outcomes.covered,
+                    "selected_but_uncollected": outcomes.selected_but_uncollected,
+                    "note": outcome_note,
+                    "measured": outcome_result.to_dict()["measured"],
+                },
+                indent=2,
+            )
+            + "\n",
+            encoding="utf-8",
+        )
     _write_summary(eval_dir / "summary.md", result, run_id=run_dir.name,
-                   dry_run=args.dry_run)
+                   dry_run=args.dry_run, ablation=ablation, pair=pair,
+                   outcomes=outcomes if outcome_result else None,
+                   outcome_result=outcome_result, outcome_note=outcome_note)
     _write_manifest(
         run_dir, args, result,
         started=started, elapsed_seconds=time.monotonic() - clock,
@@ -314,6 +514,32 @@ def run(args: argparse.Namespace) -> int:
         f"cut {'splits' if result.ties.cut_inside_tie_block else 'does not split'} a tie block.\n"
         f"wrote {eval_dir}/summary.md"
     )
+    if outcome_result is not None:
+        om = outcome_result.measured
+        print(
+            f"M3 outcome, same top {om.k}: precision {_pct(om.precision)} "
+            f"({om.positives} dockable, {om.negatives} not, {om.unlabelled} uncollected); "
+            f"base rate {_pct(outcomes.base_rate)}, lift {_signed(outcomes.lift(om.precision))}"
+        )
+        if not outcomes.discriminates():
+            print(
+                "  WARNING: the outcome label has almost no variance, so this precision is "
+                "not evidence the ranking selects well. See summary.md."
+            )
+    if ablation is not None:
+        movers = ablation.load_bearing()
+        print(
+            f"ablation: {len(movers)} of {len(ablation.effects)} components move the top "
+            f"{ablation.k}"
+            + (" — " + ", ".join(f"{e.component} {e.churn_at_k}" for e in movers[:4])
+               if movers else "")
+        )
+    if pair is not None:
+        rho = "n/a" if pair.spearman is None else f"{pair.spearman:+.3f}"
+        print(
+            f"m1_priority vs triage: spearman {rho}, "
+            f"{pair.overlap_at_k} of {pair.k} shared at the cut"
+        )
     if result.leakage.unclassified_reasons:
         print(
             "WARNING: priority.py emitted score reasons this audit cannot attribute; "
@@ -328,6 +554,10 @@ def build_parser() -> argparse.ArgumentParser:
     parser.add_argument(
         "--truthset", default=DEFAULT_TRUTHSET,
         help=f"bundled truth-set name or a path to a TSV (default: {DEFAULT_TRUTHSET})",
+    )
+    parser.add_argument(
+        "--score", default="", choices=("", *SCORES),
+        help="which ranking to measure; default is m1_priority when present",
     )
     parser.add_argument("--top-k", type=int, default=50, help="rank cut to measure at (default: 50)")
     parser.add_argument(

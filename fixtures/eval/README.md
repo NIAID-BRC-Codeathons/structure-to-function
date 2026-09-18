@@ -54,6 +54,14 @@ Symbols in the truth set with no protein here (`rmpA`, the `iro` and `iuc` loci,
 the Sec and Tra regions) exercise the not-present path, which drops them from the recall
 denominator instead of scoring them as misses.
 
+It also carries a `triage` record per protein and a `structures` section, so the dry run
+exercises the ablation, the M3 outcome scoring and the m1-vs-triage agreement, not only the
+truth-set calibration. Triage scores come from M2's own `triage_score_from_components`, and
+the fixture deliberately leaves `membrane_penalty` at zero everywhere so the "component
+never fired, which is a data gap and not a finding" path is covered. The structures section
+carries all four outcome classes, including a `failed` record that must be excluded from
+the measurement rather than counted as a negative.
+
 Regenerate by editing the feature table and re-running the generator recorded in the PR for
 issue #49; the fixture and any test asserting on it change in the same commit (pitfall #18).
 

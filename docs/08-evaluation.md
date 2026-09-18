@@ -1,13 +1,28 @@
-# Evaluation — calibrating a ranking against a curated truth set
+# Evaluation — measuring what the pipeline's rankings actually do
 
-Issue #49. Scope: measure `proteins[].m1_priority` against ground truth, report the number
+Issues #49 and #12. Scope: measure the two scores that order proteins, report the numbers
 before anyone touches a weight, and give the project a scoreboard it can quote.
 
-    python -m s2f.evaluation --run runs/<run_id> --top-k 50
+    python -m s2f.evaluation --run runs/<run_id> --score m1_priority --top-k 50
+    python -m s2f.evaluation --run runs/<run_id> --score triage
     python -m s2f.evaluation --dry-run          # committed fixture, no network, no credentials
 
 Outputs land in `runs/<run_id>/eval/`: `metrics.json`, `truth_matches.tsv`, `summary.md`
-(short enough to paste into an issue), and `run.json`.
+(short enough to paste into an issue), and `run.json`. Three more appear as the pipeline
+stages they depend on become available: `ablation.json`, `outcome.json`, `agreement.json`.
+
+## Four measurements, three of which need no curation
+
+| what | needs | answers |
+| --- | --- | --- |
+| **calibration** | a curated truth set | does the ranking surface real virulence factors? |
+| **outcome** | M3 | did the proteins it picked actually yield dockable structures? |
+| **ablation** | M2 | which of the eight triage components decide the selection? |
+| **agreement** | M1 and M2 | how far apart are the two scores, as the contract predicts? |
+
+Only the first needs anyone to adjudicate biology. The other three score the pipeline
+against its own recorded output, which is why they can be re-run on any genome without
+curating a truth set for it first.
 
 ## Why this exists
 
@@ -186,6 +201,99 @@ reporting a silent zero.
 - Labelled coverage is 38%: 19 of the top 50 are adjudicated, 30 are not.
 - Precision mixes the host-interaction and AMR axes, as described above.
 
+## Second measurement — the triage score, HS11286, 2026-09-18
+
+`python -m s2f.m2_triage --run runs/kp_hs11286 --top 300 --report` over 4,000 proteins
+(M1 caps sequence retrieval at 4,000), then `python -m s2f.m3_fold --run runs/kp_hs11286`,
+then the harness with `--score triage`. Weights `WEIGHTS_VERSION 2026-09-16`.
+
+**Caveat first:** this M2 pass ran with no optional providers — no `--annotate`,
+`--human-homology`, `--essentiality` or `--foldseek`. Three of the eight components are
+therefore under-exercised, and the harness reports that rather than scoring them as inert.
+
+### The two scores select almost disjoint populations
+
+| | |
+| --- | --- |
+| Spearman rho over the 4,000 both scored | **+0.373** |
+| shared between the two top 50s | **3 of 50** (Jaccard 0.03) |
+
+`m1_priority`'s top 50 is named virulence factors: FimD, fimbrial adhesins, TonB-dependent
+receptors, phospholipase A1. `triage`'s top 50 is **45 of 50 hypothetical, putative or
+uncharacterised proteins** with good PDB evidence — "hypothetical protein", "Putative
+NAD(P)H nitroreductase YdjA", "Uncharacterized ferredoxin-like protein YfhL".
+
+`00a-data-contract.md` predicted disagreement. The magnitude at the top is near-total, and
+it is the pipeline working as named: this project is a *hypothetical-protein* factory, and
+`triage` is the score that acts on that brief. `m1_priority` ranks the proteins we already
+know about.
+
+**The consequence matters more than the number.** M3 reads `triage.selected`, not
+`m1_priority`. So the four false positives issue #49 opens with — SurA, Skp, VirB10 — sit
+in M1's top band and **never reach M3 at all**. #49 is a defect in M1's report, not in the
+pipeline's selection, and fixing it will not change one protein that gets folded or docked.
+That reframes how much of Day 3 it deserves.
+
+### Which components decide the selection
+
+Leave-one-out at K=50, against the full score:
+
+| component | weight | fires on | moves out of top 50 | Δ precision vs M3 outcome |
+| --- | ---: | ---: | ---: | ---: |
+| `annotation_gap` | +0.30 | 563 | **41** | 0 |
+| `pdb_evidence` | +0.40 | 3056 | **33** | **−5.3 pp** |
+| `virulence_amr` | +0.20 | 250 | 12 | 0 |
+| `drug_target` | +0.15 | 347 | 2 | 0 |
+| `essential` | +0.15 | 126 | 0 | 0 |
+| `human_homolog_penalty` | −0.25 | 3 | 0 | 0 |
+| `surface_bonus` | +0.10 | **0** | 0 | 0 |
+| `membrane_penalty` | −0.15 | **0** | 0 | 0 |
+
+- **`annotation_gap` is the dominant selector, not `pdb_evidence`.** It fires on 14% of the
+  proteome (563 of 4,000) and occupies 45 of the top 50. Removing it churns 41 of 50 —
+  more than removing the component with the largest weight. A +0.30 bonus for reading
+  "hypothetical" is, in practice, what the shortlist is built from.
+- **Four of eight components move the selection at all.** `essential` and
+  `human_homolog_penalty` fire but change nothing at this cut.
+- **Two never fire.** `surface_bonus` and `membrane_penalty` are `OPTIONAL_COMPONENTS` and
+  their providers did not run here. That is a data gap, not a finding about the design, and
+  the run says so instead of reporting them as inert.
+
+### The M3 outcome label cannot discriminate on this run
+
+M3 collected structures for all 300 selected proteins: 0 required prediction, 0 failed, and
+**298 of 300 passed the provisional quality gate**.
+
+| | |
+| --- | --- |
+| precision @ 50 against `usable_for_docking` | 100.0% |
+| base rate of `dockable` in the labelled set | 99.3% |
+| **lift** | **+0.7 pp** |
+
+A label that is 99.3% one class cannot separate a good ranking from a bad one, so the
+headline 100% is not evidence that `triage` selects well. Two reasons, both worth acting on:
+
+1. **The gate is not currently a test.** `provisional-2026-09-17` passes essentially
+   everything handed to it. Its thresholds need tightening before it can validate anything.
+2. **The measurement is partly circular by construction.** `pdb_evidence` is 0.40 of the
+   triage score, and having a PDB hit is most of what makes a structure retrievable. The
+   ablation is the non-circular part: only `pdb_evidence` has a nonzero Δ against this
+   label (−5.3 pp), which says the other seven components contribute nothing to whether a
+   pick turns out dockable.
+
+### The finding underneath all three
+
+**Neither instrument can currently evaluate `triage`**, and they fail in opposite
+directions. The curated truth set cannot reach it — 0 of its top 50 are labelled, because
+curated gene symbols are by definition characterised proteins and `triage` selects
+uncharacterised ones. The outcome label cannot discriminate — 99.3% base rate.
+
+That is a result about the *evaluability* of the pipeline's central decision, and it says
+what a third instrument would have to be: a held-out set of proteins that were hypothetical
+at annotation time and have since been characterised, so that "we would have picked this
+one" can be checked against what it turned out to be. `gene-function-prediction` from the
+2025 codeathon solved exactly this ground-truth design problem and is the place to start.
+
 ## Matching, and the trap issue #49 names
 
 > a naive regex over product text matches `ent` inside "ATP-dependent" and "TonB-dependent",
@@ -238,27 +346,40 @@ two numbers do not compare — which is the point of recording it.
 
 ## Next, in order
 
-1. ~~Measure against a full live run and record the numbers before any weight change.~~
-   Done, above.
-2. **Discriminate inside the score-5 block.** 74 proteins tie there and the top 50 cuts
-   through it, so half the shortlist is ordered by protein length. This is a bigger problem
-   than the 14-way ceiling tie #49 opens with, and no weight change fixes it: the score is
-   a small integer and needs either a continuous component or an explicit secondary key.
-3. **Then** tighten the `secretion` rule to require secretion-system membership rather than
-   envelope vocabulary, and re-measure under a new fingerprint. Expect it to help less than
-   it looks: it removes +2 from SurA, Skp and VirB10, each of which keeps +3 from a curated
-   database and stays in the top band.
-4. **Decide what a curated VFDB hit on SurA and Skp means.** They are genuinely listed as
+Done: the first measurement of `m1_priority`, the extension to `triage`, and the outcome
+and ablation passes above.
+
+1. **Tighten the M3 quality gate.** `provisional-2026-09-17` passes 298 of 300, so nothing
+   downstream is being filtered and no outcome measurement can mean anything until it is.
+   Cheapest high-value fix on the board, and it unblocks every later validation.
+2. **Decide what `annotation_gap` at 0.30 is for.** It is the dominant selector — 45 of the
+   top 50 — and it is a bonus for the annotation being *absent*. That may be exactly right
+   for a hypothetical-protein factory, in which case say so in the report and stop
+   describing the output as a virulence ranking. If it is not intended, it is the first
+   weight to revisit, and there is now a churn number to revisit it against.
+3. **Discriminate inside the score-5 block.** 74 proteins tie there and the top 50 cuts
+   through it, so half of M1's shortlist is ordered by protein length. Bigger than the
+   14-way ceiling tie #49 opens with, and no weight change fixes it: the score is a small
+   integer and needs a continuous component or an explicit secondary key.
+4. **Then** tighten the `secretion` rule to require secretion-system membership rather than
+   envelope vocabulary, and re-measure under a new fingerprint. Expect less than it looks:
+   it removes +2 from SurA, Skp and VirB10, each of which keeps +3 from a curated database
+   and stays in the top band — and none of them reach M3 anyway.
+5. **Decide what a curated VFDB hit on SurA and Skp means.** They are genuinely listed as
    virulence-associated, because OMP biogenesis is required for virulence. If the truth set
-   calls them negatives and VFDB calls them positives, one of the two is using "virulence
-   factor" in a sense the other does not, and the scorer cannot resolve it.
-5. Fix the `\btonb\b` hyphen match in `MECHANISM_RULES["iron"]` (pitfall #27), which
+   calls them negatives and VFDB calls them positives, the two are using "virulence factor"
+   in different senses and the scorer cannot arbitrate.
+6. Fix the `\btonb\b` hyphen match in `MECHANISM_RULES["iron"]` (pitfall #27), which
    mislabels VirB10 as iron acquisition in `categories` and in the hypothesis sentence.
-6. Split the host-interaction and AMR axes so precision stops mixing them.
-7. Extend the harness to M2's `proteins[].triage`, which is a different question — structural
-   tractability, not host interaction — and needs its own truth set.
-8. Propose the `evaluation` section key so the numbers can live in `report.json` and M6 can
-   render them.
+7. Split the host-interaction and AMR axes so precision stops mixing them.
+8. Re-run the ablation with the optional providers enabled (`--annotate`,
+   `--human-homology`, `--essentiality`), so `surface_bonus` and `membrane_penalty` are
+   measured rather than reported as never having fired.
+9. Build the third instrument: proteins that were hypothetical at annotation time and have
+   since been characterised, so `triage` can be scored on the population it actually
+   selects. `gene-function-prediction` (2025) already solved this ground-truth design.
+10. Propose the `evaluation` section key so the numbers can live in `report.json` and M6 can
+    render them.
 
 ## Related
 
