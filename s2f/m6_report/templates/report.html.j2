@@ -1,0 +1,193 @@
+{#
+  M6 report template (issue #66).
+
+  Prints the view model and nothing else: no arithmetic, no sorting, no formatting decisions.
+  `docs/06-m6-report.md` requires every number to trace to a report.json field, so anything
+  that needed computing was computed in view.py.
+
+  No CDN, no fonts, no images — the file has to open from disk with the network off.
+#}<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>{{ view.title }} — {{ view.organism }}</title>
+<style>
+  :root {
+    --bg: #ffffff; --fg: #1a1c1e; --muted: #5b6168; --line: #d9dde1;
+    --accent: #1f5c8b; --warn: #8a5a00; --warn-bg: #fdf6e7; --chip: #eef2f5;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root { --bg:#16181a; --fg:#e7eaed; --muted:#9aa3ab; --line:#2f343a;
+            --accent:#7db4dd; --warn:#e0b25e; --warn-bg:#2a2316; --chip:#22262a; }
+  }
+  * { box-sizing: border-box; }
+  body { margin:0; background:var(--bg); color:var(--fg); font:16px/1.55 -apple-system,
+         BlinkMacSystemFont,"Segoe UI",Roboto,Helvetica,Arial,sans-serif; }
+  .wrap { max-width: 1100px; margin: 0 auto; padding: 32px 16px 80px; }
+  h1 { font-size: 1.7rem; margin: 0 0 4px; }
+  h2 { font-size: 1.15rem; margin: 40px 0 10px; padding-bottom: 6px;
+       border-bottom: 2px solid var(--line); }
+  h3 { font-size: 1rem; margin: 22px 0 6px; }
+  .sub { color: var(--muted); margin: 0 0 20px; }
+  table { border-collapse: collapse; width: 100%; font-size: 0.86rem; }
+  th, td { text-align: left; padding: 6px 8px; border-bottom: 1px solid var(--line);
+           vertical-align: top; }
+  th { color: var(--muted); font-weight: 600; white-space: nowrap; }
+  td.num, th.num { text-align: right; font-variant-numeric: tabular-nums; }
+  .chip { display:inline-block; padding:1px 7px; border-radius:10px; background:var(--chip);
+          font-size:0.76rem; color:var(--muted); margin-right:4px; white-space:nowrap; }
+  .chip.on { background: var(--accent); color: #fff; }
+  .grid { display:grid; grid-template-columns:repeat(auto-fit,minmax(150px,1fr)); gap:10px;
+          margin: 12px 0 4px; }
+  .stat { border:1px solid var(--line); border-radius:8px; padding:10px 12px; }
+  .stat b { display:block; font-size:1.4rem; font-variant-numeric: tabular-nums; }
+  .stat span { color: var(--muted); font-size:0.8rem; }
+  .note { background:var(--warn-bg); border-left:3px solid var(--warn); padding:10px 14px;
+          margin:14px 0; font-size:0.9rem; }
+  .muted { color: var(--muted); }
+  .reason { color: var(--muted); font-size: 0.82rem; }
+  ul.tight { margin:6px 0; padding-left:20px; }
+  ul.tight li { margin: 4px 0; }
+  code { background: var(--chip); padding: 1px 5px; border-radius: 4px; font-size: 0.85em; }
+  @media print { body { font-size: 11pt; } .wrap { max-width: none; } h2 { page-break-after: avoid; } }
+</style>
+</head>
+<body><div class="wrap">
+
+<h1>{{ view.title }}</h1>
+<p class="sub">
+  <strong>{{ view.organism }}</strong>
+  {%- if view.taxon_id %} · taxon {{ view.taxon_id }}{% endif %}
+  {%- if view.genome_id and view.genome_id != "—" %} · genome {{ view.genome_id }}{% endif %}
+  · run <code>{{ view.run_id }}</code> · generated {{ view.generated_at }}
+</p>
+
+<h2>What ran</h2>
+<p class="sub">A section that did not run is absent, which is not the same as empty.</p>
+<p>
+{%- for section in view.sections %}
+  <span class="chip {% if section.present %}on{% endif %}">{{ section.key }}:
+    {{ section.status }}{% if section.count is not none and section.present %} ({{ section.count }}){% endif %}</span>
+{%- endfor %}
+</p>
+
+<div class="grid">
+  <div class="stat"><b>{{ view.counts.proteins }}</b><span>proteins analysed</span></div>
+  <div class="stat"><b>{{ view.counts.selected }}</b><span>selected for structure work</span></div>
+  <div class="stat"><b>{{ view.counts.structures }}</b><span>structures collected</span></div>
+  <div class="stat"><b>{{ view.counts.usable_for_docking }}</b><span>usable for docking</span></div>
+</div>
+
+{% for caveat in view.caveats %}<div class="note">{{ caveat }}</div>{% endfor %}
+
+<h2>Selected proteins</h2>
+<p class="sub">Showing {{ view.counts.shown }} of {{ view.counts.selected }} selected, by triage rank.
+Each score is reproducible from the components beside it.</p>
+<table>
+  <thead><tr>
+    <th class="num">#</th><th>protein</th><th>gene</th><th class="num">score</th>
+    <th>structural homolog</th><th>predicted model</th><th>flags</th>
+  </tr></thead>
+  <tbody>
+  {% for p in view.proteins %}
+    <tr>
+      <td class="num">{{ p.rank if p.rank is not none else "—" }}</td>
+      <td>{{ p.product }}<br><span class="reason">{{ p.feature_id }}</span></td>
+      <td>{{ p.gene }}</td>
+      <td class="num">{{ p.score }}</td>
+      <td>
+        {%- if p.homolog %}{{ p.homolog.entity }} · {{ p.homolog.identity }} id ·
+          {{ p.homolog.coverage }} cov{% if p.homolog.resolution != "—" %} · {{ p.homolog.resolution }} Å{% endif %}
+          {%- if p.homolog.holo %}<br><span class="chip on">ligand bound</span>{{ p.homolog.ligands }}{% endif %}
+        {%- else %}<span class="muted">none</span>{% endif %}
+      </td>
+      <td>
+        {%- if p.model %}{{ p.model.entry }}<br><span class="reason">pLDDT {{ p.model.plddt }}
+          ({{ p.model.band }}), {{ p.model.coverage }} cov</span>
+        {%- else %}<span class="muted">none</span>{% endif %}
+      </td>
+      <td>
+        {%- if p.same_species %}<span class="chip">same species</span>
+        {%- elif p.same_genus %}<span class="chip">same genus</span>{% endif %}
+        {%- if p.structure and p.structure.usable %}<span class="chip">dockable</span>{% endif %}
+      </td>
+    </tr>
+    <tr><td></td><td colspan="6" class="reason">{{ p.reason }}</td></tr>
+  {% else %}
+    <tr><td colspan="7" class="muted">No proteins in this report.</td></tr>
+  {% endfor %}
+  </tbody>
+</table>
+
+{% if view.weights %}
+<h3>Triage weights</h3>
+<p>{% for name, weight in view.weights.items() %}<span class="chip">{{ name }} {{ weight }}</span>{% endfor %}</p>
+{% endif %}
+
+<h2>Ligand candidates</h2>
+{% if view.candidates_by_protein %}
+<p class="sub">Grouped by protein. Scores are a ranking <em>within</em> one protein and are never
+comparable across proteins.</p>
+{% for group in view.candidates_by_protein %}
+  <h3>{{ group.feature_id }}</h3>
+  <table>
+    <thead><tr><th>ligand</th><th class="num">score</th><th>docking</th><th>role</th></tr></thead>
+    <tbody>
+    {% for ligand in group.ligands %}
+      <tr><td>{{ ligand.ligand_id }}</td><td class="num">{{ ligand.score }}</td>
+          <td class="muted">—</td><td>{{ ligand.source }}</td></tr>
+    {% endfor %}
+    {% for pose in group.poses %}
+      <tr><td>{{ pose.ligand_id }}</td><td class="num">—</td>
+          <td class="num">{{ pose.score }} <span class="muted">({{ pose.engine }})</span></td>
+          <td>{{ pose.control }}</td></tr>
+    {% endfor %}
+    </tbody>
+  </table>
+{% endfor %}
+{% else %}
+<p class="muted">Not run. M4 did not contribute to this report, so there are no ligand
+candidates or docking poses — not zero candidates, but none attempted.</p>
+{% endif %}
+
+<h2>Knowledge subgraph</h2>
+{% if view.kg_summary %}
+<p>{{ view.kg_summary.nodes }} nodes, {{ view.kg_summary.edges }} edges.
+{% for kind, n in view.kg_summary.edge_types.items() %}<span class="chip">{{ kind }} {{ n }}</span>{% endfor %}</p>
+<p class="sub">Edges through a homolog carry the identity that justifies them. A homolog's
+annotation is not this protein's function.</p>
+{% else %}
+<p class="muted">Not run for this report.</p>
+{% endif %}
+
+<h2>Disease analysis</h2>
+{% if view.disease_claims %}
+<table>
+  <thead><tr><th>claim</th><th>evidence</th><th>basis</th></tr></thead>
+  <tbody>
+  {% for claim in view.disease_claims %}
+    <tr><td>{{ claim.claim }}</td><td class="reason">{{ claim.evidence }}</td>
+        <td>{{ claim.source_type }}</td></tr>
+  {% endfor %}
+  </tbody>
+</table>
+{% else %}
+<p class="muted">Not run. M5 did not contribute to this report.</p>
+{% endif %}
+
+<h2>Provenance</h2>
+{% if view.provenance %}
+<table>
+  <thead><tr><th>what</th><th>value</th></tr></thead>
+  <tbody>{% for row in view.provenance %}<tr><td>{{ row.what }}</td><td>{{ row.value }}</td></tr>{% endfor %}</tbody>
+</table>
+{% else %}<p class="muted">No tool versions recorded in this run.</p>{% endif %}
+
+<h2>Limitations</h2>
+<ul class="tight">
+{% for limitation in view.limitations %}<li>{{ limitation }}</li>{% endfor %}
+</ul>
+
+</div></body>
+</html>
