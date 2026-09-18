@@ -86,6 +86,19 @@ def _taxon_id(run_dir: str) -> int | None:
         return None
 
 
+def _organism(run_dir: str) -> str | None:
+    """M1 determined the organism; M2 needs it for the same-species flags. Read it, do not
+    make M2 infer it from FASTA header brackets (issue #55)."""
+    path = Path(run_dir) / "report.json"
+    if not path.exists():
+        return None
+    try:
+        genome = json.loads(path.read_text()).get("genome") or {}
+    except (json.JSONDecodeError, OSError):
+        return None
+    return ((genome.get("taxonomy") or {}).get("scientific_name") or "").strip() or None
+
+
 def stage_args(stage: str, args: argparse.Namespace) -> list[str]:
     common = ["--run", args.run]
     if stage == "m1":
@@ -132,6 +145,9 @@ def stage_args(stage: str, args: argparse.Namespace) -> list[str]:
         taxon = _taxon_id(args.run)
         if taxon:
             out += ["--taxon", str(taxon)]
+        organism = _organism(args.run)
+        if organism:
+            out += ["--organism", organism]
         return out
     return common
 

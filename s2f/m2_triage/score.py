@@ -157,6 +157,7 @@ def score_protein(
     essential_source: str = "",
     annotation: Any = None,
     query_organism: str = "",
+    query_taxonomy: Any = None,
 ) -> ProteinScore:
     """Score one protein from its PDB hits and M1 specialty rows.
 
@@ -236,8 +237,8 @@ def score_protein(
         # its own structures in the PDB, so a 100% identity "discovery" can be a self-match
         # (raised by @cmmann21 on #12). Recorded, never scored differently — but M6 must be able
         # to say why an annotation was easy.
-        "same_species_hit": bool(top and query_organism and same_species(query_organism, top.organism)),
-        "same_genus_hit": bool(top and query_organism and same_genus(query_organism, top.organism)),
+        "same_species_hit": _same_species(query_taxonomy, query_organism, top),
+        "same_genus_hit": _same_genus(query_taxonomy, query_organism, top),
     }
 
     return ProteinScore(
@@ -256,6 +257,23 @@ def score_protein(
         },
         error=error,
     )
+
+
+def _same_species(taxonomy: Any, organism_name: str, top: SequenceHit | None) -> bool:
+    """Prefer M1's lineage (issue #55); fall back to name comparison when standalone."""
+    if top is None:
+        return False
+    if taxonomy is not None and getattr(taxonomy, "determined", False):
+        return bool(taxonomy.same_species_as(top.organism, getattr(top, "taxonomy_id", None)))
+    return bool(organism_name and same_species(organism_name, top.organism))
+
+
+def _same_genus(taxonomy: Any, organism_name: str, top: SequenceHit | None) -> bool:
+    if top is None:
+        return False
+    if taxonomy is not None and getattr(taxonomy, "determined", False):
+        return bool(taxonomy.same_genus_as(top.organism, getattr(top, "taxonomy_id", None)))
+    return bool(organism_name and same_genus(organism_name, top.organism))
 
 
 def _reason(score: ProteinScore) -> str:

@@ -59,6 +59,7 @@ from .pdb_evidence import (
     PdbEvidenceClient,
     apply_metadata,
 )
+from . import taxonomy as taxonomy_mod
 from .score import (
     ANNOTATION_BONUS,
     OPTIONAL_COMPONENTS,
@@ -336,15 +337,18 @@ def run(args: argparse.Namespace) -> int:
     # that layout the same-organism flags below are all False for want of anything to compare
     # against — which reads exactly like "every hit is a genuine cross-organism transfer".
     # Say so instead of implying it.
-    if args.organism:
-        query_organism, query_organism_source = args.organism, "cli"
-    elif bundle.organism:
-        query_organism, query_organism_source = bundle.organism, "fasta_header"
-    else:
-        query_organism, query_organism_source = "", "undetermined"
+    # M1 determines the organism and writes it to report.json; read it rather than infer it
+    # from FASTA header brackets (issue #55). --organism overrides, and the header path stays
+    # for the standalone entry point where there is no genome section to read.
+    query_taxonomy = taxonomy_mod.resolve(
+        run_dir, override=args.organism, header_organism=bundle.organism
+    )
+    query_organism = query_taxonomy.scientific_name
+    query_organism_source = query_taxonomy.source
+    if not query_taxonomy.determined:
         print(
-            "Warning: no query organism in the FASTA headers — same-species and same-genus "
-            "hits cannot be told apart from cross-organism transfers. Pass --organism."
+            "Warning: query organism undetermined — same-species and same-genus hits cannot "
+            "be told apart from cross-organism transfers. Run M1 first, or pass --organism."
         )
 
     proteins = bundle.proteins[: args.limit] if args.limit else bundle.proteins
@@ -521,6 +525,7 @@ def run(args: argparse.Namespace) -> int:
                             else None
                         ),
                         query_organism=query_organism,
+                        query_taxonomy=query_taxonomy,
                     )
                 )
                 hit_rows.extend(_hit_rows(protein.feature_id, hits, hit_score))
@@ -800,8 +805,9 @@ def run(args: argparse.Namespace) -> int:
                 }
                 for name in OPTIONAL_COMPONENTS
             },
-            "query_organism": query_organism,
+            "query_organism": query_organism or None,
             "query_organism_source": query_organism_source,
+            "query_taxonomy": query_taxonomy.as_dict(),
             # How much of the ranking rests on our own organism already being in the PDB. On a
             # novel genome this is 0; on the smoke-test genome it is most of the top of the list.
             "same_organism_hits": {
@@ -814,7 +820,7 @@ def run(args: argparse.Namespace) -> int:
                 ),
                 "same_genus_total": sum(1 for s_ in ranked if s_.flags.get("same_genus_hit")),
                 # Zeros mean two different things, and only one of them is a measurement.
-                "measured": bool(query_organism),
+                "measured": query_taxonomy.determined,
                 "note": (
                     "A hit against our own organism or genus is not a cross-organism transfer. "
                     "Weights calibrated on a genome with its own PDB structures will not carry "
