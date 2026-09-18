@@ -10,26 +10,50 @@ before anyone touches a weight, and give the project a scoreboard it can quote.
 Outputs land in `runs/<run_id>/eval/`: `metrics.json`, `truth_matches.tsv`, `summary.md`
 (short enough to paste into an issue), and `run.json`. Three more appear as the pipeline
 stages they depend on become available: `ablation.json`, `outcome.json`, `agreement.json`.
-`--figures` adds PNG and SVG under `eval/figures/` (needs matplotlib; a missing figure
-never fails a run).
+`--figures` writes `eval/figures/` (needs matplotlib; a missing figure never fails a run).
 
 ## Figures
 
-One claim each, so any of them can go into a slide alone.
+One claim each, so any panel stands alone, plus a four-panel composite and the legends.
 
 | file | claim |
 | --- | --- |
-| `seq_cap_loss` | M1's cap retains 72% of all proteins but only 42% of the hypothetical ones |
+| `seq_cap_loss` | M1's cap retains 72% of all CDS but only 42% of the hypothetical ones |
 | `score_disagreement` | `m1_priority` rank against `triage` rank; 3 of 50 shared at the cut |
 | `triage_ablation` | `annotation_gap` moves 41 of the top 50, more than `pdb_evidence` |
 | `outcome_lift` | precision 100% beside a 99.3% base rate — the label is not a test |
+| `figure_composite` | all four as panels A–D at double-column width |
+| `captions.md` | numbered legends, each self-contained |
 
-Colour is two slots from a validated categorical palette, checked with the palette
-validator in both light and dark modes for lightness band, chroma floor, CVD separation,
-normal-vision separation and surface contrast. Identity never rests on colour alone: every
-series is direct-labelled, and a component whose provider never ran is drawn as a hatched
-ghost with the words "not measured" rather than as a zero-length bar, because "we did not
-measure this" and "we measured zero" are different claims and the chart must not merge them.
+### `--figure-style publication` (default)
+
+- **No title inside the artwork.** The legend lives in `captions.md`, where a journal wants
+  it; a baked-in title has to be removed in production.
+- **Real column widths**: 89 mm single, 120 mm for the ablation panel's long labels, 183 mm
+  for the composite. Arial at 7 pt, which survives reduction.
+- **PDF, SVG and 600 dpi PNG.** matplotlib defaults to `pdf.fonttype = 3` and
+  `svg.fonttype = "path"`; Type 3 is rejected outright by Nature, Elsevier and IEEE, and
+  outlined SVG text cannot be copy-edited or read by a screen reader. Publication mode sets
+  fonttype 42 and live SVG text, and `tests/test_eval_figures.py` asserts both on the
+  written files rather than trusting the setting.
+- Mathtext is pinned to Arial too, or `$w$` and `$\rho$` fall back to DejaVu and the
+  italics sit in a different typeface from every other glyph.
+
+`--figure-style slide` puts one headline in each figure at larger type, for a talk.
+
+### Two deliberate choices a reviewer will ask about
+
+**The outcome panel uses a full 0–100 baseline.** Truncating it would magnify a 0.7-point
+gap into a visible difference and argue the opposite of the panel's point: the two bars
+being the same height *is* the finding.
+
+**A component whose provider never ran is a hatched ghost reading "not measured",** not a
+zero-length bar. "We did not measure this" and "we measured zero" are different claims and
+a blank bar merges them.
+
+Colour is two slots from a validated categorical palette, checked in both light and dark
+for lightness band, chroma floor, CVD separation, normal-vision separation and surface
+contrast. Identity never rests on colour alone; every series is direct-labelled.
 
 ## Four measurements, three of which need no curation
 

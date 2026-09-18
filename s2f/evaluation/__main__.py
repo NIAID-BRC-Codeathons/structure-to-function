@@ -31,7 +31,7 @@ from . import agreement as agreement_mod
 from .ablation import Ablation, ablate
 from .metrics import BASELINES, RANDOM_SEED, Evaluation, evaluate
 from .outcome import OutcomeSet, coverage_warning, outcomes_from_report
-from .figures import save_figures
+from .figures import STYLES, save_figures
 from .rankings import (
     SCORES, available_scores, build_ranking, population_stages, score_accessor,
     triage_components,
@@ -519,6 +519,7 @@ def run(args: argparse.Namespace) -> int:
             k=args.top_k,
             ablation=ablation.to_dict() if ablation else None,
             outcome=outcome_payload,
+            style=args.figure_style,
         )
         if not figures:
             print("NOTE: matplotlib is not installed, so no figures were written.")
@@ -549,7 +550,7 @@ def run(args: argparse.Namespace) -> int:
         f"wrote {eval_dir}/summary.md"
     )
     if figures:
-        print(f"figures: {len(figures)} files in {eval_dir}/figures")
+        print(f"figures: {len(figures)} {args.figure_style} files in {eval_dir}/figures")
     if outcome_result is not None:
         om = outcome_result.measured
         print(
@@ -607,7 +608,12 @@ def build_parser() -> argparse.ArgumentParser:
     parser.add_argument("--seed", type=int, default=RANDOM_SEED,
                         help=f"seed for the random baseline (default: {RANDOM_SEED})")
     parser.add_argument("--figures", action="store_true",
-                        help="also write PNG/SVG figures (needs matplotlib; optional)")
+                        help="also write figures (needs matplotlib; optional)")
+    parser.add_argument(
+        "--figure-style", default="publication", choices=list(STYLES),
+        help="publication: column-width PDF/SVG/PNG with editable text and captions.md, "
+             "no in-figure titles. slide: one headline per figure, larger type.",
+    )
     parser.add_argument("--dry-run", action="store_true",
                         help="use the committed evaluation fixture; no network, no credentials")
     return parser
