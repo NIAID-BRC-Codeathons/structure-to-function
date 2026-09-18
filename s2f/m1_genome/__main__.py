@@ -447,6 +447,41 @@ def main(argv: list[str] | None = None) -> int:
     run_section["modules"] = modules
     update_section(run_dir, "run", run_section)
 
+    # Species-level metadata. CGA analyses an assembly BV-BRC has never seen — `2097.118`
+    # is the id CGA minted for our own submission and has no public record — so growth,
+    # isolation, host and disease cannot be looked up against our own genome id. They come
+    # from a public record instead, and `metadata_provenance` records which one and how
+    # close it is. Optional by design: the contract above is already on disk, and a network
+    # failure here must not cost it. The catch is deliberately broad for that reason; the
+    # exception type is printed so a real bug is still visible.
+    try:
+        from .bvbrc_api import BvbrcApi
+        from .collect import collect_cga_metadata
+        from .pathogens import resolve_disease_profile
+        from ..common.http import CachedJsonClient, JsonCache
+        cache_path = Path(args.cache) if getattr(args, "cache", "") else m1_dir / "cache.sqlite"
+        api = BvbrcApi(CachedJsonClient(
+            cache=JsonCache(cache_path), offline=args.offline, session=_api_session(args),
+            timeout_seconds=args.timeout, max_attempts=max(1, args.retries)))
+        section = dict((init_report(run_dir, run_id).get("genome")) or {})
+        metadata = collect_cga_metadata(api, section)
+        section.update(metadata)
+        species = metadata["metadata_provenance"].get("species") or ""
+        if species:
+            section.setdefault("species", species)
+            section.setdefault("genus", species.split(" ")[0])
+        update_section(run_dir, "genome", section)
+        profile = resolve_disease_profile({"species": species,
+                                           "genus": section.get("genus") or "",
+                                           "disease": metadata["disease"]})
+        (m1_dir / "disease_profile.json").write_text(
+            json.dumps(profile, indent=1, default=str), encoding="utf-8")
+        p = metadata["metadata_provenance"]
+        where = f" from {p['genome_id']} ({p['genome_name']})" if p["genome_id"] else ""
+        print(f"species metadata: {p['basis']}{where}")
+    except Exception as exc:
+        print(f"species metadata skipped — {type(exc).__name__}: {exc}", file=sys.stderr)
+
     _report_outputs(run_dir, m1_dir, tree=None, want_html=args.html,
                     want_figures=args.figures, seq_limit=1200)
 

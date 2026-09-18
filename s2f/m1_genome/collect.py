@@ -194,7 +194,8 @@ def collect_taxonomy(api: BvbrcApi, genome: dict[str, Any]) -> dict[str, Any]:
             "genetic_code": genetic_code}
 
 
-def collect_growth(api: BvbrcApi, genome: dict[str, Any]) -> list[dict[str, Any]]:
+def collect_growth(api: BvbrcApi, genome: dict[str, Any], *,
+                   own_label: str = "this genome") -> list[dict[str, Any]]:
     """Growth conditions for this genome, falling back to the species-typical value.
 
     Each row carries its own `source`, because "this genome is anaerobic" and "most
@@ -206,7 +207,7 @@ def collect_growth(api: BvbrcApi, genome: dict[str, Any]) -> list[dict[str, Any]
     for key, label in GROWTH_FIELDS:
         value = genome.get(key)
         if _present(value):
-            rows.append({"property": label, "value": value, "source": "this genome"})
+            rows.append({"property": label, "value": value, "source": own_label})
             continue
         if not species:
             continue
@@ -219,9 +220,10 @@ def collect_growth(api: BvbrcApi, genome: dict[str, Any]) -> list[dict[str, Any]
     return rows
 
 
-def collect_isolation(api: BvbrcApi, genome: dict[str, Any]) -> dict[str, Any]:
+def collect_isolation(api: BvbrcApi, genome: dict[str, Any], *,
+                      own_label: str = "this genome") -> dict[str, Any]:
     """This isolate's provenance, plus the species-wide distribution as context."""
-    own = [{"property": label, "value": genome[key]}
+    own = [{"property": label, "value": genome[key], "source": own_label}
            for key, label in ISOLATION_FIELDS if _present(genome.get(key))]
     distribution: dict[str, list[list[Any]]] = {}
     species = genome.get("species")
@@ -301,6 +303,105 @@ def collect_nutrition(api: BvbrcApi, genome: dict[str, Any]) -> dict[str, Any]:
         "cofactor_vitamin_biosynthesis_count": len(cofactor),
         "biosynthesis_subsystems": biosynthesis,
         "basis": "inferred from encoded metabolic subsystems; not a growth assay",
+    }
+
+
+#: Everything a public genome record can contribute to the metadata sections.
+_METADATA_SELECT = sorted(
+    {key for key, _ in GROWTH_FIELDS}
+    | {key for key, _ in ISOLATION_FIELDS}
+    | {"genome_id", "genome_name", "species", "genus", "disease"}
+)
+
+
+def resolve_metadata_genome(
+    api: BvbrcApi,
+    *,
+    genome_id: str = "",
+    species: str = "",
+    closest: Any = (),
+) -> tuple[dict[str, Any], dict[str, Any]]:
+    """Which public BV-BRC record the species-level metadata may be taken from.
+
+    A CGA run analyses an assembly BV-BRC has never seen. `2097.118` is the id CGA minted
+    for our own submission, and `eq(genome_id,2097.118)` returns nothing, so growth,
+    isolation, host and disease — which are held against *public* records — have to come
+    from somewhere else: this genome if it happens to be public, otherwise the nearest
+    relative the taxon call found, otherwise species-wide facets alone.
+
+    The basis is returned rather than folded away, because "this isolate came from a human
+    in Australia" and "a relative of this isolate did" are different claims and the report
+    must not print the second as the first.
+    """
+    select = f"&select({','.join(_METADATA_SELECT)})&limit(1)"
+
+    def fetch(gid: str) -> dict[str, Any]:
+        rows = api.query("genome", f"eq(genome_id,{rql_value(gid)}){select}")
+        return rows[0] if rows else {}
+
+    if genome_id:
+        record = fetch(genome_id)
+        if record:
+            return record, {"basis": "this-genome", "genome_id": str(genome_id),
+                            "genome_name": record.get("genome_name") or "",
+                            "mash_distance": 0.0, "ani": 100.0}
+    for hit in closest or ():
+        gid = str((hit or {}).get("genome_id") or "")
+        if not gid:
+            continue
+        record = fetch(gid)
+        if record:
+            return record, {"basis": "relative", "genome_id": gid,
+                            "genome_name": record.get("genome_name") or hit.get("name") or "",
+                            "mash_distance": hit.get("mash_distance"),
+                            "ani": hit.get("ani")}
+    return {}, {"basis": "species" if species else "none", "genome_id": "",
+                "genome_name": "", "mash_distance": None, "ani": None}
+
+
+_METADATA_NOTE = {
+    "this-genome": ("This assembly has its own public BV-BRC record, so the isolate "
+                    "metadata below describes this genome."),
+    "relative": ("This assembly is not in BV-BRC. The isolate metadata below belongs to "
+                 "the nearest public relative, not to the analysed genome."),
+    "species": ("This assembly is not in BV-BRC and no public relative was identified, so "
+                "only species-wide distributions are shown."),
+    "none": "No species was resolved, so no metadata could be looked up.",
+}
+
+
+def collect_cga_metadata(api: BvbrcApi, genome: dict[str, Any]) -> dict[str, Any]:
+    """Species-level metadata for a CGA run, with an honest account of its origin."""
+    taxonomy = genome.get("taxonomy") or {}
+    species = (taxonomy.get("scientific_name") or "").strip()
+    record, provenance = resolve_metadata_genome(
+        api,
+        genome_id=str(genome.get("genome_id") or ""),
+        species=species,
+        closest=genome.get("closest_genomes") or [],
+    )
+    basis = provenance["basis"]
+    provenance["species"] = species
+    provenance["note"] = _METADATA_NOTE[basis]
+
+    donor = dict(record)
+    donor.setdefault("species", species)
+    own_label = {"this-genome": "this genome",
+                 "relative": f"relative {provenance['genome_id']}",
+                 "species": "species-typical",
+                 "none": "species-typical"}[basis]
+
+    disease = donor.get("disease") or []
+    if isinstance(disease, str):
+        disease = [disease]
+
+    return {
+        "metadata_provenance": provenance,
+        "growth": collect_growth(api, donor, own_label=own_label) if species else [],
+        "isolation": (collect_isolation(api, donor, own_label=own_label) if species else {}),
+        "amr_phenotypes": (collect_amr_phenotypes(api, provenance["genome_id"])
+                           if provenance["genome_id"] else []),
+        "disease": list(disease),
     }
 
 

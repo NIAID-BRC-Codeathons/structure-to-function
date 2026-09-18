@@ -566,6 +566,27 @@ def build_html(report: dict[str, Any], *, priorities: list[dict[str, Any]],
     w("<section id='overview'><h2>Genome overview</h2>")
     w(f"<p class='lead'>Annotation source: {esc(genome.get('annotation_source') or 'CGA')}"
       f" · acquisition route: {esc(route)}.</p>")
+    # Where the isolate metadata came from. "This isolate was taken from a human in
+    # Australia" and "a relative of this isolate was" are different claims, and a CGA run
+    # can only ever make the second one, so the page has to say which it is showing.
+    provenance = _mapping(genome.get("metadata_provenance"))
+    if provenance:
+        basis = provenance.get("basis")
+        bits = []
+        donor = provenance.get("genome_name") or provenance.get("genome_id")
+        if donor and basis in ("this-genome", "relative"):
+            bits.append(f"Source record: <b>{esc(donor)}</b>")
+        if basis == "relative":
+            distance = provenance.get("mash_distance")
+            ani = provenance.get("ani")
+            bits.append(f"Mash distance {esc(distance)}" if distance is not None
+                        else "Mash distance not recorded")
+            if ani is not None:
+                bits.append(f"ANI {esc(ani)}%")
+        w(f"<div class='note{'' if basis == 'this-genome' else ' warn'}'>"
+          f"{esc(provenance.get('note'))}"
+          + (" &middot; " + " &middot; ".join(bits) if bits else "")
+          + "</div>")
     w("<div class='grid'>")
     stats = [
         ("Species", genome.get("species")), ("Genus", genome.get("genus")),
@@ -595,7 +616,10 @@ def build_html(report: dict[str, Any], *, priorities: list[dict[str, Any]],
     own = _rows(isolation.get("genome"))
     if own:
         for row in own:
-            w(f"<div><b>{esc(row.get('property'))}:</b> {esc(row.get('value'))}</div>")
+            source = row.get("source")
+            w(f"<div><b>{esc(row.get('property'))}:</b> {esc(row.get('value'))}"
+              + (f" <span class='muted'>({esc(source)})</span>" if source else "")
+              + "</div>")
     else:
         w("<div class='muted'>No isolate-specific metadata (typical for a lab reference "
           "strain).</div>")
