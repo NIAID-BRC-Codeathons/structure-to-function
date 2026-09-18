@@ -26,6 +26,7 @@ bearing before anyone proposes a change.
 
 from __future__ import annotations
 
+import re
 from dataclasses import dataclass, field
 from typing import Any, Callable, Iterable, Sequence
 
@@ -182,6 +183,42 @@ def build_ranking(
     )
 
 
+#: A product string that says the annotation does not know what this protein is. Used only
+#: to describe how the *population* moves through the pipeline, never to score anything —
+#: M2's own `annotation_gap` component is the scoring definition and this must not be
+#: confused with it. Kept deliberately broad, because the question it answers is "how many
+#: of the proteins this project exists to characterise survive each stage".
+GAP_LIKE = re.compile(r"hypothetical|uncharacteri[sz]ed|putative|\bDUF\d", re.I)
+
+
+def is_gap_like(protein: dict[str, Any]) -> bool:
+    """Does the annotation admit it does not know what this protein is?"""
+    return bool(GAP_LIKE.search(protein.get("product") or ""))
+
+
+def population_stages(
+    proteins: Sequence[dict[str, Any]]
+) -> list[tuple[str, int, int]]:
+    """`(stage, population, gap_like)` as proteins pass through M1's cap and M2's selection.
+
+    The seam this exposes: M1's `--seq-cap` truncates by `m1_priority`, which scores a
+    hypothetical protein 0 because it has no gene name, no mechanism keyword and no
+    specialty hit. M2's `annotation_gap` then pays 0.30 for exactly that property. The two
+    policies are each locally sensible and together they cancel, which is only visible
+    from outside both modules.
+    """
+    scored = [p for p in proteins if p.get("triage")]
+    selected = [p for p in scored if (p.get("triage") or {}).get("selected") is True]
+    stages = [("in genome", proteins), ("survived M1 seq-cap", scored)]
+    if selected:
+        stages.append(("selected by triage", selected))
+    return [
+        (label, len(pop), sum(1 for p in pop if is_gap_like(p)))
+        for label, pop in stages
+        if pop
+    ]
+
+
 def available_scores(proteins: Sequence[dict[str, Any]]) -> list[str]:
     """Which of `SCORES` this report actually carries."""
     return [
@@ -199,8 +236,11 @@ __all__ = [
     "TRIAGE_TEXT",
     "TRIAGE_WEIGHTS",
     "ablated_triage_score",
+    "GAP_LIKE",
     "available_scores",
     "build_ranking",
+    "is_gap_like",
+    "population_stages",
     "component_availability",
     "m1_priority_score",
     "score_accessor",

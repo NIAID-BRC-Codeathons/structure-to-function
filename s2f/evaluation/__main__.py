@@ -31,7 +31,11 @@ from . import agreement as agreement_mod
 from .ablation import Ablation, ablate
 from .metrics import BASELINES, RANDOM_SEED, Evaluation, evaluate
 from .outcome import OutcomeSet, coverage_warning, outcomes_from_report
-from .rankings import SCORES, available_scores, build_ranking, score_accessor, triage_components
+from .figures import save_figures
+from .rankings import (
+    SCORES, available_scores, build_ranking, population_stages, score_accessor,
+    triage_components,
+)
 from .truthset import TruthSetError, bundled_truthsets, load_truthset, match_proteins
 
 REPO_ROOT = Path(__file__).resolve().parents[2]
@@ -452,9 +456,14 @@ def run(args: argparse.Namespace) -> int:
         )
 
     pair = None
+    pair_common: list[str] = []
+    right_ranking = None
     if len(present) > 1:
-        left, right = build_ranking(proteins, "m1_priority"), build_ranking(proteins, "triage")
-        pair = agreement_mod.compare(left, right, proteins, k=args.top_k)
+        left, right_ranking = (build_ranking(proteins, "m1_priority"),
+                               build_ranking(proteins, "triage"))
+        pair = agreement_mod.compare(left, right_ranking, proteins, k=args.top_k)
+        pair_common = [f for f in left.order if f in right_ranking.scores]
+        ranking = left
 
     eval_dir = run_dir / "eval"
     eval_dir.mkdir(parents=True, exist_ok=True)
@@ -489,6 +498,31 @@ def run(args: argparse.Namespace) -> int:
             + "\n",
             encoding="utf-8",
         )
+    figures: list = []
+    if args.figures:
+        outcome_payload = None
+        if outcome_result is not None:
+            outcome_payload = {
+                "base_rate": outcomes.base_rate,
+                "measured": {"precision": outcome_result.measured.precision},
+            }
+        figures = save_figures(
+            eval_dir / "figures",
+            stages=population_stages(proteins),
+            ranks=(
+                ([ranking.position()[f] for f in pair_common],
+                 [right_ranking.position()[f] for f in pair_common])
+                if pair is not None else None
+            ),
+            shared_at_k=pair.overlap_at_k if pair else None,
+            spearman=pair.spearman if pair else None,
+            k=args.top_k,
+            ablation=ablation.to_dict() if ablation else None,
+            outcome=outcome_payload,
+        )
+        if not figures:
+            print("NOTE: matplotlib is not installed, so no figures were written.")
+
     _write_summary(eval_dir / "summary.md", result, run_id=run_dir.name,
                    dry_run=args.dry_run, ablation=ablation, pair=pair,
                    outcomes=outcomes if outcome_result else None,
@@ -514,6 +548,8 @@ def run(args: argparse.Namespace) -> int:
         f"cut {'splits' if result.ties.cut_inside_tie_block else 'does not split'} a tie block.\n"
         f"wrote {eval_dir}/summary.md"
     )
+    if figures:
+        print(f"figures: {len(figures)} files in {eval_dir}/figures")
     if outcome_result is not None:
         om = outcome_result.measured
         print(
@@ -570,6 +606,8 @@ def build_parser() -> argparse.ArgumentParser:
     )
     parser.add_argument("--seed", type=int, default=RANDOM_SEED,
                         help=f"seed for the random baseline (default: {RANDOM_SEED})")
+    parser.add_argument("--figures", action="store_true",
+                        help="also write PNG/SVG figures (needs matplotlib; optional)")
     parser.add_argument("--dry-run", action="store_true",
                         help="use the committed evaluation fixture; no network, no credentials")
     return parser

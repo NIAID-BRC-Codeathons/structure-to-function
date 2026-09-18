@@ -10,6 +10,26 @@ before anyone touches a weight, and give the project a scoreboard it can quote.
 Outputs land in `runs/<run_id>/eval/`: `metrics.json`, `truth_matches.tsv`, `summary.md`
 (short enough to paste into an issue), and `run.json`. Three more appear as the pipeline
 stages they depend on become available: `ablation.json`, `outcome.json`, `agreement.json`.
+`--figures` adds PNG and SVG under `eval/figures/` (needs matplotlib; a missing figure
+never fails a run).
+
+## Figures
+
+One claim each, so any of them can go into a slide alone.
+
+| file | claim |
+| --- | --- |
+| `seq_cap_loss` | M1's cap retains 72% of all proteins but only 42% of the hypothetical ones |
+| `score_disagreement` | `m1_priority` rank against `triage` rank; 3 of 50 shared at the cut |
+| `triage_ablation` | `annotation_gap` moves 41 of the top 50, more than `pdb_evidence` |
+| `outcome_lift` | precision 100% beside a 99.3% base rate — the label is not a test |
+
+Colour is two slots from a validated categorical palette, checked with the palette
+validator in both light and dark modes for lightness band, chroma floor, CVD separation,
+normal-vision separation and surface contrast. Identity never rests on colour alone: every
+series is direct-labelled, and a component whose provider never ran is drawn as a hatched
+ghost with the words "not measured" rather than as a zero-length bar, because "we did not
+measure this" and "we measured zero" are different claims and the chart must not merge them.
 
 ## Four measurements, three of which need no curation
 
@@ -280,6 +300,40 @@ headline 100% is not evidence that `triage` selects well. Two reasons, both wort
    ablation is the non-circular part: only `pdb_evidence` has a nonzero Δ against this
    label (−5.3 pp), which says the other seven components contribute nothing to whether a
    pick turns out dockable.
+
+### The seam defect: M1's cap removes the population M2 exists to find
+
+Not visible from inside either module, which is the argument for measuring across them.
+
+`--seq-cap` defaults to 4,000 and truncates **by `m1_priority` rank** — deliberately, with
+a code comment explaining that this beats truncating by position on the chromosome. That
+reasoning is right. But `m1_priority` scores a hypothetical protein **0**: no gene name, no
+mechanism keyword, no specialty hit. So hypothetical proteins sort to the bottom and are
+cut first, and M2's `annotation_gap` then pays 0.30 for exactly that property.
+
+| | |
+| --- | --- |
+| gap-like proteins in the genome | 1,333 of 5,523 |
+| reached M2 | 560 |
+| **never scored at all** | **773 (58%)** |
+| overall drop rate | 28% |
+| enrichment of the drop against gap-like proteins | **2.1×** |
+
+The dropped set is exactly `m1_priority` ranks 4001–5523; every one scored 0 or −2.
+
+Both policies are locally sensible and together they cancel. The project is named
+*Hypothetical Protein and Binding-Evidence Factory*.
+
+**Severity.** This does not fire on the chosen blinded test genome: USA300 is 2,741 CDS,
+under the cap. It fires on *K. pneumoniae* at 5,523 — the genome the pipeline has actually
+been developed against — and on *E. coli* and most Enterobacteriaceae. Chlamydiales, the
+charter's named target at roughly 900 CDS, is also safe. Latent, but real, and it will bite
+the first larger genome.
+
+The fix is small and the choice is the team's: rank for the cap by something that does not
+zero the hypotheticals, exempt gap-like products from truncation, or raise the default.
+`rankings.population_stages` is what measures it, and `GAP_LIKE` there is a *population*
+definition kept deliberately separate from M2's `annotation_gap` scoring component.
 
 ### The finding underneath all three
 
