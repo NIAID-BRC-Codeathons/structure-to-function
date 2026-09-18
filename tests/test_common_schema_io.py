@@ -97,6 +97,10 @@ def test_every_section_has_a_schema() -> None:
     expected = {
         "run", "genome", "proteins", "structures", "kg",
         "ligands", "docking", "analyses", "disease", "report",
+        # The canonical whole-run report, owned by s2f.full_report. Its own key rather
+        # than M6's: one module owns one section, and two renderers sharing a key would
+        # each overwrite the other's record of what it produced.
+        "full_report",
     }
     assert set(SECTION_SCHEMAS) == expected
 
