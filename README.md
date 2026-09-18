@@ -126,7 +126,8 @@ resumes polling a submitted job, `--only m1` / `--skip m2` select stages,
 `--map-ids` and `--kg` turn on M2's id resolution and knowledge graph.
 
 `--ani` turns the Mash distances in `genome.closest_genomes[]` into real identities: it
-downloads each close genome from BV-BRC over HTTPS and runs skani against the assembly.
+downloads each close genome's contigs from the BV-BRC Data API over HTTPS (no `p3-` CLI,
+no token) and runs skani against the assembly.
 It needs the assembly FASTA — a retrieved CGA directory does not contain it — so pass
 `--contigs` or `--ani-query` alongside `--from-cga-dir`. See
 [docs/01-m1-genome.md](docs/01-m1-genome.md#ani-to-the-closest-genomes).

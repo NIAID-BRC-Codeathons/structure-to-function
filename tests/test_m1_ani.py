@@ -22,7 +22,7 @@ from s2f.m1_genome.distances import (
     GENOME_FASTA_URL,
     SkaniError,
     add_ani,
-    fasta_names_in_index,
+    count_fasta_records,
     fetch_reference_fasta,
     parse_skani,
     run_skani,
@@ -77,42 +77,54 @@ def test_an_empty_table_is_no_rows_not_a_failure():
     assert parse_skani(SKANI_TABLE.splitlines()[0]) == []
 
 
-# --- the directory-index fallback -------------------------------------------
-
-def test_finds_fasta_names_in_a_directory_index():
-    html = ('<a href="?C=N;O=D">Name</a><a href="/genomes/">Parent</a>'
-            '<a href="243273.25.fna">243273.25.fna</a>'
-            '<a href="243273.25.faa">243273.25.faa</a>'
-            '<a href="243273.25.PATRIC.ffn">ffn</a>')
-    assert fasta_names_in_index(html) == ["243273.25.fna"]
-
-
 # --- the download layer -----------------------------------------------------
 
+def test_counts_fasta_records():
+    assert count_fasta_records(b">a\nACGT\n>b\nACGT\n") == 2
+    assert count_fasta_records(b"") == 0
+
+
 class FakeResponse:
-    def __init__(self, body: bytes | None, status: int = 200) -> None:
+    def __init__(self, body: bytes | None, status: int = 200,
+                 headers: dict | None = None, rows=None) -> None:
         self.content = body or b""
         self.status_code = status
-        self.headers: dict[str, str] = {}
+        self.headers = headers or {}
         self.text = ""
+        self._rows = rows
 
     @property
     def ok(self) -> bool:
         return self.status_code < 400
 
+    def json(self):
+        return self._rows
 
-class FakeFtp:
-    """ftp.bvbrc.org, serving whatever `files` says and 404 for everything else."""
 
-    def __init__(self, files: dict[str, bytes]) -> None:
-        self.files = files
+class FakeApi:
+    """The BV-BRC Data API: a FASTA route and a Content-Range count route per genome.
+
+    `genomes` maps a genome id to (fasta bytes, contig total as Content-Range reports it).
+    A total of None stands for `items 0-0/*` — legal, and means "total unknown". A genome
+    id that is absent answers 200 with an empty body, which is what the real API does.
+    """
+
+    def __init__(self, genomes: dict[str, tuple[bytes, int | None]]) -> None:
+        self.genomes = genomes
         self.calls: list[str] = []
         self.headers: dict[str, str] = {}
 
     def get(self, url, params=None, timeout=None, headers=None):
         self.calls.append(url)
-        body = self.files.get(url)
-        return FakeResponse(body) if body is not None else FakeResponse(None, 404)
+        gid = url.split("eq(genome_id,")[1].split(")")[0]
+        fasta, total = self.genomes.get(gid, (b"", 0))
+        if "http_accept=" in url:
+            return FakeResponse(fasta)
+        span = "0-0" if total else "0--1"
+        return FakeResponse(b"[]", rows=[],
+                            headers={"Content-Range": f"items {span}/{total}"}
+                            if total is not None else
+                            {"Content-Range": "items 0-0/*"})
 
 
 def make_client(session, tmp_path: Path, *, offline: bool = False) -> CachedJsonClient:
@@ -120,26 +132,38 @@ def make_client(session, tmp_path: Path, *, offline: bool = False) -> CachedJson
                             offline=offline, min_interval_seconds=0, sleep=lambda _: None)
 
 
-def test_downloads_a_reference_genome_to_a_readable_name(tmp_path):
-    url = GENOME_FASTA_URL.format(gid="243273.25")
-    session = FakeFtp({url: b">contig_1\nACGT\n"})
-    path, provenance = fetch_reference_fasta(
-        make_client(session, tmp_path), "243273.25",
-        genomes_dir=tmp_path / "m1" / "genomes", cache_dir=tmp_path / "cache")
+def fetch(session, tmp_path: Path, gid: str):
+    return fetch_reference_fasta(make_client(session, tmp_path), gid,
+                                 genomes_dir=tmp_path / "m1" / "genomes",
+                                 cache_dir=tmp_path / "cache")
 
-    # skani's output table names the reference by file path, so the file has to be
-    # named for the genome and not for a cache hash.
+
+def test_downloads_a_reference_genome_to_a_readable_name(tmp_path):
+    session = FakeApi({"243273.25": (b">contig_1\nACGT\n", 1)})
+    path, provenance = fetch(session, tmp_path, "243273.25")
+
+    # skani's output table names the reference by file path, so the file has to be named
+    # for the genome and not for a cache hash.
     assert path.name == "243273.25.fna"
     assert path.read_bytes() == b">contig_1\nACGT\n"
-    assert provenance["url"] == url and provenance["retrieved_at"]
-    assert "error" not in provenance
+    assert provenance["contigs"] == 1 and provenance["contigs_expected"] == 1
+    assert provenance["retrieved_at"] and "error" not in provenance
+
+
+def test_the_recorded_url_is_the_data_api_and_reproduces_the_bytes(tmp_path):
+    """ftp.bvbrc.org serves FTP only, so the download moved to the Data API. The URL is
+    recorded whole, `http_accept` included, so pasting it returns the same FASTA."""
+    _, provenance = fetch(FakeApi({"243273.25": (b">c\nACGT\n", 1)}), tmp_path, "243273.25")
+    assert provenance["url"] == GENOME_FASTA_URL.format(gid="243273.25")
+    assert "www.bv-brc.org/api/genome_sequence" in provenance["url"]
+    assert "http_accept=application/dna+fasta" in provenance["url"]
+    assert "ftp.bvbrc.org" not in provenance["url"]
 
 
 def test_a_second_run_does_not_re_download(tmp_path):
-    url = GENOME_FASTA_URL.format(gid="243273.25")
-    session = FakeFtp({url: b">contig_1\nACGT\n"})
-    args = dict(genomes_dir=tmp_path / "m1" / "genomes", cache_dir=tmp_path / "cache")
+    session = FakeApi({"243273.25": (b">contig_1\nACGT\n", 1)})
     client = make_client(session, tmp_path)
+    args = dict(genomes_dir=tmp_path / "m1" / "genomes", cache_dir=tmp_path / "cache")
     fetch_reference_fasta(client, "243273.25", **args)
     calls = len(session.calls)
     path, provenance = fetch_reference_fasta(client, "243273.25", **args)
@@ -147,34 +171,42 @@ def test_a_second_run_does_not_re_download(tmp_path):
     assert path.exists()
 
 
-def test_falls_back_to_the_directory_index_when_the_documented_name_is_missing(tmp_path):
-    index = "https://ftp.bvbrc.org/genomes/999.9/"
-    session = FakeFtp({
-        index: b'<a href="999.9.renamed.fna">999.9.renamed.fna</a>',
-        index + "999.9.renamed.fna": b">contig_1\nACGT\n",
-    })
-    path, provenance = fetch_reference_fasta(
-        make_client(session, tmp_path), "999.9",
-        genomes_dir=tmp_path / "m1" / "genomes", cache_dir=tmp_path / "cache")
-    assert path is not None and path.name == "999.9.fna"
-    assert provenance["url"].endswith("999.9.renamed.fna")
-
-
-def test_a_missing_genome_records_why_and_returns_no_path(tmp_path):
-    path, provenance = fetch_reference_fasta(
-        make_client(FakeFtp({}), tmp_path), "999.9",
-        genomes_dir=tmp_path / "m1" / "genomes", cache_dir=tmp_path / "cache")
+def test_an_unknown_genome_id_answers_200_with_an_empty_body(tmp_path):
+    """The Data API does not 404. Failure has to be read off the body."""
+    path, provenance = fetch(FakeApi({}), tmp_path, "999999.9")
     assert path is None
-    assert "404" in provenance["error"]
+    assert "no sequence returned" in provenance["error"]
+    assert "999999.9" in provenance["error"]
 
 
 def test_a_body_that_is_not_fasta_is_rejected(tmp_path):
     """An HTML error page served with a 200 must not become a reference genome."""
-    url = GENOME_FASTA_URL.format(gid="243273.25")
-    path, provenance = fetch_reference_fasta(
-        make_client(FakeFtp({url: b"<html>not found</html>"}), tmp_path), "243273.25",
-        genomes_dir=tmp_path / "m1" / "genomes", cache_dir=tmp_path / "cache")
-    assert path is None and "did not return FASTA" in provenance["error"]
+    path, provenance = fetch(FakeApi({"243273.25": (b"<html>oops</html>", 1)}),
+                             tmp_path, "243273.25")
+    assert path is None and "no sequence returned" in provenance["error"]
+
+
+def test_a_truncated_reference_is_refused(tmp_path):
+    """The API pages at 25 rows. A reference missing contigs deflates ANI silently, so a
+    short download is refused rather than used."""
+    fasta = b"".join(b">c%d\nACGT\n" % i for i in range(25))
+    path, provenance = fetch(FakeApi({"243273.27": (fasta, 40)}), tmp_path, "243273.27")
+    assert path is None
+    assert "truncated" in provenance["error"]
+    assert "25 contigs downloaded, 40 in BV-BRC" in provenance["error"]
+
+
+def test_a_complete_multi_contig_reference_is_accepted(tmp_path):
+    fasta = b"".join(b">c%d\nACGT\n" % i for i in range(25))
+    path, provenance = fetch(FakeApi({"243273.27": (fasta, 25)}), tmp_path, "243273.27")
+    assert path is not None and provenance["contigs"] == 25
+
+
+def test_an_unknown_total_does_not_reject_the_download(tmp_path):
+    """`items 0-0/*` is legal and means the total is unknown — not a mismatch."""
+    path, provenance = fetch(FakeApi({"243273.25": (b">c\nACGT\n", None)}),
+                             tmp_path, "243273.25")
+    assert path is not None and provenance["contigs_expected"] is None
 
 
 # --- the step ---------------------------------------------------------------
@@ -210,8 +242,7 @@ def stub_skani(tmp_path):
 
 
 def genome_server(gids):
-    return FakeFtp({GENOME_FASTA_URL.format(gid=g): f">{g}\nACGT\n".encode()
-                    for g in gids})
+    return FakeApi({g: (f">{g}\nACGT\n".encode(), 1) for g in gids})
 
 
 CLOSEST = [
@@ -229,7 +260,7 @@ def test_writes_ani_onto_each_row_and_flags_the_self_match(tmp_path, stub_skani)
     assert [row["ani"] for row in rows] == [99.99, 99.48, 87.41]
     assert [row["self_match"] for row in rows] == [True, False, False]
     assert all(row["ani_source"] == "skani" for row in rows)
-    assert rows[0]["ani_reference_url"].endswith("243273.9999.fna")
+    assert "eq(genome_id,243273.9999)" in rows[0]["ani_reference_url"]
     assert meta["self_match"]["genome_id"] == "243273.9999"
     # Issue #7: the self-match is reported, and it is not the only row.
     assert meta["non_self_with_ani"] == 2
@@ -254,13 +285,13 @@ def test_a_pair_below_min_af_gets_no_number_and_a_reason(tmp_path, stub_skani):
     assert meta["genomes_with_ani"] == 2
 
 
-def test_a_genome_that_will_not_download_records_the_http_error(tmp_path, stub_skani):
+def test_a_genome_bvbrc_will_not_serve_records_why(tmp_path, stub_skani):
     served = [row["genome_id"] for row in CLOSEST[:2]]
     rows, meta = add_ani(CLOSEST, MGEN,
                          client=make_client(genome_server(served), tmp_path),
                          run_dir=tmp_path, exe=stub_skani())
     assert rows[2]["ani"] is None
-    assert "404" in meta["no_ani_reason"]["662945.8741"]
+    assert "no sequence returned" in meta["no_ani_reason"]["662945.8741"]
     assert meta["genomes_fetched"] == 2
 
 

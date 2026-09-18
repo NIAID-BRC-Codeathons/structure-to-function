@@ -54,10 +54,33 @@ python -m s2f.m1_genome --run runs/<id> --from-cga-dir data/<cga> \
     --contigs <the assembly that was submitted>.fna --ani
 ```
 
-It downloads each closest genome's contigs from `https://ftp.bvbrc.org/genomes/<id>/<id>.fna`
-— plain HTTPS, no `p3-` CLI and no token — caches them under `<run>/cache/` with a readable
-copy in `<run>/m1/genomes/`, and runs `skani dist` against the assembly. A second run makes
-no network calls; `--offline` replays the cache and fails on a miss.
+It downloads each closest genome's contigs from the BV-BRC **Data API** — plain HTTPS, no
+`p3-` CLI and no token — caches them under `<run>/cache/` with a readable copy in
+`<run>/m1/genomes/<genome_id>.fna`, and runs `skani dist` against the assembly. A second
+run makes no network calls; `--offline` replays the cache and fails on a miss.
+
+```
+https://www.bv-brc.org/api/genome_sequence/?eq(genome_id,<id>)&limit(10000)&http_accept=application/dna+fasta
+```
+
+**Not `ftp.bvbrc.org`.** That host resolves (140.221.78.70) but refuses both port 80 and
+port 443 — it serves FTP only. Checked from lambda0 on 2026-09-18: `curl` returns
+`Connection refused` in under 3 ms, while `www.bv-brc.org/api` answers 200. `http_accept`
+is passed as a query parameter rather than an `Accept` header so the URL recorded in
+`ani.json` is pasteable and reproduces the exact bytes. For `243273.25` it returns 589,848
+bytes in one record, byte-identical to `fixtures/genomes/mgen_G37/mgen_G37.fna` — which is
+where that fixture came from.
+
+Two Data API behaviours the code has to handle, and an FTP server would not have:
+
+- **An unknown genome id answers `200` with an empty body**, not `404`. Whether a download
+  worked is therefore decided from the body, never from the status code.
+- **A truncated result looks exactly like a complete one.** The API pages at 25 rows and
+  `limit()` did not visibly raise that in testing, so after each download the record count
+  is checked against the `Content-Range` total from a one-row companion query. A short
+  FASTA is refused with a recorded reason rather than used — half a reference genome
+  yields a plausible, wrong ANI and fails nothing. A `Content-Range` of `items 0-0/*`
+  means the total is unknown, which is not a mismatch and does not reject the download.
 
 **It needs the assembly FASTA.** A retrieved CGA directory contains an annotated genome and
 a tree but not the contigs that were submitted, so `--from-cga-dir` runs must pass

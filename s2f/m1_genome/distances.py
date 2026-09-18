@@ -43,14 +43,21 @@ from typing import Any, Iterable, Sequence
 
 from ..common.http import HttpError, OfflineCacheMiss
 
-#: BV-BRC publishes one directory of derived files per genome id over plain HTTPS. No
-#: `p3-` CLI and no token are needed, which is what lets the ANI step run on a node that
-#: has never seen `p3-login` (`p3-genome-fasta` is used when it is present, see
-#: `fetch_reference_fasta`).
-GENOME_DIR_URL = "https://ftp.bvbrc.org/genomes/{gid}"
-GENOME_FASTA_URL = GENOME_DIR_URL + "/{gid}.fna"
+#: Reference genomes come from the BV-BRC Data API, not from `ftp.bvbrc.org`. That host
+#: resolves (140.221.78.70) but refuses both 80 and 443, so it serves FTP only; the Data
+#: API answers over HTTPS, needs no `p3-` CLI and no token, and is the same host the rest
+#: of M1 already talks to. `http_accept` is a query parameter rather than a request
+#: header so the recorded provenance URL is pasteable and reproduces the exact bytes.
+#:
+#: Verified 2026-09-18 from lambda0: `243273.25` returns 589,848 bytes in one record,
+#: byte-identical to `fixtures/genomes/mgen_G37/mgen_G37.fna`.
+BASE = "https://www.bv-brc.org/api"
+GENOME_FASTA_URL = (BASE + "/genome_sequence/?eq(genome_id,{gid})"
+                    "&limit(10000)&http_accept=application/dna+fasta")
+#: One row of the same query, used only for its `Content-Range` total: the authoritative
+#: contig count, which the downloaded FASTA is checked against.
+GENOME_COUNT_URL = BASE + "/genome_sequence/?eq(genome_id,{gid})&select(sequence_id)"
 
-#: Cache namespace for downloaded reference genomes, under `runs/<id>/cache/`.
 NAMESPACE = "bvbrc_genome_fna"
 
 DEFAULT_MAX_GENOMES = 10
@@ -174,17 +181,12 @@ def run_skani(query: str | Path, references: Sequence[str | Path], *,
 
 # --- reference genomes ------------------------------------------------------
 
-_HREF = re.compile(r'href=["\']([^"\']+\.fna)["\']', re.IGNORECASE)
+_DEFLINE = re.compile(rb"^>", re.MULTILINE)
 
 
-def fasta_names_in_index(html: str) -> list[str]:
-    """Filenames ending `.fna` in an Apache-style directory index."""
-    names: list[str] = []
-    for href in _HREF.findall(html):
-        name = href.rsplit("/", 1)[-1]
-        if name and name not in names:
-            names.append(name)
-    return names
+def count_fasta_records(payload: bytes) -> int:
+    """How many `>` records a FASTA body contains."""
+    return len(_DEFLINE.findall(payload))
 
 
 def _looks_like_fasta(payload: bytes) -> bool:
@@ -197,72 +199,86 @@ def _short(exc: BaseException, limit: int = 160) -> str:
     return text if len(text) <= limit else text[:limit].rstrip() + " …"
 
 
+def expected_contig_count(client, gid: str, *, cache_dir: Path | None = None) -> int | None:
+    """The genome's contig count from `Content-Range`, or None if it cannot be read.
+
+    One row is requested and discarded; only the result-set total is wanted. This exists
+    because the FASTA route gives no way to tell a complete download from a truncated one:
+    the Data API pages at 25 rows by default, `limit()` did not visibly raise it in
+    testing, and a reference missing contigs would deflate every ANI computed against it
+    without failing anything.
+
+    None means "could not be checked", which is not the same as a mismatch and does not
+    reject the download — `items 0-24/*` is a legal answer meaning the total is unknown.
+    """
+    url = GENOME_COUNT_URL.format(gid=gid)
+    try:
+        envelope = client.get_envelope(NAMESPACE + "_count", url,
+                                       headers={"Range": "items=0-0"})
+    except (HttpError, OfflineCacheMiss, OSError, ValueError):
+        return None
+    raw = str((envelope.get("headers") or {}).get("content-range", ""))
+    match = re.search(r"/\s*(\d+)\s*$", raw)
+    return int(match.group(1)) if match else None
+
+
 def fetch_reference_fasta(client, gid: str, *, genomes_dir: Path, cache_dir: Path,
                           ) -> tuple[Path | None, dict[str, Any]]:
     """Get one BV-BRC genome's contigs as a local FASTA, cached.
 
     The named copy under ``genomes_dir`` is what skani is handed: the shared HTTP cache
-    stores bodies under a hash of the URL, and a tool that reads a file called
-    ``a3f9…`` gives an output table nobody can read. The named copy is hard-linked to
-    the cached body where the filesystem allows it, so the bytes are stored once.
+    stores bodies under a hash of the URL, and a tool that reads a file called ``a3f9…``
+    gives an output table nobody can read. The named copy is hard-linked to the cached
+    body where the filesystem allows it, so the bytes are stored once.
 
-    ``<gid>.fna`` is the documented layout, and a directory index is read only if that
-    404s — a layout change should cost one extra request, not the run.
+    Two failure modes the Data API has and an FTP server does not, both handled here:
+
+    * **An unknown genome id answers 200 with an empty body**, not 404. So "did the
+      download work" cannot be read off the status code and is decided from the body.
+    * **A truncated result is indistinguishable from a complete one.** The record count is
+      checked against `Content-Range`, and a short FASTA is refused rather than silently
+      used — half a reference genome produces a plausible, wrong ANI.
     """
-    provenance: dict[str, Any] = {"genome_id": gid, "url": GENOME_FASTA_URL.format(gid=gid)}
+    url = GENOME_FASTA_URL.format(gid=gid)
+    provenance: dict[str, Any] = {"genome_id": gid, "url": url}
     target = genomes_dir / f"{gid}.fna"
     if target.exists() and target.stat().st_size > 0:
         provenance["from_cache"] = True
+        provenance["contigs"] = count_fasta_records(target.read_bytes())
         return target, provenance
 
     genomes_dir.mkdir(parents=True, exist_ok=True)
-    errors: list[str] = []
+    expected = expected_contig_count(client, gid, cache_dir=cache_dir)
+    provenance["contigs_expected"] = expected
 
-    def attempt(url: str):
-        try:
-            body = client.get_file(NAMESPACE, url, cache_dir=cache_dir)
-        except (HttpError, OfflineCacheMiss, OSError) as exc:
-            # Truncated: a 404 from an HTTP server carries its whole error page, and
-            # `ani.json` is meant to be read.
-            errors.append(f"{url}: {type(exc).__name__}: {_short(exc)}")
-            return None
-        if not _looks_like_fasta(body.content):
-            errors.append(f"{url} did not return FASTA "
-                          f"(first bytes {body.content[:20]!r})")
-            return None
-        provenance["url"] = url
-        return body
-
-    downloaded = attempt(GENOME_FASTA_URL.format(gid=gid))
-    if downloaded is None:
-        alternative = _index_fallback(client, gid, cache_dir=cache_dir, errors=errors)
-        if alternative:
-            downloaded = attempt(alternative)
-
-    if downloaded is None:
-        joined = "; ".join(errors) or "no reference FASTA retrieved"
-        provenance["error"] = joined if len(joined) <= 300 else joined[:300].rstrip() + " …"
+    try:
+        downloaded = client.get_file(NAMESPACE, url, cache_dir=cache_dir)
+    except (HttpError, OfflineCacheMiss, OSError) as exc:
+        provenance["error"] = f"{type(exc).__name__}: {_short(exc)}"
         return None, provenance
 
-    cached_path = _cached_body_path(cache_dir, NAMESPACE, client, provenance["url"])
-    _link_or_write(cached_path, target, downloaded.content)
+    payload = downloaded.content
+    if not _looks_like_fasta(payload):
+        provenance["error"] = (
+            f"no sequence returned for genome id {gid} "
+            f"({len(payload)} bytes; the Data API answers 200 with an empty body for a "
+            f"genome id it does not hold)")
+        return None, provenance
+
+    contigs = count_fasta_records(payload)
+    provenance["contigs"] = contigs
+    if expected is not None and contigs != expected:
+        provenance["error"] = (
+            f"truncated reference: {contigs} contigs downloaded, {expected} in BV-BRC. "
+            f"Refusing it — a reference missing contigs deflates ANI without failing.")
+        return None, provenance
+
+    cached_path = _cached_body_path(cache_dir, NAMESPACE, client, url)
+    _link_or_write(cached_path, target, payload)
     provenance["retrieved_at"] = downloaded.retrieved_at.isoformat()
     provenance["from_cache"] = downloaded.from_cache
-    provenance["bytes"] = len(downloaded.content)
+    provenance["bytes"] = len(payload)
     return target, provenance
-
-
-def _index_fallback(client, gid: str, *, cache_dir: Path,
-                    errors: list[str]) -> str | None:
-    """The first `.fna` in the genome's directory index, if there is one."""
-    index_url = GENOME_DIR_URL.format(gid=gid) + "/"
-    try:
-        body = client.get_file(NAMESPACE, index_url, cache_dir=cache_dir).content
-    except (HttpError, OfflineCacheMiss, OSError) as exc:
-        errors.append(f"directory index: {type(exc).__name__}: {_short(exc)}")
-        return None
-    names = fasta_names_in_index(body.decode("utf-8", "replace"))
-    return index_url + names[0] if names else None
 
 
 def _cached_body_path(cache_dir: Path, namespace: str, client, url: str) -> Path:
