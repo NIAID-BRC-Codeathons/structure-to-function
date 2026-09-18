@@ -276,9 +276,55 @@ def render_tree_svg(tree: dict[str, Any], width: int = 900) -> str:
     return "".join(parts)
 
 
+def _wrap_svg_text(text: Any, width_px: float, font_size: float,
+                   max_lines: int = 3) -> list[str]:
+    """Greedy word wrap for SVG, which has no line breaking of its own.
+
+    Character widths are estimated from the font size, because nothing here can measure
+    rendered text, so the factor is deliberately generous: over-estimating costs a little
+    whitespace, while under-estimating is what let protein identifiers run out of their box
+    and across the next column. Tokens longer than a whole line — `fig|2097.118.peg.522`
+    against a narrow box — are hyphenated rather than allowed to overflow.
+    """
+    text = str(text or "").strip()
+    if not text:
+        return []
+    budget = max(8, int(width_px / (font_size * 0.58)))
+    words = text.split()
+    lines: list[str] = []
+    current = ""
+    index = 0
+    while index < len(words) and len(lines) < max_lines:
+        word = words[index]
+        if len(word) > budget and not current:
+            lines.append(word[:budget - 1] + "-")
+            words[index] = word[budget - 1:]
+            continue
+        candidate = f"{current} {word}".strip()
+        if len(candidate) <= budget:
+            current = candidate
+            index += 1
+        elif current:
+            lines.append(current)
+            current = ""
+        else:
+            index += 1
+    if current and len(lines) < max_lines:
+        lines.append(current)
+        current = ""
+    if lines and (index < len(words) or current):
+        lines[-1] = lines[-1][:max(1, budget - 1)].rstrip(" ,;-") + "\u2026"
+    return lines
+
+
 def pathogenesis_flow_svg(priorities: list[dict[str, Any]],
                           disease_profile: dict[str, Any], width: int = 940) -> str:
-    """Mechanism -> host effect -> disease, as three linked columns."""
+    """Mechanism -> host effect -> disease, as three linked columns.
+
+    Every box is sized from its own wrapped content and the rows are laid out from those
+    heights, because a fixed 48px box with unwrapped text overflowed into the next column
+    on any genome whose protein identifiers were long.
+    """
     counts: dict[str, int] = {}
     examples: dict[str, list[str]] = {}
     for record in priorities:
@@ -295,27 +341,69 @@ def pathogenesis_flow_svg(priorities: list[dict[str, Any]],
         return ('<p class="muted">No host-interaction mechanisms were detected from this '
                 'annotation.</p>')
 
-    col1_x, col2_x, col3_x = 40, 360, 660
-    w1, w2, w3 = 240, 220, 240
-    top = 70
-    gap = max(64, int(380 / len(present)))
-    height = max(top + gap * len(present) + 60, 260)
-    outcomes = (disease_profile.get("diseases")
-                or disease_profile.get("bvbrc_disease") or ["Disease outcome"])[:5]
+    col1_x, col2_x, col3_x = 40, 330, 630
+    w1, w2, w3 = 250, 240, 270
+    top, row_gap = 70, 24
+    pad_x, title_size, sub_size = 12, 13, 11
+    title_leading, sub_leading = 17, 14
 
-    def box(x: int, y: int, w: int, h: int, fill: str, stroke: str, title: str,
-            sub: str = "", tip: str = "") -> str:
+    def box(x: int, w: int, fill: str, stroke: str, title: str, sub: str = "",
+            tip: str = "", title_fill: str = "#0f172a",
+            sub_fill: str = "#475569") -> tuple[str, int]:
+        """One rounded box drawn at y=0; the caller translates it into place."""
+        title_lines = _wrap_svg_text(title, w - 2 * pad_x, title_size, max_lines=2)
+        sub_lines = _wrap_svg_text(sub, w - 2 * pad_x, sub_size, max_lines=3)
+        height = (14 + title_leading * len(title_lines)
+                  + (6 + sub_leading * len(sub_lines) if sub_lines else 0) + 10)
         out = "<g>"
         if tip:
             out += f"<title>{esc(tip)}</title>"
-        out += (f'<rect x="{x}" y="{y}" width="{w}" height="{h}" rx="9" fill="{fill}" '
+        out += (f'<rect x="{x}" y="0" width="{w}" height="{height}" rx="9" fill="{fill}" '
                 f'stroke="{stroke}" stroke-width="1.5"/>')
-        out += (f'<text x="{x + 12}" y="{y + 22}" font-size="13" font-weight="600" '
-                f'fill="#0f172a">{esc(title)}</text>')
-        if sub:
-            out += (f'<text x="{x + 12}" y="{y + 40}" font-size="11" fill="#475569">'
-                    f'{esc(sub)}</text>')
-        return out + "</g>"
+        cursor = 22
+        for line in title_lines:
+            out += (f'<text x="{x + pad_x}" y="{cursor}" font-size="{title_size}" '
+                    f'font-weight="600" fill="{title_fill}">{esc(line)}</text>')
+            cursor += title_leading
+        cursor += 4
+        for line in sub_lines:
+            out += (f'<text x="{x + pad_x}" y="{cursor}" font-size="{sub_size}" '
+                    f'fill="{sub_fill}">{esc(line)}</text>')
+            cursor += sub_leading
+        return out + "</g>", height
+
+    rows = []
+    for category in present:
+        colour = CAT_COLOR[category]
+        left, left_h = box(
+            col1_x, w1, colour + "20", colour,
+            f"{CAT_LABEL[category]} ({counts[category]})",
+            "e.g. " + ", ".join(examples[category][:4]),
+            tip="Proteins: " + ", ".join(examples[category]),
+        )
+        right, right_h = box(
+            col2_x, w2, "#f1f5f9", "#94a3b8",
+            CAT_PROCESS.get(category, "Host effect"), CAT_EFFECT[category],
+        )
+        rows.append((colour, left, left_h, right, right_h))
+
+    positions: list[int] = []
+    cursor = top
+    for _colour, _left, left_h, _right, right_h in rows:
+        positions.append(cursor)
+        cursor += max(left_h, right_h) + row_gap
+    rows_bottom = cursor - row_gap
+
+    outcomes = (disease_profile.get("diseases")
+                or disease_profile.get("bvbrc_disease") or ["Disease outcome"])[:5]
+    species_lines = _wrap_svg_text(disease_profile.get("species", ""),
+                                   w3 - 2 * pad_x, title_size, max_lines=2)
+    outcome_lines = [_wrap_svg_text(outcome, w3 - 2 * pad_x - 10, sub_size, max_lines=2)
+                     for outcome in outcomes]
+    panel_h = (14 + title_leading * len(species_lines) + 6
+               + sum(sub_leading * len(lines) for lines in outcome_lines) + 12)
+    panel_y = max(top, int(top + (rows_bottom - top) / 2 - panel_h / 2))
+    height = max(rows_bottom, panel_y + panel_h) + 30
 
     parts = [
         f'<svg viewBox="0 0 {width} {height}" xmlns="http://www.w3.org/2000/svg" '
@@ -325,42 +413,39 @@ def pathogenesis_flow_svg(priorities: list[dict[str, Any]],
     ]
     for x, label in [(col1_x, "Virulence mechanism (proteins found)"),
                      (col2_x, "Effect on the host"),
-                     (col3_x, "Disease & symptoms")]:
+                     (col3_x, "Disease &amp; symptoms")]:
         parts.append(f'<text x="{x}" y="40" font-size="12.5" font-weight="700" '
-                     f'fill="#334155">{esc(label)}</text>')
+                     f'fill="#334155">{label}</text>')
 
-    panel_h = 46 + 16 * len(outcomes)
-    panel_y = top + (gap * len(present)) / 2 - panel_h / 2
-    for index, category in enumerate(present):
-        y = top + index * gap
-        colour = CAT_COLOR[category]
-        parts.append(box(col1_x, y, w1, 48, colour + "20", colour,
-                         f"{CAT_LABEL[category]}  ({counts[category]})",
-                         "e.g. " + ", ".join(examples[category][:4]),
-                         tip="Proteins: " + ", ".join(examples[category])))
-        effect = CAT_EFFECT[category]
-        parts.append(box(col2_x, y, w2, 48, "#f1f5f9", "#94a3b8",
-                         CAT_PROCESS.get(category, "Host effect"),
-                         effect[:46] + ("…" if len(effect) > 46 else "")))
-        ax, ay = col1_x + w1, y + 24
-        bx, by = col2_x, y + 24
-        parts.append(f'<path d="M{ax},{ay} C{ax + 40},{ay} {bx - 40},{by} {bx},{by}" '
-                     f'fill="none" stroke="{colour}" stroke-width="2" opacity="0.8"/>')
-        cx, cy = col2_x + w2, y + 24
-        dx, dy = col3_x, panel_y + panel_h / 2
-        parts.append(f'<path d="M{cx},{cy} C{cx + 50},{cy} {dx - 50},{dy} {dx},{dy}" '
+    panel_mid = panel_y + panel_h / 2
+    for (colour, left, left_h, right, right_h), y in zip(rows, positions):
+        parts.append(f'<g transform="translate(0,{y})">{left}</g>')
+        parts.append(f'<g transform="translate(0,{y})">{right}</g>')
+        ay, by = y + left_h / 2, y + right_h / 2
+        parts.append(f'<path d="M{col1_x + w1},{ay:.1f} C{col1_x + w1 + 40},{ay:.1f} '
+                     f'{col2_x - 40},{by:.1f} {col2_x},{by:.1f}" fill="none" '
+                     f'stroke="{colour}" stroke-width="2" opacity="0.8"/>')
+        cy = y + right_h / 2
+        parts.append(f'<path d="M{col2_x + w2},{cy:.1f} C{col2_x + w2 + 50},{cy:.1f} '
+                     f'{col3_x - 50},{panel_mid:.1f} {col3_x},{panel_mid:.1f}" '
                      f'fill="none" stroke="#cbd5e1" stroke-width="1.6"/>')
 
-    parts.append(f'<rect x="{col3_x}" y="{panel_y:.0f}" width="{w3}" '
-                 f'height="{panel_h:.0f}" rx="9" fill="#fee2e2" stroke="#b91c1c" '
-                 f'stroke-width="1.6"/>')
-    parts.append(f'<text x="{col3_x + 12}" y="{panel_y + 24:.0f}" font-size="13" '
-                 f'font-weight="700" fill="#7f1d1d">'
-                 f'{esc(disease_profile.get("species", ""))}</text>')
-    for index, outcome in enumerate(outcomes):
-        parts.append(f'<text x="{col3_x + 12}" y="{panel_y + 44 + 16 * index:.0f}" '
-                     f'font-size="11" fill="#7f1d1d">&#8226; '
-                     f'{esc(str(outcome)[:40])}</text>')
+    parts.append(f'<rect x="{col3_x}" y="{panel_y}" width="{w3}" height="{panel_h}" '
+                 f'rx="9" fill="#fee2e2" stroke="#b91c1c" stroke-width="1.6"/>')
+    cursor = panel_y + 22
+    for line in species_lines:
+        parts.append(f'<text x="{col3_x + pad_x}" y="{cursor}" font-size="{title_size}" '
+                     f'font-weight="700" fill="#7f1d1d">{esc(line)}</text>')
+        cursor += title_leading
+    cursor += 4
+    for lines in outcome_lines:
+        for offset, line in enumerate(lines):
+            bullet = "&#8226; " if offset == 0 else ""
+            indent = pad_x if offset == 0 else pad_x + 10
+            parts.append(f'<text x="{col3_x + indent}" y="{cursor}" '
+                         f'font-size="{sub_size}" fill="#7f1d1d">{bullet}{esc(line)}'
+                         f'</text>')
+            cursor += sub_leading
     parts.append("</svg>")
     return "".join(parts)
 
@@ -502,6 +587,25 @@ def build_html(report: dict[str, Any], *, priorities: list[dict[str, Any]],
     quality = _mapping(genome.get("quality"))
     gid = genome.get("genome_id") or ""
     genome_url = genome.get("bvbrc_url") or BVBRC_GENOME_URL.format(gid=gid)
+    # A CGA run's genome id belongs to CGA, not to BV-BRC: 2097.118 is our own submission
+    # and the public site has no page for it, so the obvious link is a dead one. Point at
+    # the record the metadata actually came from, and label it as the relative it is.
+    provenance = _mapping(genome.get("metadata_provenance"))
+    donor_id = str(provenance.get("genome_id") or "")
+    donor_name = provenance.get("genome_name") or donor_id
+    basis = provenance.get("basis")
+    if basis == "relative" and donor_id:
+        genome_link = BVBRC_GENOME_URL.format(gid=donor_id)
+        genome_link_label = f"Open the BV-BRC report for the closest match: {donor_name}"
+        genome_link_note = "closest public match, not this assembly"
+    elif provenance and basis != "this-genome":
+        genome_link = ""
+        genome_link_label = ""
+        genome_link_note = "This assembly has no public BV-BRC record."
+    else:
+        genome_link = genome_url
+        genome_link_label = "Open the live BV-BRC genome report"
+        genome_link_note = ""
     route = genome.get("annotation_route") or ("cga" if genome.get("cga_job_id") else "unknown")
     name = (genome.get("taxonomy") or {}).get("scientific_name") or gid or "genome"
     generated = run.get("created_at") or ""
@@ -537,9 +641,13 @@ def build_html(report: dict[str, Any], *, priorities: list[dict[str, Any]],
             continue
         w(f"<span class='badge'>{esc(key)}: <b>{esc(value)}</b></span>")
     w("</div>")
-    if gid:
-        w(f"<a class='btn' href='{esc(genome_url)}' target='_blank' rel='noopener'>"
-          f"&#128279; Open the live BV-BRC genome report &#8599;</a>")
+    if genome_link:
+        w(f"<a class='btn' href='{esc(genome_link)}' target='_blank' rel='noopener'>"
+          f"&#128279; {esc(genome_link_label)} &#8599;</a>")
+        if genome_link_note:
+            w(f"<span class='muted' style='margin-left:10px'>{esc(genome_link_note)}</span>")
+    elif genome_link_note:
+        w(f"<span class='muted'>{esc(genome_link_note)}</span>")
     w("</header>")
 
     w("<nav class='toc'>")
@@ -774,9 +882,15 @@ def build_html(report: dict[str, Any], *, priorities: list[dict[str, Any]],
     w("</ol></section>")
 
     w("<section id='methods'><h2>Methods, provenance and limitations</h2><ul class='kv'>")
-    w(f"<li><b>Data source:</b> BV-BRC (<a href='{esc(genome_url)}' target='_blank' "
-      f"rel='noopener'>{esc(genome_url)}</a>), route <code>{esc(route)}</code>, "
-      f"accessed {esc(generated)}.</li>")
+    if genome_link:
+        note = f" &mdash; {esc(genome_link_note)}" if genome_link_note else ""
+        w(f"<li><b>Data source:</b> BV-BRC (<a href='{esc(genome_link)}' target='_blank' "
+          f"rel='noopener'>{esc(genome_link)}</a>{note}), route <code>{esc(route)}</code>, "
+          f"accessed {esc(generated)}.</li>")
+    else:
+        w(f"<li><b>Data source:</b> BV-BRC, route <code>{esc(route)}</code>, accessed "
+          f"{esc(generated)}. This assembly has no public BV-BRC record, so there is no "
+          f"genome page to link to.</li>")
     w("<li><b>Annotation:</b> PATRIC/RASTtk CDS calls; protein families PLFam and PGFam.</li>")
     w("<li><b>Specialty genes:</b> CARD and NDARO (resistance); VFDB and Victors "
       "(virulence); BV-BRC essential-gene and drug-target sets.</li>")
