@@ -29,10 +29,6 @@ WEIGHTS = {
     "essential": 0.15,
     "drug_target": 0.15,
     "annotation_gap": 0.30,
-    # Exactly offsets annotation_gap rather than being an independent judgement: a protein whose
-    # function the annotation layer has named nets 0.0, one with only a domain match nets 0.15.
-    # Provisional pending the #51 calibration, which should price the two together.
-    "function_recovered": -0.30,
     "surface_bonus": 0.10,
     "ligandable_homolog": 0.10,
     "membrane_penalty": -0.15,
@@ -43,9 +39,7 @@ WEIGHTS = {
 #: contributes 0 — the same number as "we checked and it is false" — so the two are recorded
 #: separately per protein and summarised per run. Otherwise a missing DeepTMHMM run reads as
 #: "no membrane proteins in this genome" (issue #10's flag_row makes the same distinction).
-OPTIONAL_COMPONENTS = (
-    "surface_bonus", "membrane_penalty", "ligandable_homolog", "function_recovered",
-)
+OPTIONAL_COMPONENTS = ("surface_bonus", "membrane_penalty", "ligandable_homolog")
 
 LIGAND_BONUS = 0.10
 PARTNER_BONUS = 0.05
@@ -70,40 +64,6 @@ CLOSE_HUMAN_HOMOLOG_IDENTITY = 40.0
 #: aminoglycoside liability. Coverage is gated upstream by ``--human-min-coverage`` (default
 #: 0.5), so an identity reaching this check has already passed a coverage floor.
 DISQUALIFYING_HUMAN_HOMOLOG_IDENTITY = 40.0
-
-#: Term kinds that amount to a functional assignment, versus a domain match alone.
-FUNCTION_TERM_KINDS = ("ec", "ko", "cog", "go")
-DOMAIN_TERM_KINDS = ("pfam", "interpro", "signature")
-PARTIAL_FUNCTION_RECOVERY = 0.5
-
-
-def function_recovered_value(protein: Protein, annotation: Any = None) -> float:
-    """How much of a product-string "annotation gap" the annotation layer has since filled.
-
-    ``annotation_gap`` is scored from the BV-BRC product, which is written before any provider
-    runs, so it cannot know that InterProScan has since named the protein. Rather than make
-    ``annotation_gap`` itself depend on annotation — ``test_m2_function`` fixes the invariant
-    that annotation reaches the score only through its own components — the recovery is a
-    component of its own, carrying a negative weight that offsets the gap it has closed.
-
-    Measured on the 2026-09-18 lambda0 G37 run: 91 of the 178 proteins collecting a full
-    ``annotation_gap`` had InterProScan terms, as did 17 of the 34 uncharacterized proteins in
-    the top 50. Those were being paid in full for function we had already recovered.
-
-    1.0  an uncharacterized product that now has an EC/KO/COG/GO assignment
-    0.5  an uncharacterized product with a domain match but no functional assignment
-    0.0  nothing recovered, or nothing to recover
-    """
-    if not protein.is_uncharacterized:
-        return 0.0
-    terms_of = getattr(annotation, "terms_of", None)
-    if terms_of is None:
-        return 0.0
-    if any(terms_of(kind) for kind in FUNCTION_TERM_KINDS):
-        return 1.0
-    if any(terms_of(kind) for kind in DOMAIN_TERM_KINDS):
-        return PARTIAL_FUNCTION_RECOVERY
-    return 0.0
 
 
 def hit_qualifies(hit: SequenceHit) -> bool:
@@ -159,7 +119,6 @@ class TriageComponents:
     essential: float = 0.0
     drug_target: float = 0.0
     annotation_gap: float = 0.0
-    function_recovered: float = 0.0
     surface_bonus: float = 0.0
     ligandable_homolog: float = 0.0
     membrane_penalty: float = 0.0
@@ -291,7 +250,6 @@ def score_protein(
         essential=1.0 if essential else 0.0,
         drug_target=1.0 if protein.is_drug_target else 0.0,
         annotation_gap=1.0 if protein.is_uncharacterized else 0.0,
-        function_recovered=function_recovered_value(protein, annotation),
         surface_bonus=surface_value,
         ligandable_homolog=ligandable,
         membrane_penalty=membrane_value,
@@ -346,7 +304,6 @@ def score_protein(
             "surface_bonus": surface_known,
             "ligandable_homolog": ligandable_known,
             "membrane_penalty": membrane_known,
-            "function_recovered": annotation is not None,
         },
         error=error,
     )
@@ -393,11 +350,6 @@ def _reason(score: ProteinScore) -> str:
         parts.append("known drug target")
     if score.components.annotation_gap:
         parts.append("uncharacterized product")
-    if score.components.function_recovered:
-        parts.append(
-            "function recovered by annotation"
-            + ("" if score.components.function_recovered >= 1.0 else " (domain match only)")
-        )
     if score.components.ligandable_homolog:
         parts.append("ligandable homolog" + (f" ({score.flags.get('ligandable_basis','')})"
                                              if score.flags.get("ligandable_basis") else ""))
