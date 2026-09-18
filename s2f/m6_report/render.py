@@ -19,7 +19,7 @@ from pathlib import Path
 from typing import Any
 
 from ..m1_genome.report_html import (
-    CATEGORIES, _cat_chips, _mapping, _rows, collect_priorities, esc,
+    BVBRC_GENOME_URL, CATEGORIES, _cat_chips, _mapping, _rows, collect_priorities, esc,
     pathogenesis_flow_svg, render_tree_svg, specialty_bar_svg, specialty_counts,
     specialty_labels,
 )
@@ -27,7 +27,7 @@ from ..m1_genome.pathogens import resolve_disease_profile
 
 #: tab id -> (label, what it holds when empty)
 TABS: list[tuple[str, str, str]] = [
-    ("organism", "The organism",
+    ("organism", "Genome Overview",
      "M1 has not run: no genome, growth, phylogeny or disease information."),
     ("genes", "Genes and proteins",
      "M1 has not run: no protein calls to list."),
@@ -56,6 +56,10 @@ header.hero .sub{opacity:.9;font-size:14px}
 .badgebar{margin-top:14px;display:flex;flex-wrap:wrap;gap:8px}
 .badge{background:rgba(255,255,255,.16);border:1px solid rgba(255,255,255,.3);
 padding:4px 10px;border-radius:20px;font-size:12.5px}
+.btn{display:inline-block;background:#fff;color:#0b5cad;font-weight:600;padding:8px 14px;
+border-radius:8px;text-decoration:none;margin-top:14px}
+.btn:hover{background:#eff6ff}
+header.hero .sourcenote{color:rgba(255,255,255,.85);font-size:12.5px;margin-left:10px}
 nav.tabs{position:sticky;top:0;z-index:5;background:#fff;border-bottom:1px solid var(--line);
 padding:0 32px;display:flex;flex-wrap:wrap;gap:20px}
 nav.tabs button{background:none;border:0;border-bottom:2.5px solid transparent;
@@ -698,7 +702,47 @@ def build_page(report: dict[str, Any], m2_run: dict[str, Any] | None = None) -> 
                        ("Structures", tallies["structures"] or None)]:
         if value not in (None, "", "None bp", " "):
             out.append(f"<span class='badge'>{esc(key)}: <b>{esc(value)}</b></span>")
-    out.append("</div></header>")
+    out.append("</div>")
+
+    # The link belongs on the donor when the metadata is borrowed: a CGA run's genome id
+    # is CGA's own and BV-BRC has no page for it, so the obvious link is a dead one.
+    provenance = _mapping(genome.get("metadata_provenance"))
+    basis = provenance.get("basis")
+    donor_id = str(provenance.get("genome_id") or "")
+    donor_name = provenance.get("genome_name") or donor_id
+    if basis == "relative" and donor_id:
+        link = BVBRC_GENOME_URL.format(gid=donor_id)
+        label = f"Open the BV-BRC report for the closest match: {donor_name}"
+        note = "closest public match, not this assembly"
+    elif provenance and basis != "this-genome":
+        link, label, note = "", "", "This assembly has no public BV-BRC record."
+    elif (genome.get("annotation_route")
+          or ("cga" if genome.get("cga_job_id") else "")) == "cga":
+        # A run from before metadata_provenance existed. The genome id is still CGA's, so
+        # fall back to the nearest relative the run does record rather than link to a page
+        # BV-BRC does not have.
+        relatives = [str(row.get("genome_id")) for row in _rows(genome.get("closest_genomes"))
+                     if row.get("genome_id")]
+        relatives += [str(g) for g in (genome.get("tree_ingroup") or []) if g]
+        if relatives:
+            link = BVBRC_GENOME_URL.format(gid=relatives[0])
+            label = f"Open the BV-BRC report for the closest match: {relatives[0]}"
+            note = "closest public match, not this assembly"
+        else:
+            link, label, note = "", "", "This assembly has no public BV-BRC record."
+    elif genome.get("genome_id"):
+        link = genome.get("bvbrc_url") or BVBRC_GENOME_URL.format(gid=genome["genome_id"])
+        label, note = "Open the live BV-BRC genome report", ""
+    else:
+        link, label, note = "", "", ""
+    if link:
+        out.append(f"<a class='btn' href='{esc(link)}' target='_blank' rel='noopener'>"
+                   f"&#128279; {esc(label)} &#8599;</a>")
+        if note:
+            out.append(f"<span class='sourcenote'>{esc(note)}</span>")
+    elif note:
+        out.append(f"<div class='sourcenote' style='margin-top:12px'>{esc(note)}</div>")
+    out.append("</header>")
 
     out.append("<nav class='tabs' role='tablist'>")
     for key, label, _empty_text in TABS:
