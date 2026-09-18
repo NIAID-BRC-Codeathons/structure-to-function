@@ -127,6 +127,11 @@ class EssentialitySearch:
             "diamond_version": self.diamond_version,
             "essential_calls": sum(1 for c in self.calls.values() if c.essential),
             "no_call": sum(1 for c in self.calls.values() if c.status == STATUS_NO_CALL),
+            # Distinguishes "we searched and found no ortholog" from "the search never ran".
+            # Without this an empty reference set reports all-zero and reads as a completed
+            # transfer that found nothing (observed on lambda0, 2026-09-18, with an empty
+            # --essentiality-keyword sending `keyword()` to BV-BRC).
+            "not_run": sum(1 for c in self.calls.values() if c.status == STATUS_NOT_RUN),
             "elapsed_seconds": round(self.elapsed_seconds, 2),
             "caveat": (
                 "FBA essentiality is a metabolic-model prediction, transferred here by homology. "
@@ -145,7 +150,8 @@ def _api_get(client, core: str, rql: str) -> list[dict[str, Any]]:
 def fetch_reference_set(
     client,
     *,
-    keyword: str,
+    keyword: str = "",
+    genome_ids: Sequence[str] = (),
     limit: int = DEFAULT_REFERENCE_LIMIT,
 ) -> list[ReferenceProtein]:
     """FBA-essential proteins from public relatives, with their sequences.
@@ -154,10 +160,14 @@ def fetch_reference_set(
     search. Three calls: the essential-gene rows, the features' sequence checksums, then the
     sequences themselves, batched.
     """
+    if genome_ids:
+        selector = f"in(genome_id,({','.join(genome_ids)}))"
+    else:
+        selector = f"keyword({keyword})"
     rows = _api_get(
         client,
         "sp_gene",
-        f"and(eq(evidence,FBA),keyword({keyword}))"
+        f"and(eq(evidence,FBA),{selector})"
         f"&select(patric_id,genome_id,genome_name,gene,product)&limit({limit})",
     )
     by_id = {r["patric_id"]: r for r in rows if r.get("patric_id")}
@@ -203,6 +213,75 @@ def fetch_reference_set(
             )
         )
     return reference
+
+
+def resolve_reference_set(
+    client,
+    *,
+    keyword: str = "",
+    taxonomy: Any = None,
+    limit: int = DEFAULT_REFERENCE_LIMIT,
+) -> tuple[str, list[ReferenceProtein]]:
+    """Find a keyword that actually returns relatives, and the set it returns.
+
+    An explicit ``keyword`` is used as given. Otherwise walk the query genome's lineage outwards
+    from the nearest rank, because the caller does not know what the organism is — that is the
+    premise of the pipeline — and because BV-BRC's keyword index does not track NCBI's current
+    names. Measured 2026-09-18: this genome resolves to genus *Mycoplasmoides*, which returns 0
+    rows, while its former genus *Mycoplasma* returns 12,742 rows across 96 genomes.
+    """
+    if keyword:
+        return keyword, fetch_reference_set(client, keyword=_rql_value(keyword), limit=limit)
+
+    # Relatives by id, not by name. Measured 2026-09-18 against BV-BRC's sp_gene core:
+    # eq(taxon_id,2097) and eq(genome_id,2097.118) both return 0 rows, every name in this
+    # genome's current lineage returns 0 (BV-BRC still indexes the superseded "Mycoplasma"),
+    # but in(genome_id,(243273.25,272634.6)) returns 299. M1 already computes the ingroup, so
+    # use it rather than guessing at a genus.
+    genome_ids = [g for g in (getattr(taxonomy, "relative_genome_ids", None) or []) if g]
+    if genome_ids:
+        try:
+            reference = fetch_reference_set(client, genome_ids=genome_ids[:200], limit=limit)
+        except (RuntimeError, OSError, ValueError):
+            reference = []
+        if reference:
+            return f"genome_id in {len(genome_ids[:200])} M1 relatives", reference
+
+    candidates = lineage_candidates(taxonomy)
+    for candidate in candidates:
+        try:
+            reference = fetch_reference_set(client, keyword=_rql_value(candidate), limit=limit)
+        except (RuntimeError, OSError, ValueError):
+            # One rank failing must not abort the walk: the whole point is that we do not know
+            # which name this index carries, so try the next rank out.
+            continue
+        if reference:
+            return candidate, reference
+    return (candidates[0] if candidates else ""), []
+
+
+def _rql_value(value: str) -> str:
+    """RQL needs %22 quotes around any value containing a space (see ``_api_get``)."""
+    return f"%22{value}%22" if " " in value else value
+
+
+def lineage_candidates(taxonomy: Any) -> list[str]:
+    """Names to try as a keyword, nearest rank first.
+
+    M1 writes each lineage entry as ``[name, taxon_id, rank]``; a bare string is accepted too so
+    a hand-built taxonomy still works.
+    """
+    names: list[str] = []
+    for entry in getattr(taxonomy, "lineage_names", None) or []:
+        if isinstance(entry, (list, tuple)):
+            entry = entry[0] if entry else ""
+        if isinstance(entry, str) and entry.strip():
+            names.append(entry.strip())
+    candidates = list(reversed(names))[:4]
+    scientific = (getattr(taxonomy, "scientific_name", "") or "").strip()
+    if scientific and scientific not in candidates:
+        candidates.insert(0, scientific)
+    return candidates
 
 
 def parse_calls(
