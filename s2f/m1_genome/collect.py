@@ -370,6 +370,37 @@ _METADATA_NOTE = {
 }
 
 
+def metadata_candidates(genome: dict[str, Any]) -> list[dict[str, Any]]:
+    """Public genomes to try as a metadata donor, nearest first.
+
+    Two sources, because only one of them is ever populated on a given run.
+    ``closest_genomes`` comes from the Minhash taxon call and carries distances, but is
+    empty whenever the taxon was supplied or a CGA directory was parsed directly.
+    ``tree_ingroup`` comes from CGA's own codon tree and is a bare list of genome ids with
+    no distances — but it is present exactly when the other is not, and its first entry is
+    the nearest genome CGA placed next to ours.
+
+    Reading only ``closest_genomes`` is why a run against a pre-fetched CGA directory fell
+    through to species-wide facets and reported "Aerobic" for an organism whose nearest
+    relative's record says "Facultative".
+    """
+    seen: set[str] = set()
+    out: list[dict[str, Any]] = []
+    for hit in genome.get("closest_genomes") or []:
+        gid = str((hit or {}).get("genome_id") or "")
+        if gid and gid not in seen:
+            seen.add(gid)
+            out.append(dict(hit))
+    for gid in genome.get("tree_ingroup") or []:
+        gid = str(gid or "")
+        if gid and gid not in seen:
+            seen.add(gid)
+            # No distance: the codon tree gives order, not a metric. Left null rather than
+            # invented, and filed as its own issue.
+            out.append({"genome_id": gid, "name": "", "mash_distance": None, "ani": None})
+    return out
+
+
 def collect_cga_metadata(api: BvbrcApi, genome: dict[str, Any]) -> dict[str, Any]:
     """Species-level metadata for a CGA run, with an honest account of its origin."""
     taxonomy = genome.get("taxonomy") or {}
@@ -378,7 +409,7 @@ def collect_cga_metadata(api: BvbrcApi, genome: dict[str, Any]) -> dict[str, Any
         api,
         genome_id=str(genome.get("genome_id") or ""),
         species=species,
-        closest=genome.get("closest_genomes") or [],
+        closest=metadata_candidates(genome),
     )
     basis = provenance["basis"]
     provenance["species"] = species
