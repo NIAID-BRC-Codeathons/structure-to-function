@@ -25,6 +25,9 @@ One claim each, so any panel stands alone, plus a four-panel composite and the l
 | `figure_composite` | all four as panels A–D at double-column width |
 | `captions.md` | numbered legends, each self-contained |
 
+The PDFs from the HS11286 run are committed under
+[`figures/`](figures/) with their provenance and the command that regenerates them.
+
 ### `--figure-style publication` (default)
 
 - **No title inside the artwork.** The legend lives in `captions.md`, where a journal wants

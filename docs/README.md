@@ -15,6 +15,7 @@ NIAID-BRCs AI Codeathon 2.0 · Argonne National Laboratory · Sept 16–18, 2026
 | [common-ids.md](common-ids.md) | Mapping any identifier — feature_id, UniProt, PDB, ChEMBL. Never write your own mapping. |
 | [07-decisions-and-risks.md](07-decisions-and-risks.md) | Open decisions, thread dependencies, non-negotiables. |
 | [08-evaluation.md](08-evaluation.md) | Before quoting any ranking as a shortlist, and before changing a scoring weight. |
+| [figures/](figures/) | The measured results as submission-ready PDFs, with legends and provenance. |
 | [00a-data-contract.md](00a-data-contract.md) | And when you want the measured answer to "how much do `m1_priority` and `triage` disagree": 3 of 50. |
 
 ## Modules
