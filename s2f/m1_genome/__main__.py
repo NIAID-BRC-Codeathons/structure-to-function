@@ -390,7 +390,12 @@ def _load_taxon_call(path: Path | str | None) -> dict | None:
             hits = [top]
             print(f"taxon call at {source} predates the current format "
                   f"(no `hits`); using `top_hit` alone")
+    # `n_hits` is a true fact about the original call and is kept as recorded, but it is
+    # not how many hits we actually hold: an older file yields only `top_hit`, so six
+    # recorded hits can become one usable relative. Reporting the recorded number alone
+    # would overstate closest_genomes.
     data["hits"] = hits
+    data["hits_usable"] = len(hits)
     data["source_path"] = str(source)
     data.setdefault("called_by", "minhash-recorded")
     data.setdefault("n_hits", len(hits))
@@ -492,9 +497,12 @@ def main(argv: list[str] | None = None) -> int:
         taxon_call = _load_taxon_call(recorded)
         if taxon_call:
             top = taxon_call.get("top_hit") or {}
-            print(f"taxon call reused from {taxon_call['source_path']}: "
-                  f"{taxon_call.get('n_hits')} hits, top {top.get('genome_id')} "
-                  f"at d={top.get('distance')}")
+            recorded = taxon_call.get("n_hits")
+            usable = taxon_call.get("hits_usable")
+            count = (f"{usable} of {recorded} recorded hits" if usable != recorded
+                     else f"{usable} hits")
+            print(f"taxon call reused from {taxon_call['source_path']}: {count}, "
+                  f"top {top.get('genome_id')} at d={top.get('distance')}")
 
     parsed = load_cga(cga_dir)
     proteins = proteins_section(parsed)
