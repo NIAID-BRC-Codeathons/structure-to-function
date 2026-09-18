@@ -19,8 +19,9 @@ from pathlib import Path
 from typing import Any
 
 from ..m1_genome.report_html import (
-    _mapping, _rows, collect_priorities, esc, pathogenesis_flow_svg,
-    render_tree_svg, specialty_bar_svg, specialty_counts, specialty_labels,
+    CATEGORIES, _cat_chips, _mapping, _rows, collect_priorities, esc,
+    pathogenesis_flow_svg, render_tree_svg, specialty_bar_svg, specialty_counts,
+    specialty_labels,
 )
 from ..m1_genome.pathogens import resolve_disease_profile
 
@@ -96,6 +97,15 @@ code{background:#f1f5f9;border-radius:5px;padding:1px 5px;font-size:12px}
 .bar{display:inline-block;height:9px;background:#e2e8f0;border-radius:5px;overflow:hidden;
 width:70px;vertical-align:middle}
 .bar>i{display:block;height:100%;background:var(--brand)}
+.scorebar{height:8px;background:#e2e8f0;border-radius:5px;overflow:hidden;min-width:52px}
+.scorebar>span{display:block;height:100%;background:linear-gradient(90deg,#0b5cad,#0e7490)}
+.chip{display:inline-block;color:#fff;border-radius:20px;padding:1px 8px;font-size:11px;
+margin:1px 3px 1px 0;white-space:nowrap}
+.controls{display:flex;flex-wrap:wrap;gap:8px;align-items:center;margin-bottom:12px}
+.controls input[type=search]{flex:1;min-width:220px;margin-bottom:0}
+.fbtn{border:1px solid var(--line);background:#fff;border-radius:20px;padding:5px 12px;
+font:inherit;font-size:12.5px;cursor:pointer;color:var(--ink)}
+.fbtn.active{background:var(--brand);color:#fff;border-color:var(--brand)}
 .pill{display:inline-block;border-radius:20px;padding:1px 9px;font-size:11.5px;
 border:1px solid #bfdbfe;background:#eff6ff;color:#1e3a8a;margin:1px 3px 1px 0}
 .pill.bad{background:#fef2f2;border-color:#fecaca;color:#991b1b}
@@ -114,6 +124,23 @@ function showTab(id){
   document.querySelectorAll('section.pane').forEach(function(p){
     p.classList.toggle('on', p.id==='tab-'+id);});
   if(location.hash!=='#'+id){history.replaceState(null,'','#'+id);}
+}
+var geneCat='all';
+function setCat(btn,cat){
+  geneCat=cat;
+  document.querySelectorAll('.fbtn').forEach(function(b){b.classList.toggle('active',b===btn);});
+  applyGeneFilter();
+}
+function applyGeneFilter(){
+  var box=document.getElementById('gsearch');
+  var q=((box&&box.value)||'').toLowerCase(), shown=0;
+  document.querySelectorAll('#gtable tbody tr').forEach(function(r){
+    var cats=(r.getAttribute('data-cat')||'').split(' ');
+    var okCat = geneCat==='all' || cats.indexOf(geneCat)>-1;
+    var okText = !q || r.textContent.toLowerCase().indexOf(q)>-1;
+    r.style.display = (okCat&&okText) ? '' : 'none';
+    if(okCat&&okText){shown++;}});
+  var c=document.getElementById('gcount'); if(c){c.textContent=shown;}
 }
 function filterTable(inputId, tableId, countId){
   var q=(document.getElementById(inputId).value||'').toLowerCase();
@@ -314,34 +341,55 @@ def tab_genes(report: dict[str, Any]) -> str:
         return ""
     total = len(priorities)
     shown = priorities[:PROTEIN_ROWS]
-    # Specialty categories live on the protein record, not on the priority record.
     by_id = {protein.get("feature_id"): specialty_labels(protein)
              for protein in _rows(report.get("proteins"))}
+    best = max((record.get("score") or 0 for record in priorities), default=0) or 1
+    selected = sum(1 for record in priorities if record.get("selected"))
+
     out = ["<div class='card'><h2>Genes and proteins</h2>",
            f"<p class='lead'>All <b>{total}</b> protein-coding genes, ranked by the "
-           f"annotation-driven pathogenesis priority score. Showing the first "
-           f"{len(shown)}. Search filters every column.</p>",
-           "<input id='gsearch' type='search' placeholder='Search gene, product, "
-           "locus tag, mechanism…' oninput=\"filterTable('gsearch','gtable','gcount')\">",
-           f"<div class='muted' style='margin-bottom:6px'>Showing "
-           f"<span id='gcount'>{len(shown)}</span> of {len(shown)} listed</div>",
-           "<div class='tablewrap'><table id='gtable'><thead><tr>"
-           "<th>Rank</th><th>Score</th><th>Gene</th><th>Locus</th>"
-           "<th>Product / function</th><th>aa</th><th>Mechanism</th>"
-           "<th>Specialty</th></tr></thead><tbody>"]
+           f"annotation-driven pathogenesis priority score; <b>{selected}</b> are carried "
+           f"forward. Showing the first {len(shown)}. Filter by mechanism or search any "
+           "column.</p>",
+           "<div class='controls'>",
+           "<input id='gsearch' type='search' aria-label='Search proteins' "
+           "placeholder='Search gene, product, locus tag, mechanism…' "
+           "oninput='applyGeneFilter()'>",
+           "<button class='fbtn active' onclick=\"setCat(this,'all')\">All</button>"]
+    for key, label, _a, _b in CATEGORIES:
+        out.append(f"<button class='fbtn' onclick=\"setCat(this,'{key}')\">"
+                   f"{esc(label)}</button>")
+    out.append("</div>")
+    out.append(f"<div class='muted' style='margin-bottom:6px'>Showing "
+               f"<span id='gcount'>{len(shown)}</span> of {len(shown)} listed</div>")
+    out.append("<div class='tablewrap'><table id='gtable'><thead><tr>"
+               "<th>Rank</th><th>Score</th><th>Gene</th><th>Locus</th>"
+               "<th>Product / function</th><th>aa</th><th>Mechanism</th>"
+               "<th>Specialty</th><th>Hypothesis</th></tr></thead><tbody>")
     for record in shown:
-        specialty = ", ".join(by_id.get(record.get("feature_id"), []))
+        categories = record.get("categories") or []
+        width = max(0, min(100, int((record.get("score") or 0) / best * 100)))
+        pills = "".join(f"<span class='pill'>{esc(name)}</span>"
+                        for name in by_id.get(record.get("feature_id"), []))
+        row_class = " class='sel'" if record.get("selected") else ""
         out.append(
-            f"<tr{' class=sel' if record.get('selected') else ''}>"
+            f"<tr data-cat='{esc(' '.join(categories))}'{row_class}>"
             f"<td>{esc(record.get('rank'))}</td>"
-            f"<td>{esc(_fmt(record.get('score')))}</td>"
-            f"<td>{esc(_fmt(record.get('gene')))}</td>"
-            f"<td>{esc(_fmt(record.get('locus_tag')))}</td>"
+            f"<td><div class='scorebar'><span style='width:{width}%'></span></div>"
+            f"<span class='muted'>{esc(_fmt(record.get('score')))}</span></td>"
+            f"<td>{esc(record.get('gene') or '—')}</td>"
+            f"<td>{esc(record.get('locus_tag') or '')}</td>"
             f"<td>{esc(_fmt(record.get('product')))}</td>"
             f"<td>{esc(_fmt(record.get('aa_length')))}</td>"
-            f"<td>{esc(_fmt(record.get('mechanism_hypothesis')))}</td>"
-            f"<td>{esc(specialty or '—')}</td></tr>")
-    out.append("</tbody></table></div></div>")
+            f"<td>{_cat_chips(categories)}</td>"
+            f"<td>{pills or '—'}</td>"
+            f"<td style='max-width:320px'>"
+            f"{esc(_fmt(record.get('mechanism_hypothesis'), ''))}</td></tr>")
+    out.append("</tbody></table></div>")
+    if total > len(shown):
+        out.append(f"<p class='muted'>The table shows the top {len(shown)} of {total} by "
+                   "score; the full set is in <code>report.json</code>.</p>")
+    out.append("</div>")
     return "".join(out)
 
 
