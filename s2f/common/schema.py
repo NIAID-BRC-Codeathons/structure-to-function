@@ -37,6 +37,7 @@ SECTION_OWNERS = {
     "analyses": "M3/M4/M5",
     "disease": "M5",
     "report": "M6",
+    "full_report": "full report",
 }
 
 _PROVENANCE = {
@@ -352,6 +353,23 @@ SECTION_SCHEMAS: dict[str, dict[str, Any]] = {
         "properties": {
             "rendered_path": {"type": ["string", "null"]},
             "rendered_at": {"type": ["string", "null"]},
+            "counts": {"type": "object"},
+        },
+        "additionalProperties": True,
+    },
+    # The canonical report over the whole run. Its own key rather than M6's, because one
+    # module owns one section and two renderers writing the same key would each overwrite
+    # the other's record of what it produced. Adding a section is additive, not a
+    # tightening, so SCHEMA_VERSION is unchanged.
+    "full_report": {
+        "type": "object",
+        "properties": {
+            "rendered_path": {"type": ["string", "null"]},
+            "rendered_at": {"type": ["string", "null"]},
+            "bytes": {"type": ["integer", "null"]},
+            "sections_present": {"type": "array", "items": {"type": "string"}},
+            "sections_missing": {"type": "array", "items": {"type": "string"}},
+            "tabs": {"type": "array", "items": {"type": "string"}},
             "counts": {"type": "object"},
         },
         "additionalProperties": True,

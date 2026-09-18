@@ -214,6 +214,13 @@ document.addEventListener('DOMContentLoaded',function(){
 def render_tree_svg(tree: dict[str, Any], width: int = 900) -> str:
     """Dendrogram as inline SVG, root left, leaves right, human pathogens flagged."""
     if not tree or not tree.get("ok"):
+        # A CGA run carries a codon tree as newick rather than gene-content dendrogram
+        # coordinates. It is a different tree, not a missing one, so draw it.
+        newick = (tree or {}).get("newick")
+        if newick:
+            return render_newick_svg(newick, width=width,
+                                     focus=str((tree or {}).get("focus") or ""),
+                                     labels=(tree or {}).get("labels") or {})
         reason = esc((tree or {}).get("reason", "not computed"))
         return f'<p class="muted">Phylogeny unavailable: {reason}</p>'
 
@@ -276,9 +283,203 @@ def render_tree_svg(tree: dict[str, Any], width: int = 900) -> str:
     return "".join(parts)
 
 
+def _wrap_svg_text(text: Any, width_px: float, font_size: float,
+                   max_lines: int = 3) -> list[str]:
+    """Greedy word wrap for SVG, which has no line breaking of its own.
+
+    Character widths are estimated from the font size, because nothing here can measure
+    rendered text, so the factor is deliberately generous: over-estimating costs a little
+    whitespace, while under-estimating is what let protein identifiers run out of their box
+    and across the next column. Tokens longer than a whole line — `fig|2097.118.peg.522`
+    against a narrow box — are hyphenated rather than allowed to overflow.
+    """
+    text = str(text or "").strip()
+    if not text:
+        return []
+    budget = max(8, int(width_px / (font_size * 0.58)))
+    words = text.split()
+    lines: list[str] = []
+    current = ""
+    index = 0
+    while index < len(words) and len(lines) < max_lines:
+        word = words[index]
+        if len(word) > budget and not current:
+            lines.append(word[:budget - 1] + "-")
+            words[index] = word[budget - 1:]
+            continue
+        candidate = f"{current} {word}".strip()
+        if len(candidate) <= budget:
+            current = candidate
+            index += 1
+        elif current:
+            lines.append(current)
+            current = ""
+        else:
+            index += 1
+    if current and len(lines) < max_lines:
+        lines.append(current)
+        current = ""
+    if lines and (index < len(words) or current):
+        lines[-1] = lines[-1][:max(1, budget - 1)].rstrip(" ,;-") + "\u2026"
+    return lines
+
+
+def specialty_counts(report: dict[str, Any], genome: dict[str, Any]) -> dict[str, Any]:
+    """Specialty-gene composition, from the genome section or from the proteins.
+
+    The API route writes `genome.specialty_gene_counts`; the CGA route does not, and its
+    rows live on each protein instead. Counting them here rather than leaving the section
+    empty: a CGA run of M. genitalium carries 17 of them (14 Antibiotic Resistance,
+    2 Transporter, 1 Drug Target) and the panel was reporting none.
+    """
+    counts = _mapping(genome.get("specialty_gene_counts"))
+    if counts:
+        return counts
+    tally: dict[str, int] = {}
+    for protein in _rows(report.get("proteins")):
+        for hit in protein.get("specialty") or []:
+            # The two routes name this field differently: the CGA parse writes `type`,
+            # the API seed writes `property`. Reading only one of them tallied 17 rows
+            # as `None` and drew an empty panel.
+            name = (hit or {}).get("type") or (hit or {}).get("property")
+            if name:
+                tally[str(name)] = tally.get(str(name), 0) + 1
+    return tally
+
+
+def specialty_labels(protein: dict[str, Any]) -> list[str]:
+    """Specialty categories on one protein, from whichever key the route used."""
+    seen: list[str] = []
+    for hit in protein.get("specialty") or []:
+        name = (hit or {}).get("type") or (hit or {}).get("property")
+        if name and str(name) not in seen:
+            seen.append(str(name))
+    return seen
+
+
+def _parse_newick(text: str) -> dict[str, Any] | None:
+    """Minimal newick reader: names, branch lengths, nesting. Support values ignored."""
+    text = (text or "").strip()
+    if not text:
+        return None
+    if text.endswith(";"):
+        text = text[:-1]
+    pos = 0
+
+    def read() -> dict[str, Any]:
+        nonlocal pos
+        children: list[dict[str, Any]] = []
+        if pos < len(text) and text[pos] == "(":
+            pos += 1
+            while True:
+                children.append(read())
+                if pos < len(text) and text[pos] == ",":
+                    pos += 1
+                    continue
+                break
+            if pos < len(text) and text[pos] == ")":
+                pos += 1
+        start = pos
+        while pos < len(text) and text[pos] not in ",():":
+            pos += 1
+        label = text[start:pos].strip()
+        length = 0.0
+        if pos < len(text) and text[pos] == ":":
+            pos += 1
+            start = pos
+            while pos < len(text) and text[pos] not in ",()":
+                pos += 1
+            try:
+                length = float(text[start:pos])
+            except ValueError:
+                length = 0.0
+        # An internal label in a codon tree is a support value, not a taxon name.
+        return {"name": "" if children else label, "length": length,
+                "support": label if children else "", "children": children}
+
+    try:
+        root = read()
+    except (IndexError, ValueError):
+        return None
+    return root if (root.get("children") or root.get("name")) else None
+
+
+def render_newick_svg(newick: str, *, width: int = 900, focus: str = "",
+                      labels: dict[str, str] | None = None) -> str:
+    """Draw a newick tree: root left, leaves right, branch lengths to scale."""
+    root = _parse_newick(newick)
+    if root is None:
+        return '<p class="muted">Phylogeny unavailable: the tree could not be read.</p>'
+    labels = labels or {}
+    leaves: list[tuple[dict[str, Any], float]] = []
+
+    def collect(node: dict[str, Any], depth: float) -> None:
+        here = depth + float(node.get("length") or 0.0)
+        if node.get("children"):
+            for child in node["children"]:
+                collect(child, here)
+        else:
+            leaves.append((node, here))
+
+    collect(root, 0.0)
+    if not leaves:
+        return '<p class="muted">Phylogeny unavailable: the tree has no leaves.</p>'
+
+    row_h, top = 30, 34
+    height = top + row_h * len(leaves) + 30
+    max_depth = max((d for _, d in leaves), default=1.0) or 1.0
+    x_root, x_leaf = 30, max(260, width - 420)
+    y_of: dict[int, float] = {}
+    for index, (leaf, _depth) in enumerate(leaves):
+        y_of[id(leaf)] = top + row_h * index + row_h / 2
+
+    parts = [
+        f'<svg viewBox="0 0 {width} {height}" xmlns="http://www.w3.org/2000/svg" '
+        f'font-family="system-ui,Segoe UI,Arial" role="img" '
+        f'aria-label="Phylogenetic tree of the analysed genome and its relatives">',
+        f'<rect x="0" y="0" width="{width}" height="{height}" fill="#ffffff"/>',
+    ]
+
+    def to_x(depth: float) -> float:
+        return x_root + depth / max_depth * (x_leaf - x_root)
+
+    def draw(node: dict[str, Any], depth: float) -> float:
+        here = depth + float(node.get("length") or 0.0)
+        if node.get("children"):
+            ys = [draw(child, here) for child in node["children"]]
+            y = (min(ys) + max(ys)) / 2
+            parts.append(f'<path d="M{to_x(here):.1f},{min(ys):.1f} V{max(ys):.1f}" '
+                         f'fill="none" stroke="#94a3b8" stroke-width="1.4"/>')
+        else:
+            y = y_of[id(node)]
+            name = str(node.get("name") or "")
+            shown = labels.get(name, name)
+            is_focus = bool(focus) and name == focus
+            colour = "#b91c1c" if is_focus else "#334155"
+            weight = "700" if is_focus else "400"
+            marker = "\u2605 " if is_focus else ""
+            parts.append(f'<circle cx="{to_x(here):.1f}" cy="{y:.1f}" r="3" '
+                         f'fill="{colour}"/>')
+            parts.append(f'<text x="{to_x(here) + 10:.1f}" y="{y + 4:.1f}" '
+                         f'font-size="12" font-weight="{weight}" fill="{colour}">'
+                         f'{marker}{esc(shown)}</text>')
+        parts.append(f'<path d="M{to_x(depth):.1f},{y:.1f} H{to_x(here):.1f}" '
+                     f'fill="none" stroke="#94a3b8" stroke-width="1.4"/>')
+        return y
+
+    draw(root, 0.0)
+    parts.append("</svg>")
+    return "".join(parts)
+
+
 def pathogenesis_flow_svg(priorities: list[dict[str, Any]],
                           disease_profile: dict[str, Any], width: int = 940) -> str:
-    """Mechanism -> host effect -> disease, as three linked columns."""
+    """Mechanism -> host effect -> disease, as three linked columns.
+
+    Every box is sized from its own wrapped content and the rows are laid out from those
+    heights, because a fixed 48px box with unwrapped text overflowed into the next column
+    on any genome whose protein identifiers were long.
+    """
     counts: dict[str, int] = {}
     examples: dict[str, list[str]] = {}
     for record in priorities:
@@ -287,35 +488,106 @@ def pathogenesis_flow_svg(priorities: list[dict[str, Any]],
                 continue
             counts[category] = counts.get(category, 0) + 1
             bucket = examples.setdefault(category, [])
-            if len(bucket) < 6:
-                bucket.append(record.get("label") or record["feature_id"])
+            bucket.append(record.get("label") or record["feature_id"])
 
     present = [key for key, *_ in CATEGORIES if counts.get(key)]
     if not present:
         return ('<p class="muted">No host-interaction mechanisms were detected from this '
                 'annotation.</p>')
 
-    col1_x, col2_x, col3_x = 40, 360, 660
-    w1, w2, w3 = 240, 220, 240
-    top = 70
-    gap = max(64, int(380 / len(present)))
-    height = max(top + gap * len(present) + 60, 260)
-    outcomes = (disease_profile.get("diseases")
-                or disease_profile.get("bvbrc_disease") or ["Disease outcome"])[:5]
+    #: members listed in full before a mechanism box starts scrolling
+    SCROLL_AFTER = 5
+    col1_x, col2_x, col3_x = 40, 330, 630
+    w1, w2, w3 = 250, 240, 270
+    top, row_gap = 70, 24
+    pad_x, title_size, sub_size = 12, 13, 11
+    title_leading, sub_leading = 17, 14
 
-    def box(x: int, y: int, w: int, h: int, fill: str, stroke: str, title: str,
-            sub: str = "", tip: str = "") -> str:
+    def box(x: int, w: int, fill: str, stroke: str, title: str, sub: str = "",
+            tip: str = "", title_fill: str = "#0f172a",
+            sub_fill: str = "#475569") -> tuple[str, int]:
+        """One rounded box drawn at y=0; the caller translates it into place."""
+        title_lines = _wrap_svg_text(title, w - 2 * pad_x, title_size, max_lines=2)
+        sub_lines = _wrap_svg_text(sub, w - 2 * pad_x, sub_size, max_lines=3)
+        height = (14 + title_leading * len(title_lines)
+                  + (6 + sub_leading * len(sub_lines) if sub_lines else 0) + 10)
         out = "<g>"
         if tip:
             out += f"<title>{esc(tip)}</title>"
-        out += (f'<rect x="{x}" y="{y}" width="{w}" height="{h}" rx="9" fill="{fill}" '
+        out += (f'<rect x="{x}" y="0" width="{w}" height="{height}" rx="9" fill="{fill}" '
                 f'stroke="{stroke}" stroke-width="1.5"/>')
-        out += (f'<text x="{x + 12}" y="{y + 22}" font-size="13" font-weight="600" '
-                f'fill="#0f172a">{esc(title)}</text>')
-        if sub:
-            out += (f'<text x="{x + 12}" y="{y + 40}" font-size="11" fill="#475569">'
-                    f'{esc(sub)}</text>')
-        return out + "</g>"
+        cursor = 22
+        for line in title_lines:
+            out += (f'<text x="{x + pad_x}" y="{cursor}" font-size="{title_size}" '
+                    f'font-weight="600" fill="{title_fill}">{esc(line)}</text>')
+            cursor += title_leading
+        cursor += 4
+        for line in sub_lines:
+            out += (f'<text x="{x + pad_x}" y="{cursor}" font-size="{sub_size}" '
+                    f'fill="{sub_fill}">{esc(line)}</text>')
+            cursor += sub_leading
+        return out + "</g>", height
+
+    def mechanism_box(x: int, w: int, colour: str, title: str,
+                      members: list[str]) -> tuple[str, int]:
+        """Mechanism box as HTML inside the SVG, so long member lists can scroll.
+
+        The border sits on an outer box that never scrolls and the list scrolls inside
+        it, with room reserved on the right, so the scrollbar cannot land on the text or
+        clip the rounded edge. Up to `SCROLL_AFTER` members fit without scrolling; past
+        that the box stops growing, and the count in the heading already says how many
+        there are, so nothing needs to be said at the bottom where it cannot be seen.
+        """
+        line_h, head_h, pad, gutter = 16, 22, 12, 10
+        inner_h = line_h * min(len(members), SCROLL_AFTER)
+        height = pad * 2 + head_h + inner_h
+        scroll = "auto" if len(members) > SCROLL_AFTER else "hidden"
+        items = "".join(
+            f'<div style="white-space:nowrap;overflow:hidden;text-overflow:ellipsis">'
+            f'{esc(member)}</div>' for member in members)
+        return (
+            f'<foreignObject x="{x}" y="0" width="{w}" height="{height}">'
+            f'<div xmlns="http://www.w3.org/1999/xhtml" style="box-sizing:border-box;'
+            f'width:{w}px;height:{height}px;overflow:hidden;'
+            f'border:1.5px solid {colour};border-radius:9px;background:{colour}20;'
+            f'padding:{pad}px;font:13px system-ui,Segoe UI,Arial;color:#0f172a">'
+            f'<div style="font-weight:600;height:{head_h}px">{esc(title)}</div>'
+            f'<div style="height:{inner_h}px;overflow-y:{scroll};padding-right:{gutter}px;'
+            f'scrollbar-width:thin;font-size:11px;color:#475569;'
+            f'line-height:{line_h}px">{items}</div>'
+            f'</div></foreignObject>'), height
+
+    rows = []
+    for category in present:
+        colour = CAT_COLOR[category]
+        left, left_h = mechanism_box(
+            col1_x, w1, colour,
+            f"{CAT_LABEL[category]} ({counts[category]})",
+            examples[category],
+        )
+        right, right_h = box(
+            col2_x, w2, "#f1f5f9", "#94a3b8",
+            CAT_PROCESS.get(category, "Host effect"), CAT_EFFECT[category],
+        )
+        rows.append((colour, left, left_h, right, right_h))
+
+    positions: list[int] = []
+    cursor = top
+    for _colour, _left, left_h, _right, right_h in rows:
+        positions.append(cursor)
+        cursor += max(left_h, right_h) + row_gap
+    rows_bottom = cursor - row_gap
+
+    outcomes = (disease_profile.get("diseases")
+                or disease_profile.get("bvbrc_disease") or ["Disease outcome"])[:5]
+    species_lines = _wrap_svg_text(disease_profile.get("species", ""),
+                                   w3 - 2 * pad_x, title_size, max_lines=2)
+    outcome_lines = [_wrap_svg_text(outcome, w3 - 2 * pad_x - 10, sub_size, max_lines=2)
+                     for outcome in outcomes]
+    panel_h = (14 + title_leading * len(species_lines) + 6
+               + sum(sub_leading * len(lines) for lines in outcome_lines) + 12)
+    panel_y = max(top, int(top + (rows_bottom - top) / 2 - panel_h / 2))
+    height = max(rows_bottom, panel_y + panel_h) + 30
 
     parts = [
         f'<svg viewBox="0 0 {width} {height}" xmlns="http://www.w3.org/2000/svg" '
@@ -325,42 +597,39 @@ def pathogenesis_flow_svg(priorities: list[dict[str, Any]],
     ]
     for x, label in [(col1_x, "Virulence mechanism (proteins found)"),
                      (col2_x, "Effect on the host"),
-                     (col3_x, "Disease & symptoms")]:
+                     (col3_x, "Disease &amp; symptoms")]:
         parts.append(f'<text x="{x}" y="40" font-size="12.5" font-weight="700" '
-                     f'fill="#334155">{esc(label)}</text>')
+                     f'fill="#334155">{label}</text>')
 
-    panel_h = 46 + 16 * len(outcomes)
-    panel_y = top + (gap * len(present)) / 2 - panel_h / 2
-    for index, category in enumerate(present):
-        y = top + index * gap
-        colour = CAT_COLOR[category]
-        parts.append(box(col1_x, y, w1, 48, colour + "20", colour,
-                         f"{CAT_LABEL[category]}  ({counts[category]})",
-                         "e.g. " + ", ".join(examples[category][:4]),
-                         tip="Proteins: " + ", ".join(examples[category])))
-        effect = CAT_EFFECT[category]
-        parts.append(box(col2_x, y, w2, 48, "#f1f5f9", "#94a3b8",
-                         CAT_PROCESS.get(category, "Host effect"),
-                         effect[:46] + ("…" if len(effect) > 46 else "")))
-        ax, ay = col1_x + w1, y + 24
-        bx, by = col2_x, y + 24
-        parts.append(f'<path d="M{ax},{ay} C{ax + 40},{ay} {bx - 40},{by} {bx},{by}" '
-                     f'fill="none" stroke="{colour}" stroke-width="2" opacity="0.8"/>')
-        cx, cy = col2_x + w2, y + 24
-        dx, dy = col3_x, panel_y + panel_h / 2
-        parts.append(f'<path d="M{cx},{cy} C{cx + 50},{cy} {dx - 50},{dy} {dx},{dy}" '
+    panel_mid = panel_y + panel_h / 2
+    for (colour, left, left_h, right, right_h), y in zip(rows, positions):
+        parts.append(f'<g transform="translate(0,{y})">{left}</g>')
+        parts.append(f'<g transform="translate(0,{y})">{right}</g>')
+        ay, by = y + left_h / 2, y + right_h / 2
+        parts.append(f'<path d="M{col1_x + w1},{ay:.1f} C{col1_x + w1 + 40},{ay:.1f} '
+                     f'{col2_x - 40},{by:.1f} {col2_x},{by:.1f}" fill="none" '
+                     f'stroke="{colour}" stroke-width="2" opacity="0.8"/>')
+        cy = y + right_h / 2
+        parts.append(f'<path d="M{col2_x + w2},{cy:.1f} C{col2_x + w2 + 50},{cy:.1f} '
+                     f'{col3_x - 50},{panel_mid:.1f} {col3_x},{panel_mid:.1f}" '
                      f'fill="none" stroke="#cbd5e1" stroke-width="1.6"/>')
 
-    parts.append(f'<rect x="{col3_x}" y="{panel_y:.0f}" width="{w3}" '
-                 f'height="{panel_h:.0f}" rx="9" fill="#fee2e2" stroke="#b91c1c" '
-                 f'stroke-width="1.6"/>')
-    parts.append(f'<text x="{col3_x + 12}" y="{panel_y + 24:.0f}" font-size="13" '
-                 f'font-weight="700" fill="#7f1d1d">'
-                 f'{esc(disease_profile.get("species", ""))}</text>')
-    for index, outcome in enumerate(outcomes):
-        parts.append(f'<text x="{col3_x + 12}" y="{panel_y + 44 + 16 * index:.0f}" '
-                     f'font-size="11" fill="#7f1d1d">&#8226; '
-                     f'{esc(str(outcome)[:40])}</text>')
+    parts.append(f'<rect x="{col3_x}" y="{panel_y}" width="{w3}" height="{panel_h}" '
+                 f'rx="9" fill="#fee2e2" stroke="#b91c1c" stroke-width="1.6"/>')
+    cursor = panel_y + 22
+    for line in species_lines:
+        parts.append(f'<text x="{col3_x + pad_x}" y="{cursor}" font-size="{title_size}" '
+                     f'font-weight="700" fill="#7f1d1d">{esc(line)}</text>')
+        cursor += title_leading
+    cursor += 4
+    for lines in outcome_lines:
+        for offset, line in enumerate(lines):
+            bullet = "&#8226; " if offset == 0 else ""
+            indent = pad_x if offset == 0 else pad_x + 10
+            parts.append(f'<text x="{col3_x + indent}" y="{cursor}" '
+                         f'font-size="{sub_size}" fill="#7f1d1d">{bullet}{esc(line)}'
+                         f'</text>')
+            cursor += sub_leading
     parts.append("</svg>")
     return "".join(parts)
 
@@ -502,6 +771,25 @@ def build_html(report: dict[str, Any], *, priorities: list[dict[str, Any]],
     quality = _mapping(genome.get("quality"))
     gid = genome.get("genome_id") or ""
     genome_url = genome.get("bvbrc_url") or BVBRC_GENOME_URL.format(gid=gid)
+    # A CGA run's genome id belongs to CGA, not to BV-BRC: 2097.118 is our own submission
+    # and the public site has no page for it, so the obvious link is a dead one. Point at
+    # the record the metadata actually came from, and label it as the relative it is.
+    provenance = _mapping(genome.get("metadata_provenance"))
+    donor_id = str(provenance.get("genome_id") or "")
+    donor_name = provenance.get("genome_name") or donor_id
+    basis = provenance.get("basis")
+    if basis == "relative" and donor_id:
+        genome_link = BVBRC_GENOME_URL.format(gid=donor_id)
+        genome_link_label = f"Open the BV-BRC report for the closest match: {donor_name}"
+        genome_link_note = "closest public match, not this assembly"
+    elif provenance and basis != "this-genome":
+        genome_link = ""
+        genome_link_label = ""
+        genome_link_note = "This assembly has no public BV-BRC record."
+    else:
+        genome_link = genome_url
+        genome_link_label = "Open the live BV-BRC genome report"
+        genome_link_note = ""
     route = genome.get("annotation_route") or ("cga" if genome.get("cga_job_id") else "unknown")
     name = (genome.get("taxonomy") or {}).get("scientific_name") or gid or "genome"
     generated = run.get("created_at") or ""
@@ -518,6 +806,18 @@ def build_html(report: dict[str, Any], *, priorities: list[dict[str, Any]],
     w("<meta name='viewport' content='width=device-width,initial-scale=1'>")
     w(f"<title>M1 genome report — {esc(name)}</title>")
     w(f"<style>{HTML_CSS}</style></head><body>")
+
+    # Sections fed from the donor record say so in their own lead, not only in the
+    # banner at the top: a reader who lands on the disease panel from the table of
+    # contents must not have to scroll up to learn whose genome it describes.
+    if basis == "relative" and donor_id:
+        borrowed = (f" Metadata in this section comes from {donor_name} "
+                    f"({donor_id}), the closest public match, not from this assembly.")
+    elif basis in ("species", "none"):
+        borrowed = (" This assembly has no public BV-BRC record and no public relative "
+                    "was identified, so only species-wide values are shown.")
+    else:
+        borrowed = ""
 
     w("<header class='hero'>")
     w(f"<h1>{esc(name)}</h1>")
@@ -537,9 +837,13 @@ def build_html(report: dict[str, Any], *, priorities: list[dict[str, Any]],
             continue
         w(f"<span class='badge'>{esc(key)}: <b>{esc(value)}</b></span>")
     w("</div>")
-    if gid:
-        w(f"<a class='btn' href='{esc(genome_url)}' target='_blank' rel='noopener'>"
-          f"&#128279; Open the live BV-BRC genome report &#8599;</a>")
+    if genome_link:
+        w(f"<a class='btn' href='{esc(genome_link)}' target='_blank' rel='noopener'>"
+          f"&#128279; {esc(genome_link_label)} &#8599;</a>")
+        if genome_link_note:
+            w(f"<span class='muted' style='margin-left:10px'>{esc(genome_link_note)}</span>")
+    elif genome_link_note:
+        w(f"<span class='muted'>{esc(genome_link_note)}</span>")
     w("</header>")
 
     w("<nav class='toc'>")
@@ -566,6 +870,27 @@ def build_html(report: dict[str, Any], *, priorities: list[dict[str, Any]],
     w("<section id='overview'><h2>Genome overview</h2>")
     w(f"<p class='lead'>Annotation source: {esc(genome.get('annotation_source') or 'CGA')}"
       f" · acquisition route: {esc(route)}.</p>")
+    # Where the isolate metadata came from. "This isolate was taken from a human in
+    # Australia" and "a relative of this isolate was" are different claims, and a CGA run
+    # can only ever make the second one, so the page has to say which it is showing.
+    provenance = _mapping(genome.get("metadata_provenance"))
+    if provenance:
+        basis = provenance.get("basis")
+        bits = []
+        donor = provenance.get("genome_name") or provenance.get("genome_id")
+        if donor and basis in ("this-genome", "relative"):
+            bits.append(f"Source record: <b>{esc(donor)}</b>")
+        if basis == "relative":
+            distance = provenance.get("mash_distance")
+            ani = provenance.get("ani")
+            bits.append(f"Mash distance {esc(distance)}" if distance is not None
+                        else "Mash distance not recorded")
+            if ani is not None:
+                bits.append(f"ANI {esc(ani)}%")
+        w(f"<div class='note{'' if basis == 'this-genome' else ' warn'}'>"
+          f"{esc(provenance.get('note'))}"
+          + (" &middot; " + " &middot; ".join(bits) if bits else "")
+          + "</div>")
     w("<div class='grid'>")
     stats = [
         ("Species", genome.get("species")), ("Genus", genome.get("genus")),
@@ -595,7 +920,10 @@ def build_html(report: dict[str, Any], *, priorities: list[dict[str, Any]],
     own = _rows(isolation.get("genome"))
     if own:
         for row in own:
-            w(f"<div><b>{esc(row.get('property'))}:</b> {esc(row.get('value'))}</div>")
+            source = row.get("source")
+            w(f"<div><b>{esc(row.get('property'))}:</b> {esc(row.get('value'))}"
+              + (f" <span class='muted'>({esc(source)})</span>" if source else "")
+              + "</div>")
     else:
         w("<div class='muted'>No isolate-specific metadata (typical for a lab reference "
           "strain).</div>")
@@ -622,7 +950,7 @@ def build_html(report: dict[str, Any], *, priorities: list[dict[str, Any]],
 
     w("<section id='disease'><h2>Disease, symptoms and host-invasion mechanism</h2>")
     w(f"<p class='lead'>Evidence: {esc(disease_profile.get('source'))}. "
-      f"{esc(disease_profile.get('scope', ''))}.</p>")
+      f"{esc(disease_profile.get('scope', ''))}.{esc(borrowed)}</p>")
     w(pathogenesis_flow_svg(priorities, disease_profile))
     w("<div class='cols' style='margin-top:16px'>")
     for title, key in [("Diseases", "diseases"), ("Symptoms", "symptoms")]:
@@ -644,9 +972,10 @@ def build_html(report: dict[str, Any], *, priorities: list[dict[str, Any]],
 
     w("<section id='amr'><h2>Specialty genes — AMR and virulence</h2>")
     w("<p class='lead'>BV-BRC specialty-gene composition: CARD and NDARO for resistance, "
-      "VFDB and Victors for virulence.</p>")
+      "VFDB and Victors for virulence. These are called on <b>this assembly's own "
+      "proteins</b>, unlike the isolate metadata above.</p>")
     w("<div class='cols'>")
-    w("<div>" + specialty_bar_svg(_mapping(genome.get("specialty_gene_counts"))) + "</div>")
+    w("<div>" + specialty_bar_svg(specialty_counts(report, genome)) + "</div>")
     w("<div><h3 style='margin:4px 0'>Laboratory AMR phenotypes</h3>")
     phenotypes = _rows(genome.get("amr_phenotypes"))
     if phenotypes:
@@ -663,8 +992,10 @@ def build_html(report: dict[str, Any], *, priorities: list[dict[str, Any]],
               f"<td>{esc(row.get('laboratory_typing_method'))}</td></tr>")
         w("</tbody></table>")
     else:
-        w("<div class='muted'>No laboratory AMR phenotypes recorded for this genome. "
-          "Absence of a phenotype record is not evidence of susceptibility.</div>")
+        w("<div class='muted'>No laboratory AMR phenotypes recorded"
+          + (f" for {esc(donor_name)} ({esc(donor_id)}), the closest public match"
+             if basis == "relative" and donor_id else " for this genome")
+          + ". Absence of a phenotype record is not evidence of susceptibility.</div>")
     w("</div></div></section>")
 
     w("<section id='proteins'><h2>Protein explorer</h2>")
@@ -750,9 +1081,15 @@ def build_html(report: dict[str, Any], *, priorities: list[dict[str, Any]],
     w("</ol></section>")
 
     w("<section id='methods'><h2>Methods, provenance and limitations</h2><ul class='kv'>")
-    w(f"<li><b>Data source:</b> BV-BRC (<a href='{esc(genome_url)}' target='_blank' "
-      f"rel='noopener'>{esc(genome_url)}</a>), route <code>{esc(route)}</code>, "
-      f"accessed {esc(generated)}.</li>")
+    if genome_link:
+        note = f" &mdash; {esc(genome_link_note)}" if genome_link_note else ""
+        w(f"<li><b>Data source:</b> BV-BRC (<a href='{esc(genome_link)}' target='_blank' "
+          f"rel='noopener'>{esc(genome_link)}</a>{note}), route <code>{esc(route)}</code>, "
+          f"accessed {esc(generated)}.</li>")
+    else:
+        w(f"<li><b>Data source:</b> BV-BRC, route <code>{esc(route)}</code>, accessed "
+          f"{esc(generated)}. This assembly has no public BV-BRC record, so there is no "
+          f"genome page to link to.</li>")
     w("<li><b>Annotation:</b> PATRIC/RASTtk CDS calls; protein families PLFam and PGFam.</li>")
     w("<li><b>Specialty genes:</b> CARD and NDARO (resistance); VFDB and Victors "
       "(virulence); BV-BRC essential-gene and drug-target sets.</li>")
@@ -800,9 +1137,15 @@ def render_run(run_dir: str | Path, *, seq_limit: int = 1200,
 
     if tree is None:
         newick = genome.get("tree_newick")
-        tree = ({"ok": False, "reason": "no gene-content tree in this run; "
-                                        "the run carries a CGA codon tree instead",
-                 "newick": newick}
+        tree = ({"ok": False,
+                 "method": "CGA codon tree (gene-content tree not computed for this run)",
+                 "reason": "no gene-content tree in this run; "
+                           "the run carries a CGA codon tree instead",
+                 "newick": newick,
+                 "focus": str(genome.get("genome_id") or ""),
+                 "labels": {str(row.get("genome_id")): str(row.get("name") or "")
+                            for row in (genome.get("closest_genomes") or [])
+                            if row.get("genome_id") and row.get("name")}}
                 if newick else {"ok": False, "reason": "not computed for this run"})
 
     profile_input = {
