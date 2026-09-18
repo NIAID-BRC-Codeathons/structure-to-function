@@ -1,0 +1,7 @@
+requests>=2.31,<3
+jsonschema>=4.20,<5
+
+# The report is rendered from a Jinja2 template (s2f/m6_report/templates/). Not
+# optional: without it `python -m s2f.m6_report` and tests/test_m6_report.py both fail
+# at import.
+jinja2>=3.1,<4
