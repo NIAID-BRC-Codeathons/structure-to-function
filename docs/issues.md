@@ -551,3 +551,267 @@ protein length falls from 347 to 142 aa, quality drops to Poor.
 
 **Watch out for:** an empty result and a self-match look equally "successful" to
 a caller that only checks for errors.
+
+## M2: annotation_gap is priced against the product string, not against the evidence
+
+labels: module:m2, priority:p1, type:decision
+
+**Goal:** decide what `annotation_gap` should be worth now that the annotation
+layer can tell us whether the gap is real.
+
+**Docs:** `docs/02a-m2-pdb-evidence.md` (weight change log), `docs/02c-m2-functional-annotation.md`
+
+`score.py` sets `annotation_gap=1.0 if protein.is_uncharacterized else 0.0`, and
+`is_uncharacterized` is a regex over the BV-BRC product string, written before any
+provider runs. The term therefore cannot know that InterProScan has since named
+the protein.
+
+Measured on the lambda0 G37 run, 2026-09-18 (530 proteins, InterProScan `-appl Pfam`):
+
+- 178 proteins collect the full 0.30.
+- **91 of those 178 already have InterProScan terms** — 21 with an EC/KO/COG/GO
+  assignment, 70 with a domain match and no functional assignment.
+- 34 of the top 50 are `hypothetical protein`; 17 of those 34 have terms.
+
+At 0.30, `annotation_gap` is the second-largest positive weight, equal to
+`essential` + `drug_target` combined, so this is not a rounding error: proteins
+whose function we have already recovered are being paid in full for not having
+it.
+
+A fix was written and reverted on `m2/triage-scoring-fixes`. Both shapes break
+`test_m2_function.test_annotation_now_feeds_the_triage_score`, which reconstructs
+the whole triage score from `surface_bonus` and `membrane_penalty` and so forbids
+*any* annotation-driven component from carrying weight. That invariant is worth
+keeping or worth changing, but it is a decision, not a patch.
+
+**Scope**
+- Decide whether annotation may reach the triage score through more than two
+  components, and update the invariant deliberately if so.
+- If yes: either grade `annotation_gap` from functional terms, or add an
+  offsetting component. A graded definition that worked in testing was 1.0 no
+  terms, 0.5 a domain match only, 0.0 an EC/KO/COG/GO assignment.
+- Re-price 0.30 either way. The sweep in the change log (0.20 to 6/50, 0.30 to
+  10/50, 0.40 to 26/50) was run on HS11286 against the *old*, looser definition,
+  which fired on roughly twice as many proteins. Same number, different quantity.
+
+**Definition of done**
+- [ ] The invariant is either reaffirmed in the test docstring or changed on
+      purpose, with the decision recorded
+- [ ] `annotation_gap` reflects whether function is actually unknown
+- [ ] A dated row in the weight change log, per pitfall #12
+- [ ] Top-50 composition before and after recorded on the same genome
+
+**Watch out for:** re-pricing the weight and redefining the term in one commit
+makes the effect of neither measurable.
+
+## M2: essentiality reference set can include the query's own species
+
+labels: module:m2, priority:p1, type:code
+
+**Goal:** record, per run, how much of the transferred essentiality came from
+relatives that are the same species as the query.
+
+**Docs:** `docs/02a-m2-pdb-evidence.md`, `docs/09-pitfalls.md`
+
+`resolve_reference_set` now selects FBA-essential relatives by BV-BRC genome id
+from M1's ingroup, which is right: names drift between databases and ids do not.
+Measured 2026-09-18 against the `sp_gene` core — `eq(taxon_id,2097)` 0 rows,
+`eq(genome_id,2097.118)` 0 rows, every name in this genome's current NCBI lineage
+0 rows (BV-BRC still indexes the superseded genus *Mycoplasma*), and
+`in(genome_id,(243273.25,272634.6))` 299 rows.
+
+But `243273.25` **is G37**. On the last run, 158 essential calls were transferred
+from 1,707 reference proteins across 10 genomes, and at least one of those genomes
+is the query's own species. On a novel organism there would be no such relative,
+so the transfer would be strictly harder than the number suggests.
+
+The PDB path already solves exactly this: `same_organism_hits` records
+`same_species_in_top_n`, `same_species_total` and a note saying weights calibrated
+on a genome with its own structures will not carry to a novel one. Essentiality
+needs the same treatment.
+
+**Scope**
+- Record how many reference genomes and how many transferred calls are
+  same-species and same-genus as the query, using `QueryTaxonomy.same_species_as`
+  / `same_genus_as`.
+- Surface it in `run.json` next to `essentiality`, and make it available to M6.
+- Decide whether same-species relatives should be excluded, kept and flagged, or
+  reported both ways. Flagging is the smaller change and loses nothing.
+
+**Definition of done**
+- [ ] `essentiality` in `run.json` carries same-species and same-genus counts
+- [ ] A run on a genome with a same-species relative and one without are
+      distinguishable from the manifest alone
+
+**Watch out for:** excluding same-species relatives silently would make the G37
+numbers drop with no visible explanation.
+
+## M2: counts.no_pdb_hit does not count a failed search as a miss
+
+labels: module:m2, priority:p2, type:code
+
+**Goal:** stop the run summary reporting zero misses when every search failed.
+
+**Docs:** `docs/02a-m2-pdb-evidence.md`
+
+Offline with a cold cache, all 530 sequence searches fail and stdout says:
+
+```
+530 proteins scored from 530 unique sequences; 50 selected, 0 without a PDB hit.
+Warning: 530 sequence searches failed (recorded as query-failed in run.json).
+```
+
+`counts.no_pdb_hit` is 0 when the true figure is 530. `query-failed` lands in
+neither the hit bucket nor the miss bucket, so the two lines contradict each
+other. The per-protein records are honest — every one carries
+`triage.retrieval_status: "query-failed"` and a matching reason — and live runs
+reconcile exactly (193 = 163 `no-hit` + 30 below the retention threshold, and
+530 - 337 = 193). So this is a defect in the summary line and one counter, not
+in the data.
+
+**Scope**
+- Count `query-failed` separately and print it, or fold it into `no_pdb_hit`
+  with the failure count stated alongside.
+- Make the stdout summary agree with `counts` in every case.
+
+**Definition of done**
+- [ ] A fully failed offline run reports 530, not 0
+- [ ] A test covers the all-failed case
+
+**Watch out for:** `no_pdb_hit.tsv` is built from the same flag and has the same
+blind spot.
+
+## Runner: --dry-run reports a report.json it never writes
+
+labels: module:common, priority:p2, type:code
+
+**Goal:** stop `--dry-run` printing a success line for a file that does not exist.
+
+`python -m s2f.run --run runs/x --from-cga-dir data/<cga> --dry-run` prints the
+two subcommands it would run, then prints:
+
+```
+done. report: runs/x/report.json
+```
+
+`find runs/x -type f | wc -l` returns **0**. Verified on lambda0, 2026-09-18.
+
+Cosmetic, but it is a success claim for a nonexistent artefact, and a caller that
+checks for the line rather than the file would be misled.
+
+**Scope**
+- Print what a dry run actually did, and name no output path it did not write.
+
+**Definition of done**
+- [ ] A dry run's output names no file it did not create
+- [ ] A test asserts a dry run writes nothing
+
+## M1: the genome section carries no contig count or genome length
+
+labels: module:m1, priority:p2, type:code
+
+**Goal:** carry the genome's size into the contract, since CGA already supplies it.
+
+**Docs:** `docs/00a-data-contract.md`, `docs/01-m1-genome.md`
+
+`report.json`'s `genome` holds `genome_id`, `taxon_id`, `taxonomy`, `quality`,
+`annotation_route`, `cga_job_id`, `closest_genomes`, `tree_ingroup` and
+`tree_newick` — but neither the contig count nor the genome length.
+
+`data/<cga>/.annotation/load_files/genome.json` supplies both:
+`contigs: 1`, `genome_length: 580076` for the G37 test genome. A report about a
+genome that never states the genome's size is incomplete, and M6 has nothing to
+quote.
+
+**Scope**
+- Carry `contigs` and `genome_length` from the CGA load files into `genome`.
+- Do the same on the BV-BRC API route so both routes stay symmetric.
+
+**Definition of done**
+- [ ] `genome.contigs` and `genome.genome_length` populated on both routes
+- [ ] Schema updated and validated
+
+**Watch out for:** the API route reports these under different field names.
+
+## M2: annotation confidence is reported per protein, not per flag
+
+labels: module:m2, priority:p1, type:code
+
+**Goal:** stop a single confidence histogram implying that every flag on every
+protein came from a real predictor.
+
+**Docs:** `docs/02c-m2-functional-annotation.md`
+
+After a full provider pass on lambda0 (2026-09-18, DeepTMHMM over all 530 plus
+InterProScan), `run.json` reports:
+
+```
+providers            {'deeptmhmm': 530, 'interproscan': 435, 'heuristic': 530}
+confidence           {'predicted': 530}
+membrane_flag_source {'deeptmhmm': 530}
+heuristic_only       0
+```
+
+`confidence` is computed per protein, from the sources behind the two required
+flags. But `lipoprotein` is **not** one of them, and DeepTMHMM does not predict
+lipoprotein status at all — it predicts topology. Scored against DeepTMHMM over
+530 proteins, `lipoprotein` gives P 1.00, R 1.00, MCC 1.00, which looks like a
+perfect heuristic and actually means *the flag never changed because no provider
+covers it*. There is a `membrane_flag_source` but no `lipoprotein_source`.
+
+For contrast, the flags that are covered: `membrane` MCC 0.95 (P 0.98, R 0.94),
+`signal_peptide` MCC 0.41 (P 0.42, R 0.47), `secreted` MCC 0.36 (P 0.46, R 0.32).
+The last two are poor enough that a reader needs to know which tier each flag came
+from.
+
+**Scope**
+- Give every flag a source, or report confidence per flag rather than per protein.
+- Make M6 able to say which flags are predicted and which are still heuristic.
+
+**Definition of done**
+- [ ] `lipoprotein` carries a source, or is reported as uncovered
+- [ ] A run where one flag is predicted and another is not is distinguishable
+      from the manifest alone
+
+**Watch out for:** `{'predicted': 530}` is the number most likely to be quoted in
+the paper. It currently overstates what was measured.
+
+## Ops: the lambda runbook describes a different node than the one we run on
+
+labels: module:common, priority:p2, type:ops
+
+**Goal:** make `docs/02d-lambda-runbook.md` match the machine people actually use.
+
+Checked against lambda0 on 2026-09-18. Every row below is wrong in the doc:
+
+| runbook says | lambda0 has |
+| --- | --- |
+| node lambda13 | lambda0 |
+| `scripts/setup_lambda.sh` | `scripts/setup_env.sh` |
+| 173 tests | 390 passed, 4 skipped |
+| InterProScan at `/nfs/lambda_stor_01/homes/cmann/software/interproscan-5.78-109.0` | `/homes/cmann/software/interproscan-5.78-109.0` |
+| `INTERPROSCAN_HOME` exported in `~/.bashrc` | unset; discovery finds it by directory search |
+
+Measured runtimes worth adding, none of which the doc currently has:
+
+| Step | Route | Sequences | Wall |
+| --- | --- | --- | --- |
+| Pass one (RCSB + UniProt + AFDB) | network, serial | 530 | 23 m 47 s |
+| InterProScan `-appl Pfam` | local | 530 | 1 m 5 s |
+| DeepTMHMM | BioLib cloud | 530 | 9 m 8 s |
+| Pass two ingest | `--offline` | 530 | 1.8 s |
+
+Pass one is ~99.5% network wait (7.5 s user time, ~2.7 s per unique sequence,
+serial) and is the pipeline's bottleneck. DeepTMHMM in the cloud is close enough
+to the local V100 figure (6 m 45 s) that installing it locally is not worth it
+for single-genome work.
+
+**Scope**
+- Rewrite against lambda0, or parameterise the node as
+  `docs/02d-remote-runbook.md` already does.
+- Add the runtime table and note that InterProScan is fast here only because
+  *M. genitalium* sits in EBI's pre-calculated lookup.
+
+**Definition of done**
+- [ ] Every command in the doc runs as written on lambda0
+- [ ] Pass-one runtime recorded, closing that part of #10's definition of done
