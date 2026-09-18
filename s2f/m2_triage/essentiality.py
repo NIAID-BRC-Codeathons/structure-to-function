@@ -226,17 +226,42 @@ def resolve_reference_set(
     rows, while its former genus *Mycoplasma* returns 12,742 rows across 96 genomes.
     """
     if keyword:
-        return keyword, fetch_reference_set(client, keyword=keyword, limit=limit)
-    names = [name for name in reversed(list(getattr(taxonomy, "lineage_names", None) or [])) if name]
-    candidates = names[:4]
-    scientific = (getattr(taxonomy, "scientific_name", "") or "").strip()
-    if scientific and scientific not in candidates:
-        candidates.insert(0, scientific)
+        return keyword, fetch_reference_set(client, keyword=_rql_value(keyword), limit=limit)
+    candidates = lineage_candidates(taxonomy)
     for candidate in candidates:
-        reference = fetch_reference_set(client, keyword=candidate, limit=limit)
+        try:
+            reference = fetch_reference_set(client, keyword=_rql_value(candidate), limit=limit)
+        except (RuntimeError, OSError, ValueError):
+            # One rank failing must not abort the walk: the whole point is that we do not know
+            # which name this index carries, so try the next rank out.
+            continue
         if reference:
             return candidate, reference
     return (candidates[0] if candidates else ""), []
+
+
+def _rql_value(value: str) -> str:
+    """RQL needs %22 quotes around any value containing a space (see ``_api_get``)."""
+    return f"%22{value}%22" if " " in value else value
+
+
+def lineage_candidates(taxonomy: Any) -> list[str]:
+    """Names to try as a keyword, nearest rank first.
+
+    M1 writes each lineage entry as ``[name, taxon_id, rank]``; a bare string is accepted too so
+    a hand-built taxonomy still works.
+    """
+    names: list[str] = []
+    for entry in getattr(taxonomy, "lineage_names", None) or []:
+        if isinstance(entry, (list, tuple)):
+            entry = entry[0] if entry else ""
+        if isinstance(entry, str) and entry.strip():
+            names.append(entry.strip())
+    candidates = list(reversed(names))[:4]
+    scientific = (getattr(taxonomy, "scientific_name", "") or "").strip()
+    if scientific and scientific not in candidates:
+        candidates.insert(0, scientific)
+    return candidates
 
 
 def parse_calls(
