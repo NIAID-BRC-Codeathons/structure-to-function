@@ -150,7 +150,8 @@ def _api_get(client, core: str, rql: str) -> list[dict[str, Any]]:
 def fetch_reference_set(
     client,
     *,
-    keyword: str,
+    keyword: str = "",
+    genome_ids: Sequence[str] = (),
     limit: int = DEFAULT_REFERENCE_LIMIT,
 ) -> list[ReferenceProtein]:
     """FBA-essential proteins from public relatives, with their sequences.
@@ -159,10 +160,14 @@ def fetch_reference_set(
     search. Three calls: the essential-gene rows, the features' sequence checksums, then the
     sequences themselves, batched.
     """
+    if genome_ids:
+        selector = f"in(genome_id,({','.join(genome_ids)}))"
+    else:
+        selector = f"keyword({keyword})"
     rows = _api_get(
         client,
         "sp_gene",
-        f"and(eq(evidence,FBA),keyword({keyword}))"
+        f"and(eq(evidence,FBA),{selector})"
         f"&select(patric_id,genome_id,genome_name,gene,product)&limit({limit})",
     )
     by_id = {r["patric_id"]: r for r in rows if r.get("patric_id")}
@@ -227,6 +232,21 @@ def resolve_reference_set(
     """
     if keyword:
         return keyword, fetch_reference_set(client, keyword=_rql_value(keyword), limit=limit)
+
+    # Relatives by id, not by name. Measured 2026-09-18 against BV-BRC's sp_gene core:
+    # eq(taxon_id,2097) and eq(genome_id,2097.118) both return 0 rows, every name in this
+    # genome's current lineage returns 0 (BV-BRC still indexes the superseded "Mycoplasma"),
+    # but in(genome_id,(243273.25,272634.6)) returns 299. M1 already computes the ingroup, so
+    # use it rather than guessing at a genus.
+    genome_ids = [g for g in (getattr(taxonomy, "relative_genome_ids", None) or []) if g]
+    if genome_ids:
+        try:
+            reference = fetch_reference_set(client, genome_ids=genome_ids[:200], limit=limit)
+        except (RuntimeError, OSError, ValueError):
+            reference = []
+        if reference:
+            return f"genome_id in {len(genome_ids[:200])} M1 relatives", reference
+
     candidates = lineage_candidates(taxonomy)
     for candidate in candidates:
         try:

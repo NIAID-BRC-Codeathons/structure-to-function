@@ -42,6 +42,9 @@ class QueryTaxonomy:
     scientific_name: str = ""
     taxon_id: int | None = None
     lineage_names: list[str] = field(default_factory=list)
+    #: BV-BRC genome ids of the relatives M1 placed in the tree, nearest first. Names
+    #: drift between databases; ids do not, so anything selecting relatives uses these.
+    relative_genome_ids: list[str] = field(default_factory=list)
     lineage_ids: list[int] = field(default_factory=list)
     source: str = SOURCE_UNDETERMINED
 
@@ -137,8 +140,28 @@ def from_report(run_dir: str | Path) -> QueryTaxonomy:
     genome = report.get("genome") or {}
     taxonomy = genome.get("taxonomy") or {}
     name = (taxonomy.get("scientific_name") or "").strip()
-    lineage_names = [str(n) for n in (taxonomy.get("lineage_names") or []) if n]
-    lineage_ids_raw = taxonomy.get("lineage_ids") or genome.get("taxon_lineage_ids") or []
+    # M1 writes each entry as [name, taxon_id, rank]. Stringifying the whole triple put
+    # "['Mycoplasmoides genitalium', 2097, 'species']" into a BV-BRC query on 2026-09-18, and
+    # left lineage_ids unpaired so same_species_as fell back to name matching.
+    lineage_names = []
+    lineage_from_entries: list[int] = []
+    for entry in taxonomy.get("lineage_names") or []:
+        if isinstance(entry, (list, tuple)):
+            if not entry or not entry[0]:
+                continue
+            lineage_names.append(str(entry[0]).strip())
+            try:
+                lineage_from_entries.append(int(entry[1]))
+            except (IndexError, TypeError, ValueError):
+                lineage_from_entries.append(0)
+        elif entry:
+            lineage_names.append(str(entry).strip())
+    lineage_ids_raw = (
+        taxonomy.get("lineage_ids")
+        or genome.get("taxon_lineage_ids")
+        or [i for i in lineage_from_entries if i]
+        or []
+    )
     lineage_ids: list[int] = []
     for value in lineage_ids_raw:
         try:
@@ -161,6 +184,9 @@ def from_report(run_dir: str | Path) -> QueryTaxonomy:
         taxon_id=taxon_id,
         lineage_names=lineage_names,
         lineage_ids=lineage_ids,
+        relative_genome_ids=[
+            str(g) for g in (genome.get("tree_ingroup") or genome.get("closest_genomes") or []) if g
+        ],
         source=SOURCE_M1,
     )
 
