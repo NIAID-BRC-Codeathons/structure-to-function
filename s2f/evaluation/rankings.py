@@ -13,8 +13,8 @@ pointed at either. Nothing in this module re-runs a search or touches the networ
 
 ## Counterfactual re-scoring
 
-`m2_triage.score.triage_score_from_components` is a pure function of eight numbers that
-M2 writes out per protein, precisely so "the selection is reproducible from the recorded
+`m2_triage.score.triage_score_from_components` is a pure function of the component
+values M2 writes out per protein, precisely so "the selection is reproducible from the recorded
 numbers alone". That makes leave-one-out ablation free: zero a component, re-apply the
 same function, re-rank, and compare. No refit, no network, no second run.
 

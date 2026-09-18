@@ -19,8 +19,8 @@ One claim each, so any panel stands alone, plus a four-panel composite and the l
 | file | claim |
 | --- | --- |
 | `seq_cap_loss` | M1's cap retains 72% of all CDS but only 42% of the hypothetical ones |
-| `score_disagreement` | `m1_priority` rank against `triage` rank; 3 of 50 shared at the cut |
-| `triage_ablation` | `annotation_gap` moves 41 of the top 50, more than `pdb_evidence` |
+| `score_disagreement` | `m1_priority` rank against `triage` rank; 6 of 50 shared at the cut |
+| `triage_ablation` | 5 of 9 triage components move the top 50; four move nothing |
 | `outcome_lift` | precision 100% beside a 99.3% base rate — the label is not a test |
 | `figure_composite` | all four as panels A–D at double-column width |
 | `captions.md` | numbered legends, each self-contained |
@@ -64,7 +64,7 @@ contrast. Identity never rests on colour alone; every series is direct-labelled.
 | --- | --- | --- |
 | **calibration** | a curated truth set | does the ranking surface real virulence factors? |
 | **outcome** | M3 | did the proteins it picked actually yield dockable structures? |
-| **ablation** | M2 | which of the eight triage components decide the selection? |
+| **ablation** | M2 | which of M2's triage components decide the selection? |
 | **agreement** | M1 and M2 | how far apart are the two scores, as the contract predicts? |
 
 Only the first needs anyone to adjudicate biology. The other three score the pipeline
@@ -250,61 +250,75 @@ reporting a silent zero.
 
 ## Second measurement — the triage score, HS11286, 2026-09-18
 
-`python -m s2f.m2_triage --run runs/kp_hs11286 --top 300 --report` over 4,000 proteins
-(M1 caps sequence retrieval at 4,000), then `python -m s2f.m3_fold --run runs/kp_hs11286`,
-then the harness with `--score triage`. Weights `WEIGHTS_VERSION 2026-09-16`.
+`python -m s2f.m2_triage --run runs/kp_hs11286 --top 300 --report` over 4,000 proteins (M1
+caps sequence retrieval at 4,000), then `python -m s2f.m3_fold`, then the harness with
+`--score triage`. Weights fingerprint **`4879c6253690`**.
 
-**Caveat first:** this M2 pass ran with no optional providers — no `--annotate`,
-`--human-homology`, `--essentiality` or `--foldseek`. Three of the eight components are
-therefore under-exercised, and the harness reports that rather than scoring them as inert.
+> **Re-measured after #60.** The first pass ran against an eight-component triage score,
+> fingerprint `f2713321fabd`. PR #60 added a ninth, `ligandable_homolog` at weight 0.10,
+> **without bumping `WEIGHTS_VERSION`**, which is still `2026-09-16`. The fingerprint hashes
+> the weight dict rather than trusting that constant, so the change was detected anyway —
+> and it moved the result enough to overturn one of the conclusions below. Numbers taken
+> under `f2713321fabd` do not compare to these.
+
+**Caveat:** this M2 pass ran with no optional providers — no `--annotate`,
+`--human-homology`, `--essentiality` or `--foldseek` — so three components are
+under-exercised, and the harness reports that rather than scoring them as inert.
 
 ### The two scores select almost disjoint populations
 
 | | |
 | --- | --- |
-| Spearman rho over the 4,000 both scored | **+0.373** |
-| shared between the two top 50s | **3 of 50** (Jaccard 0.03) |
+| Spearman rho over the 4,000 both scored | **+0.348** |
+| shared between the two top 50s | **6 of 50** (Jaccard 0.06) |
 
 `m1_priority`'s top 50 is named virulence factors: FimD, fimbrial adhesins, TonB-dependent
-receptors, phospholipase A1. `triage`'s top 50 is **45 of 50 hypothetical, putative or
-uncharacterised proteins** with good PDB evidence — "hypothetical protein", "Putative
-NAD(P)H nitroreductase YdjA", "Uncharacterized ferredoxin-like protein YfhL".
+receptors, phospholipase A1. `triage`'s top 50 is **33 of 50 hypothetical, putative or
+uncharacterised** proteins with good structural evidence, against a 14% base rate in the
+scored population.
 
 `00a-data-contract.md` predicted disagreement. The magnitude at the top is near-total, and
 it is the pipeline working as named: this project is a *hypothetical-protein* factory, and
-`triage` is the score that acts on that brief. `m1_priority` ranks the proteins we already
-know about.
+`triage` is the score that acts on that brief. `m1_priority` ranks what we already know.
 
 **The consequence matters more than the number.** M3 reads `triage.selected`, not
 `m1_priority`. So the four false positives issue #49 opens with — SurA, Skp, VirB10 — sit
 in M1's top band and **never reach M3 at all**. #49 is a defect in M1's report, not in the
 pipeline's selection, and fixing it will not change one protein that gets folded or docked.
-That reframes how much of Day 3 it deserves.
 
 ### Which components decide the selection
 
-Leave-one-out at K=50, against the full score:
+Leave-one-out at K=50, against the full score. The component list is read from `WEIGHTS`,
+so #60's ninth component was swept without a code change.
 
 | component | weight | fires on | moves out of top 50 | Δ precision vs M3 outcome |
 | --- | ---: | ---: | ---: | ---: |
-| `annotation_gap` | +0.30 | 563 | **41** | 0 |
-| `pdb_evidence` | +0.40 | 3056 | **33** | **−5.3 pp** |
-| `virulence_amr` | +0.20 | 250 | 12 | 0 |
-| `drug_target` | +0.15 | 347 | 2 | 0 |
+| `pdb_evidence` | +0.40 | 3056 | **34** | **−4.5 pp** |
+| `annotation_gap` | +0.30 | 563 | **29** | 0 |
+| `virulence_amr` | +0.20 | 250 | **23** | 0 |
+| `ligandable_homolog` | +0.10 | 2190 | **17** | 0 |
+| `drug_target` | +0.15 | 347 | 1 | 0 |
 | `essential` | +0.15 | 126 | 0 | 0 |
-| `human_homolog_penalty` | −0.25 | 3 | 0 | 0 |
 | `surface_bonus` | +0.10 | **0** | 0 | 0 |
 | `membrane_penalty` | −0.15 | **0** | 0 | 0 |
+| `human_homolog_penalty` | −0.25 | 3 | 0 | 0 |
 
-- **`annotation_gap` is the dominant selector, not `pdb_evidence`.** It fires on 14% of the
-  proteome (563 of 4,000) and occupies 45 of the top 50. Removing it churns 41 of 50 —
-  more than removing the component with the largest weight. A +0.30 bonus for reading
-  "hypothetical" is, in practice, what the shortlist is built from.
-- **Four of eight components move the selection at all.** `essential` and
-  `human_homolog_penalty` fire but change nothing at this cut.
-- **Two never fire.** `surface_bonus` and `membrane_penalty` are `OPTIONAL_COMPONENTS` and
-  their providers did not run here. That is a data gap, not a finding about the design, and
-  the run says so instead of reporting them as inert.
+- **Five of nine components move the selection at all.** `drug_target` moves one protein;
+  `essential` and `human_homolog_penalty` fire but change nothing at this cut.
+- **`annotation_gap` is disproportionate to its reach.** It fires on 14% of the scored
+  proteome (563 of 4,000) and is the second-largest mover. A +0.30 bonus for reading
+  "hypothetical" is doing more work than its weight suggests.
+- **`ligandable_homolog` is material on arrival**: it fires on 2,190 proteins, more than
+  half the population, and moves 17 of the top 50 in its first measured run.
+- **Two never fire.** `surface_bonus` and `membrane_penalty` are `OPTIONAL_COMPONENTS` whose
+  providers did not run here. That is a data gap, not a finding about the design, and the
+  run says so instead of reporting them as inert.
+
+> **A conclusion this replaces.** Under the eight-component score, `annotation_gap` was the
+> single largest mover (41 of 50, against `pdb_evidence`'s 33), and this document said so.
+> With `ligandable_homolog` in play the ordering reverses and `pdb_evidence` leads. The
+> claim was true of that scorer and is not true of this one. This is exactly the failure
+> mode the fingerprint exists to catch, so it is recorded rather than quietly overwritten.
 
 ### The M3 outcome label cannot discriminate on this run
 
@@ -318,15 +332,28 @@ M3 collected structures for all 300 selected proteins: 0 required prediction, 0 
 | **lift** | **+0.7 pp** |
 
 A label that is 99.3% one class cannot separate a good ranking from a bad one, so the
-headline 100% is not evidence that `triage` selects well. Two reasons, both worth acting on:
+headline 100% is not evidence that `triage` selects well. Two reasons, both actionable:
 
 1. **The gate is not currently a test.** `provisional-2026-09-17` passes essentially
    everything handed to it. Its thresholds need tightening before it can validate anything.
 2. **The measurement is partly circular by construction.** `pdb_evidence` is 0.40 of the
    triage score, and having a PDB hit is most of what makes a structure retrievable. The
    ablation is the non-circular part: only `pdb_evidence` has a nonzero Δ against this
-   label (−5.3 pp), which says the other seven components contribute nothing to whether a
-   pick turns out dockable.
+   label (−4.5 pp), so the other eight contribute nothing to whether a pick turns out
+   dockable.
+
+### The finding underneath all three
+
+**Neither instrument can currently evaluate `triage`**, and they fail in opposite
+directions. The curated truth set cannot reach it — 0 of its top 50 are labelled, because
+curated gene symbols are by definition characterised proteins and `triage` selects
+uncharacterised ones. The outcome label cannot discriminate — 99.3% base rate.
+
+That is a result about the *evaluability* of the pipeline's central decision, and it says
+what a third instrument would have to be: a held-out set of proteins that were hypothetical
+at annotation time and have since been characterised, so that "we would have picked this
+one" can be checked against what it turned out to be. `gene-function-prediction` from the
+2025 codeathon solved exactly this ground-truth design problem and is the place to start.
 
 ### The seam defect: M1's cap removes the population M2 exists to find
 

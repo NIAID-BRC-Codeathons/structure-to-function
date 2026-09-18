@@ -7,8 +7,8 @@ full analysis are in [`../08-evaluation.md`](../08-evaluation.md).
 | file | panel | claim |
 | --- | --- | --- |
 | `seq_cap_loss.pdf` | A | M1's `--seq-cap` retains 72% of all CDS but only 42% of the hypothetical ones |
-| `score_disagreement.pdf` | B | `m1_priority` rank against `triage` rank; 3 of 50 shared at the cut |
-| `triage_ablation.pdf` | C | `annotation_gap` moves 41 of the top 50, more than `pdb_evidence` |
+| `score_disagreement.pdf` | B | `m1_priority` rank against `triage` rank; 6 of 50 shared at the cut |
+| `triage_ablation.pdf` | C | 5 of 9 triage components move the top 50; four move nothing |
 | `outcome_lift.pdf` | D | precision 100% against a 99.3% base rate — the label is not a test |
 | `figure_composite.pdf` | A–D | all four at double-column width, for a single figure slot |
 
@@ -19,9 +19,10 @@ full analysis are in [`../08-evaluation.md`](../08-evaluation.md).
 | genome | *Klebsiella pneumoniae* subsp. *pneumoniae* HS11286, BV-BRC `1125630.4` |
 | proteins scored | 4,000 of 5,523 CDS (M1 `--seq-cap` default) |
 | ranking measured | `triage`, cut at 50 |
-| scoring weights | fingerprint `f2713321fabd` |
+| scoring weights | fingerprint `4879c6253690` (nine components, after #60) |
 | truth set | `fixtures/eval/kpneumoniae_hs11286.truth.tsv`, sha256 `ff9fccd9…` |
 | M3 outcome | 298 dockable, 2 rejected, 0 predictions required, 0 failures |
+| superseded | an earlier pass under `f2713321fabd` predates #60's ninth component |
 
 A different weights fingerprint means a different scorer, and the numbers here do not
 compare to it. `runs/<id>/eval/run.json` records the fingerprint, both SHA-256s, the git

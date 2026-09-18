@@ -8,7 +8,7 @@ Four things it measures:
 - **calibration** — a ranking against a curated truth set (`truthset`, `metrics`)
 - **outcome** — the same ranking against what M3 actually collected, no curation needed
   (`outcome`)
-- **ablation** — which of M2's eight triage components decide the selection (`ablation`)
+- **ablation** — which of M2's triage components decide the selection (`ablation`)
 - **agreement** — how far `m1_priority` and `triage` diverge, which the data contract
   predicts but nobody had measured (`agreement`)
 """

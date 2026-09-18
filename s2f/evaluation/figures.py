@@ -354,9 +354,17 @@ def save_figures(
             lambda ax, small: _draw_score_disagreement(
                 ax, ranks, k=k, shared_at_k=shared_at_k, spearman=spearman, small=small)))
     if have_ablation:
+        effects = ablation["effects"]
+        movers = sorted((e for e in effects if e.get("churn_at_k")),
+                        key=lambda e: e["churn_at_k"], reverse=True)
+        # Derived rather than written: the first version of this headline named the top
+        # mover, and went stale the moment M2 gained a ninth component (#60) and the
+        # ordering changed. A count cannot.
+        headline = (f"{len(movers)} of {len(effects)} triage components move the top {k}"
+                    if movers else "No triage component moves the selection")
         panels.append((
             "triage_ablation",
-            "annotation_gap, not pdb_evidence, decides the shortlist",
+            headline,
             WIDE_COLUMN, 2.6,
             lambda ax, small: _draw_triage_ablation(ax, ablation, small=small)))
     if have_outcome:

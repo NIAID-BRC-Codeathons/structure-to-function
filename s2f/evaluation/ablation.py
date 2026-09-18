@@ -1,7 +1,7 @@
 """Leave-one-out ablation of M2's triage score.
 
-The question the weights cannot answer on their own: which of the eight components
-actually decide the selection? `pdb_evidence` carries weight 0.40 and `annotation_gap`
+The question the weights cannot answer on their own: which components actually decide
+the selection? `pdb_evidence` carries weight 0.40 and `annotation_gap`
 0.30, but a weight is an intention. A component only matters if zeroing it moves proteins
 across the cut, and whether that movement is good or bad needs a label.
 
@@ -12,7 +12,11 @@ For each component this reports, against the full score as the reference:
 - **precision and recall** against the curated host-interaction truth set
 - **precision** against M3's outcome labels, where a run has them
 
-and separately, whether the component ever fired. A component that is zero for every
+The component list comes from `WEIGHTS`, never a literal, so a component added upstream is
+swept automatically. `ligandable_homolog` arrived in #60 after this was written and needed
+no change here.
+
+And separately, whether the component ever fired. A component that is zero for every
 protein cannot change anything, and reading that as "inert" would be wrong: it usually
 means the provider behind it never ran. `OPTIONAL_COMPONENTS` is M2's own name for that
 distinction and it is carried through here rather than collapsed.

@@ -175,7 +175,11 @@ def test_a_score_the_report_does_not_carry_exits_two(tmp_path, capsys):
 def test_ablation_is_written_and_sweeps_every_component(run_dir):
     assert run_cli(run_dir, "--score", "triage", "--top-k", "20") == 0
     ablation = json.loads((run_dir / "eval" / "ablation.json").read_text(encoding="utf-8"))
-    assert len(ablation["effects"]) == 8
+    # Derived, not hardcoded: M2 gained a ninth component (ligandable_homolog, #60) after
+    # this harness was written, and the sweep picked it up without a code change. Pinning
+    # the count would have failed here for the wrong reason.
+    assert len(ablation["effects"]) == len(TRIAGE_WEIGHTS)
+    assert {e["component"] for e in ablation["effects"]} == set(TRIAGE_WEIGHTS)
     assert ablation["k"] == 20
     # the fixture never fires membrane_penalty, which must read as a data gap
     assert "membrane_penalty" in ablation["never_fired"]
