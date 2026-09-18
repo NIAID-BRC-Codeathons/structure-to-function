@@ -4,8 +4,11 @@
 
 | File | What it is |
 | --- | --- |
-| `outline.md` | Source of truth — slide-by-slide content, timings, speaker notes |
+| `outline.md` | Source of truth — 14 slides, timings, speaker notes |
 | `slides.html` | The deck. Open it in a browser; no server, no network |
+
+The deck answers five things in order: what goes **in**, the **flow** across modules, what each
+module **does** (APIs, filter strategy, in/out), what comes **out**, and **what is left**.
 
 Edit `outline.md` first, then mirror the change into `slides.html`.
 
@@ -17,13 +20,14 @@ survives a reload. Print to PDF lays every slide out one per page.
 
 ## Keeping it light
 
-The deck is one file, about 12 KB, with **no external references** — no CDN, no fonts, no
+The deck is one file, about 19 KB, with **no external references** — no CDN, no fonts, no
 images. Two reasons, and both are worth preserving if you edit it:
 
 - **It has to work offline.** The demo runs with the network off; the slides should too.
 - **It is git-tracked.** `runs/` and `data/` are ignored (`.gitignore`), but `docs/` is not, so
-  anything added here is in the repository permanently. Keep images out; if a figure becomes
-  unavoidable, prefer inline SVG over a binary, and keep the total well under 100 KB.
+  anything added here is in the repository permanently. Keep images out; the flow chart on
+  slide 3 is inline SVG drawn with the same CSS variables as the rest of the deck, which is the
+  pattern to follow — no binaries, and keep the total well under 100 KB.
 
 ## Where the numbers come from
 
@@ -37,6 +41,10 @@ cannot be checked by anyone reading the repo:
 | `annotation_gap` sensitivity, 0 of 1,338 | `docs/02a-m2-pdb-evidence.md` decision log |
 | Same-species 30/34, same-genus 47/108 | `docs/02a-m2-pdb-evidence.md` |
 | Foldseek median identity 16.6% | `docs/02c-m2-structure-search.md` |
+| Search and evidence cutoffs | `s2f/m2_triage/pdb_evidence.py`, `score.py` |
+| Foldseek / homology / essentiality cutoffs | `s2f/m2_triage/{foldseek,human_homology,essentiality}.py` |
+| M3 quality thresholds | `s2f/m3_fold/quality.py` |
+| Input and output samples | `runs/hs11286/m1/`, `runs/mgen_G37/m2_pdb/top50.tsv` |
 
 **Check these before presenting.** The committed G37 run under `runs/` predates the
 `surface_bonus`, `membrane_penalty` and `ligandable_homolog` components, so recomputing the

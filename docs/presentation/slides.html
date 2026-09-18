@@ -59,6 +59,22 @@ nav{position:fixed;right:14px;bottom:12px;display:flex;gap:6px;align-items:cente
 nav button{font:inherit;color:var(--fg);background:var(--mark);border:1px solid var(--rule);
   border-radius:5px;padding:2px 9px;cursor:pointer;line-height:1.5}
 nav button:hover{border-color:var(--accent)}
+svg.flow{width:100%;height:auto;display:block;margin:.3rem 0 1rem}
+svg.flow text{font-family:inherit;fill:var(--fg)}
+svg.flow .t{font-size:13px;font-weight:650}
+svg.flow .s{font-size:10.5px;fill:var(--dim)}
+svg.flow .io{font-size:10.5px;fill:var(--accent);font-weight:600}
+svg.flow .box{fill:var(--mark);stroke:var(--rule);stroke-width:1.5}
+svg.flow .box.done{stroke:var(--accent)}
+svg.flow .box.todo{stroke-dasharray:5 4;opacity:.55}
+svg.flow .arr{stroke:var(--dim);stroke-width:1.5;fill:none}
+.two{display:grid;gap:.5rem 1.5rem;grid-template-columns:1fr 1fr;align-items:start}
+@media(max-width:46rem){.two{grid-template-columns:1fr}}
+.two h3{margin:0 0 .35rem;font-size:.82rem;text-transform:uppercase;letter-spacing:.06em;color:var(--accent)}
+.two ul{margin:0 0 .6rem;font-size:.95rem} .two li{margin-bottom:.3rem;font-size:.95rem}
+pre.sm{font-size:.76rem;line-height:1.45}
+table.sm{font-size:.88rem} table.sm td,table.sm th{padding:.34rem .5rem}
+.st{color:var(--accent);font-weight:650} .no{color:var(--dim)}
 @media print{
   nav{display:none}
   section{display:flex!important;min-height:auto;page-break-after:always;padding:1.5rem 0}
@@ -86,32 +102,122 @@ nav button:hover{border-color:var(--accent)}
   <strong>which fifty are worth a structural and chemical look</strong>, and why.</p>
 </section>
 
+
 <section>
-  <p class="kicker">Scope</p>
-  <h2>Six modules were scoped. Three exist.</h2>
-  <div class="grid">
-    <div class="card"><h3>M1 · genome</h3><p>Built — annotation, AMR, virulence, phylogeny</p></div>
-    <div class="card"><h3>M2 · triage</h3><p>Built — PDB evidence, scoring, selection</p></div>
-    <div class="card"><h3>M3 · fold</h3><p>Built — structure collection and quality gate</p></div>
-    <div class="card"><h3>M4 · ligands</h3><p>Not built</p></div>
-    <div class="card"><h3>M5 · disease</h3><p>Not built</p></div>
-    <div class="card"><h3>M6 · report</h3><p>Not built</p></div>
-  </div>
-  <p class="note">We are showing depth on the front half of the pipeline rather than a thin
-  pass over all of it.</p>
+  <p class="kicker">Workflow</p>
+  <h2>Six modules, one shared contract</h2>
+  <svg class="flow" viewBox="0 0 880 250" role="img" aria-label="Pipeline flow chart">
+  <text class="io" x="8" y="16">INPUT — BV-BRC Comprehensive Genome Analysis</text>
+  <path class="arr" d="M70 24 L70 46" marker-end="url(#a)"/>
+  <defs><marker id="a" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="6" markerHeight="6"
+    orient="auto"><path d="M0 0 L10 5 L0 10 z" fill="var(--dim)"/></marker></defs>
+  <g>
+    <rect class="box done" x="8"   y="50" width="128" height="62" rx="7"/>
+    <text class="t" x="20" y="72">M1 · genome</text>
+    <text class="s" x="20" y="90">annotate, AMR,</text><text class="s" x="20" y="103">phylogeny</text>
+    <rect class="box done" x="156" y="50" width="128" height="62" rx="7"/>
+    <text class="t" x="168" y="72">M2 · triage</text>
+    <text class="s" x="168" y="90">PDB evidence,</text><text class="s" x="168" y="103">score, select 50</text>
+    <rect class="box done" x="304" y="50" width="128" height="62" rx="7"/>
+    <text class="t" x="316" y="72">M3 · fold</text>
+    <text class="s" x="316" y="90">collect + quality</text><text class="s" x="316" y="103">gate structures</text>
+    <rect class="box todo" x="452" y="50" width="128" height="62" rx="7"/>
+    <text class="t" x="464" y="72">M4 · ligands</text>
+    <text class="s" x="464" y="90">dock, score,</text><text class="s" x="464" y="103">co-fold</text>
+    <rect class="box todo" x="600" y="50" width="128" height="62" rx="7"/>
+    <text class="t" x="612" y="72">M5 · disease</text>
+    <text class="s" x="612" y="90">evidence, RAG</text><text class="s" x="612" y="103">synthesis</text>
+    <rect class="box todo" x="748" y="50" width="128" height="62" rx="7"/>
+    <text class="t" x="760" y="72">M6 · report</text>
+    <text class="s" x="760" y="90">one HTML</text><text class="s" x="760" y="103">deliverable</text>
+  </g>
+  <path class="arr" d="M136 81 L152 81" marker-end="url(#a)"/>
+  <path class="arr" d="M284 81 L300 81" marker-end="url(#a)"/>
+  <path class="arr" d="M432 81 L448 81" marker-end="url(#a)"/>
+  <path class="arr" d="M580 81 L596 81" marker-end="url(#a)"/>
+  <path class="arr" d="M728 81 L744 81" marker-end="url(#a)"/>
+  <text class="io" x="8" y="140">BUILT</text>
+  <line x1="52" y1="136" x2="432" y2="136" stroke="var(--accent)" stroke-width="2"/>
+  <text class="io" x="452" y="140" fill="var(--dim)">NOT BUILT</text>
+  <line x1="528" y1="136" x2="876" y2="136" stroke="var(--dim)" stroke-width="2" stroke-dasharray="5 4"/>
+  <text class="s" x="8" y="170">proteins.faa</text><text class="s" x="8" y="184">genes_proteins.csv</text>
+  <text class="s" x="8" y="198">specialty_genes_all.csv</text>
+  <text class="s" x="156" y="170">proteins.tsv · top50.tsv</text><text class="s" x="156" y="184">hits.tsv · kg.json</text>
+  <text class="s" x="156" y="198">no_pdb_hit.tsv</text>
+  <text class="s" x="304" y="170">structures/*.cif</text><text class="s" x="304" y="184">quality decisions</text>
+  <text class="io" x="8" y="232">report.json — one shared contract, each module owns exactly one key</text>
+  <rect x="4" y="216" width="872" height="24" rx="5" fill="none" stroke="var(--rule)" stroke-width="1.5"/>
+</svg>
+  <p class="note">Data flows one way. M2 may read M1; M4 may read M1&ndash;M3; nothing writes
+  upstream. Every module is a CLI with a <code>--dry-run</code> that works offline.</p>
+</section>
+
+<section>
+  <p class="kicker">Input</p>
+  <h2>What actually goes in</h2>
+  <p>BV-BRC Comprehensive Genome Analysis output, joined on <code>patric_id</code>. For
+  HS11286 that is 5,523 proteins and 2,592 specialty rows:</p>
+  <pre class="sm"><code>&gt;fig|1125630.4.peg.5196  DNA replication protein
+MLSAVNDMLSAVRYMLPTVLCMLSAVIDVCCQRLEPKGIHMSTKNKKESEIKEIPEDNEI…
+
+patric_id,refseq_locus_tag,gene,product,aa_length,start,end,strand,plfam_id,pgfam_id
+fig|1125630.4.peg.5196,KPHS_p100010,,DNA replication protein,405,201,1418,+,PLF_…
+
+property,gene,product,source,classification,antibiotics_class,identity,…
+Antibiotic Resistance,,Two-component regulator BasR/PmrA,PATRIC,['regulator…'],polymixins,…</code></pre>
+  <p class="note">Column names are matched through aliases — BV-BRC's web export and its
+  <code>p3-</code> CLI disagree on spelling, and both are in circulation.</p>
 </section>
 
 <section>
   <p class="kicker">M1 · genome</p>
-  <h2>Genome in, proteins and evidence out</h2>
-  <p>BV-BRC Comprehensive Genome Analysis: genes and proteins, AMR and virulence rows,
-  closest genomes, phylogeny. Two genomes went all the way through.</p>
-  <table>
-    <tr><th>Genome</th><th class="n">Proteins</th><th class="n">Specialty rows</th></tr>
-    <tr><td><em>K. pneumoniae</em> HS11286</td><td class="n">5,523</td><td class="n">2,592</td></tr>
-    <tr><td><em>M. genitalium</em> G37</td><td class="n">542</td><td class="n">—</td></tr>
-  </table>
-  <p>M1 writes its own interactive report that opens offline, with no server.</p>
+  <h2>Genome in, annotated proteins out</h2>
+  <div class="two">
+    <div>
+      <h3>APIs</h3>
+      <ul><li>BV-BRC CGA (submit / poll / parse)</li>
+      <li><code>www.bv-brc.org/api</code> — features, genomes</li>
+      <li>Minhash Similar Genome Finder</li>
+      <li><code>p3-</code> CLI fallback path</li></ul>
+    </div>
+    <div>
+      <h3>Filters</h3>
+      <ul><li>Genome-quality gate — <em>poor</em> is not handed downstream without a decision</li>
+      <li>Codon-tree ingroup chosen from sequence, not taxonomy</li></ul>
+    </div>
+  </div>
+  <table class="sm"><tr><th>In</th><th>Out</th></tr>
+  <tr><td>contigs, or a CGA job directory</td>
+      <td><code>m1/</code> three files · <code>report.json</code> keys <code>run</code>,
+      <code>genome</code>, <code>proteins</code> · offline HTML report</td></tr></table>
+</section>
+
+<section>
+  <p class="kicker">M2 · triage</p>
+  <h2>Every protein searched, then filtered hard</h2>
+  <div class="two">
+    <div>
+      <h3>APIs</h3>
+      <ul><li>RCSB <code>search/v2</code> sequence search + <code>data</code> GraphQL for entity metadata</li>
+      <li>AlphaFold DB prediction API</li>
+      <li>Foldseek web API (3Di+AA)</li>
+      <li>UniProt / UniParc, ChEMBL, STRING</li>
+      <li>DIAMOND locally — human proteome and essentiality references</li></ul>
+    </div>
+    <div>
+      <h3>Filters</h3>
+      <ul><li>Search: e-value &lt; 1e-3, identity &ge; 25%, 25 rows</li>
+      <li>Counts as evidence: e-value &lt; 1e-5 <em>and</em> coverage &ge; 50%</li>
+      <li>Foldseek: e-value &lt; 1e-4, coverage &ge; 40%</li>
+      <li>Human homolog: DIAMOND 1e-5, coverage 50%; close at &ge; 40% identity</li>
+      <li>Essential ortholog: identity &ge; 40%, coverage &ge; 70%, e-value 1e-10</li></ul>
+    </div>
+  </div>
+  <table class="sm"><tr><th>In</th><th>Out</th></tr>
+  <tr><td><code>m1/</code> three files</td>
+      <td><code>proteins.tsv</code> (all 542) · <code>top50.tsv</code> ·
+      <code>hits.tsv</code> · <code>kg.json</code> · <code>no_pdb_hit.tsv</code> ·
+      <code>run.json</code></td></tr></table>
 </section>
 
 <section>
@@ -121,26 +227,58 @@ nav button:hover{border-color:var(--accent)}
 + 0.15·drug_target + 0.30·annotation_gap + 0.10·surface_bonus
 + 0.10·ligandable_homolog
 − 0.15·membrane_penalty − 0.25·(human_identity/100)</code></pre>
-  <p>Every component, flag and one-sentence reason is written out for <strong>all 542
-  proteins</strong> — not only the fifty we chose. The selection can be recomputed from the
-  recorded columns alone, which is what makes it arguable rather than asserted.</p>
+  <p>The first full HS11286 run selected <strong>0 uncharacterized proteins out of 1,338</strong>
+  — a known target collects 0.50 from virulence, essentiality and drug-target evidence where a
+  hypothetical earns 0.10. So <code>annotation_gap</code> went 0.10 &rarr; 0.30, with the
+  sensitivity recorded rather than tuned quietly: 0.20&rarr;6, 0.25&rarr;9,
+  <strong>0.30&rarr;10</strong>, 0.35&rarr;15, 0.40&rarr;26 uncharacterized in the top 50.</p>
+  <p class="note">Changed <em>after</em> seeing a run — so it is in the decision log, with the
+  numbers, rather than quietly applied.</p>
+</section>
+<section>
+  <p class="kicker">M3 · fold</p>
+  <h2>Reuse a structure before predicting one</h2>
+  <div class="two">
+    <div>
+      <h3>APIs</h3>
+      <ul><li><code>files.rcsb.org</code> — experimental structures</li>
+      <li>AlphaFold DB — predicted models</li>
+      <li>153 <code>.cif</code> collected for G37</li></ul>
+    </div>
+    <div>
+      <h3>Quality gate</h3>
+      <ul><li>PDB: identity &ge; 25%, coverage &ge; 50%, resolution &le; 3.5 &Aring;</li>
+      <li>AFDB: mean pLDDT &ge; 70, coverage &ge; 80%</li>
+      <li>Local pLDDT &lt; 70 masked as low-confidence regions</li></ul>
+    </div>
+  </div>
+  <table class="sm"><tr><th>In</th><th>Out</th></tr>
+  <tr><td><code>report.json</code> proteins + M2 xrefs</td>
+      <td><code>structures/</code> · per-structure pass/fail with the evidence behind it</td></tr></table>
 </section>
 
 <section>
-  <p class="kicker">Calibration</p>
-  <h2>The weight we changed after seeing the data</h2>
-  <p>The first full HS11286 run selected <strong>0 uncharacterized proteins out of 1,338</strong>.
-  A known drug target collects 0.50 from virulence, essentiality and drug-target evidence.
-  A hypothetical can earn 0.10. Backwards, for a project about the unknown.</p>
-  <table>
-    <tr><th><code>annotation_gap</code></th><th class="n">0.20</th><th class="n">0.25</th>
-        <th class="n">0.30</th><th class="n">0.35</th><th class="n">0.40</th></tr>
-    <tr><td>Uncharacterized in top 50</td><td class="n">6</td><td class="n">9</td>
-        <td class="n"><strong>10</strong></td><td class="n">15</td><td class="n">26</td></tr>
-  </table>
-  <p class="note">Changed <em>after</em> seeing a run — so it is in the decision log, with the
-  sensitivity, rather than quietly applied.</p>
+  <p class="kicker">Output</p>
+  <h2>What comes out — one row, fully shown</h2>
+  <pre class="sm"><code>rank              1
+feature_id        fig|243273.25.peg.503
+product           hypothetical protein
+triage_score      0.65
+  pdb_evidence      0.875
+  annotation_gap    1.0
+best_entity_id    1YDX_1     identity 1.0   coverage 1.0   2.3 A   X-ray
+pdb_hit_organism  Mycoplasmoides genitalium
+uniprot_of_best   Q49434
+selected          True
+reason            PDB 1YDX_1 identity 100%, coverage 100%, 2.30 A;
+                  uncharacterized product</code></pre>
+  <p><strong>50 columns, written for all 542 proteins</strong> — not just the chosen fifty. The
+  <code>reason</code> is a sentence a human can check, and the score recomputes from the
+  recorded components alone.</p>
 </section>
+
+
+
 
 <section>
   <p class="kicker">The finding</p>
@@ -171,30 +309,22 @@ nav button:hover{border-color:var(--accent)}
   silently</span>.</p>
 </section>
 
-<section>
-  <p class="kicker">M3 · fold</p>
-  <h2>Reuse structures before predicting them</h2>
-  <p>Existing structures are collected and quality-gated first: <strong>153 AlphaFold
-  models</strong> for G37, before anything is folded from scratch.</p>
-  <p class="big">16.6%</p>
-  <p>Median best-hit identity for Foldseek structure search — <strong>below the 25% floor</strong>
-  where sequence alignment stops separating homology from chance. That gap is the entire reason
-  structure search earns its place in the pipeline.</p>
-</section>
 
 <section>
-  <p class="kicker">Limits</p>
-  <h2>What we did not build, and what this is not</h2>
-  <ul>
-    <li>No docking, no ligand scoring, no co-folding.</li>
-    <li>No literature synthesis or claim verification.</li>
-    <li>No final report renderer — this deck stands in for it.</li>
-    <li>Nothing here is experimentally validated.</li>
-    <li>Nothing here implies a clinical claim.</li>
-  </ul>
-  <p class="note">Scores are rankings, not affinities. Predicted structures lack cofactors.</p>
+  <p class="kicker">Status</p>
+  <h2>What we have, and what is left</h2>
+  <table class="sm">
+    <tr><th>Module</th><th>State</th><th>What exists / what is missing</th></tr>
+    <tr><td>M1 genome</td><td class="st">built</td><td>CGA parse, AMR, phylogeny, offline HTML report</td></tr>
+    <tr><td>M2 triage</td><td class="st">built</td><td>PDB + Foldseek evidence, 9-component score, 50 selected</td></tr>
+    <tr><td>M3 fold</td><td class="st">partial</td><td>collection and quality gate done; pocket detection open</td></tr>
+    <tr><td>M4 ligands</td><td class="no">not built</td><td>candidates, docking, caps, co-folding</td></tr>
+    <tr><td>M5 disease</td><td class="no">not built</td><td>evidence gathering, RAG synthesis, claim checks</td></tr>
+    <tr><td>M6 report</td><td class="no">not built</td><td>this deck stands in for it</td></tr>
+  </table>
+  <p class="note">No docking, no literature synthesis, nothing experimentally validated, and no
+  clinical claim. Scores are rankings, not affinities; predicted structures lack cofactors.</p>
 </section>
-
 <section>
   <p class="kicker">Demo</p>
   <h2>Offline, from committed fixtures</h2>
@@ -217,7 +347,7 @@ nav button:hover{border-color:var(--accent)}
 </main>
 <nav>
   <button id="p" aria-label="Previous slide">←</button>
-  <span id="c">1 / 12</span>
+  <span id="c">1 / 14</span>
   <button id="n" aria-label="Next slide">→</button>
 </nav>
 <script>
