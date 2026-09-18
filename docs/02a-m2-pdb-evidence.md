@@ -107,6 +107,7 @@ Components come from PDB evidence plus the M1 specialty table. Components that n
 | `essential` | **0.15** | 1.0 if an `Essential Gene` specialty row exists; else 0 |
 | `drug_target` | **0.15** | 1.0 if a `Drug Target` specialty row exists (DrugBank, TTD); else 0 |
 | `annotation_gap` | **0.30** | 1.0 if the product is hypothetical, uncharacterized, putative or a DUF; else 0 |
+| `ligandable_homolog` | **0.10** | 1.0 when a real ligand is observed bound in the best hit's entry, or a ChEMBL target maps to the resolved accession; **unmeasured when there is no hit and no mapping** |
 | `surface_bonus` | **0.10** | 1.0 if #10 calls the protein secreted or surface-exposed; 0 if it called it neither; **unmeasured when no provider covered it** |
 | `membrane_penalty` | **−0.15** | 1.0 if #10 calls it a membrane protein — deprioritized, never excluded (pitfall #3) |
 | `human_homolog` | **−0.25 × identity/100** | applied when a `Human Homolog` specialty row exists (identity is always populated in the export) |
@@ -114,6 +115,7 @@ Components come from PDB evidence plus the M1 specialty table. Components that n
 ```
 triage_score = 0.40·pdb_evidence + 0.20·virulence_amr + 0.15·essential
              + 0.15·drug_target + 0.30·annotation_gap + 0.10·surface_bonus
+             + 0.10·ligandable_homolog
              − 0.15·membrane_penalty − 0.25·(human_identity/100)
 ```
 
@@ -254,6 +256,38 @@ G37's public export has no `classification` column at all, so all 15 of its AMR 
 The CGA output does carry it — 10 of its 14 AMR rows are "antibiotic target in susceptible
 species" — so the correction takes effect as soon as M1's real output is used.
 
+## Ligandability is tractability, not potency
+
+`ligandable_homolog` is the last component from #12's list. It fires when a small molecule has
+been **observed bound** to the best structural hit, or when compounds have been assayed against
+the mapped accession (ChEMBL). It says the site is tractable — M4 needs a holo template and
+pitfall #2 says prefer one — and it says nothing about affinity. A ligand in a PDB entry is not
+a binding measurement, which is why additives, glycans and metals are excluded upstream: 6M0J's
+only non-polymer components are a glycan, a metal and an additive, so the SARS-CoV-2 RBD scores
+**0** here despite being a famous complex.
+
+**The weight was chosen by measuring the trade it makes.** Ligand-bound homologs belong to
+well-studied proteins, so this component pulls directly against `annotation_gap`, which exists to
+keep hypotheticals in the list. On G37 (240 of 542 proteins have a ligand-bound homolog, but only
+14 were in the top 50 before):
+
+| Weight | Ligandable in top 50 | Displaced | Uncharacterized remaining |
+| --- | --- | --- | --- |
+| 0.05 | 20 | 6 | 30 |
+| **0.10** | **27** | **13** | **25** |
+| 0.15 | 39 | 25 | 15 |
+| 0.20 | 45 | 31 | 9 |
+
+0.10 roughly doubles the holo templates available to M4 while leaving half the selection
+uncharacterized. At 0.15 the list turns over by half and the discovery half collapses.
+
+**One known interaction.** A bound ligand counts twice, by 0.133 in total: 0.10 here, plus
+0.033 inside `pdb_evidence`, whose per-hit `LIGAND_BONUS` raises the normalized hit score
+(0.40 × 0.10/1.20). The two were written for different reasons — one rates how useful the
+structure is, the other whether the site is tractable — but they are the same fact. It is pinned
+in a test so it stays visible, and dropping `LIGAND_BONUS` now that a dedicated component exists
+is the obvious simplification whenever the weights are next revisited.
+
 ## Measured or merely zero
 
 `surface_bonus` and `membrane_penalty` depend on providers that may not have run. A component
@@ -376,6 +410,7 @@ Written to `runs/<run_id>/m2_pdb/`:
 | --- | --- | --- |
 | 2026-09-16 | Initial weights, before any full run. | Written from the component list in `02-m2-triage.md` and what the HS11286 specialty export actually provides. |
 | 2026-09-16 | `pdb_evidence` normalized by 1.20 instead of clipped at 1.0. Weights unchanged. | A 10-protein smoke run put two different-quality hits (raw 1.09 and 1.043) at an identical 0.40, because clipping discards the bonus range exactly where ranking matters. Found before any full run. |
+| 2026-09-17 | Added `ligandable_homolog` (+0.10) — the last component on #12's list. | Fires on a ligand observed bound in the best hit's entry, or a ChEMBL target on the mapped accession. Weight chosen by measuring the trade against `annotation_gap`: at 0.10, holo templates in the top 50 go 14 → 27 while uncharacterized proteins stay at 25 of 50; at 0.15 the list turns over by half and hypotheticals drop to 15. Decision: project lead, 2026-09-17. Note the 0.033 overlap with `pdb_evidence`'s `LIGAND_BONUS`, documented above. |
 | 2026-09-17 | Added `surface_bonus` (+0.10) and `membrane_penalty` (−0.15), fed by #10's localization flags. | #10 shipped the flags and deliberately left them unscored, noting the weights belonged here. Surface-exposed proteins are the accessible ones (and M5's vaccine/antibody angle); membrane proteins fold and dock badly, so pitfall #3 says deprioritize rather than exclude — hence a penalty a strong protein can still outweigh. On G37: 19 proteins surface-exposed, 91 membrane, 1 of each in the top 50. |
 | 2026-09-17 | `virulence_amr` now reads the AMR classification instead of counting any AMR row. | Issue #30: most "Antibiotic Resistance" rows are "antibiotic target in susceptible species" — drug targets, not resistance genes. On HS11286, 16 of 130 such proteins were being scored as resistance evidence. Those now score `drug_target` instead, unclassified rows get 0.5, and `amr_basis` records which applied. Weight unchanged at 0.20. |
 | 2026-09-17 | `essential` now comes from orthology to FBA-essential proteins in public relatives, not BV-BRC's precomputed rows. Weight unchanged at 0.15. | Same reason as the human-homolog change: those rows exist for public genomes only (issue #29). Recovers 148 of G37's 148 known essential genes, plus 21 more that each name their source relative and identity. |

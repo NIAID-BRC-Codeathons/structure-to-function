@@ -11,7 +11,7 @@ numbers alone (``triage_score_from_components``).
 from __future__ import annotations
 
 from dataclasses import asdict, dataclass, field
-from typing import Any
+from typing import Any, Sequence
 
 from .bvbrc_input import Protein, same_genus, same_species
 from .pdb_evidence import SequenceHit
@@ -30,6 +30,7 @@ WEIGHTS = {
     "drug_target": 0.15,
     "annotation_gap": 0.30,
     "surface_bonus": 0.10,
+    "ligandable_homolog": 0.10,
     "membrane_penalty": -0.15,
     "human_homolog_penalty": -0.25,
 }
@@ -38,7 +39,7 @@ WEIGHTS = {
 #: contributes 0 — the same number as "we checked and it is false" — so the two are recorded
 #: separately per protein and summarised per run. Otherwise a missing DeepTMHMM run reads as
 #: "no membrane proteins in this genome" (issue #10's flag_row makes the same distinction).
-OPTIONAL_COMPONENTS = ("surface_bonus", "membrane_penalty")
+OPTIONAL_COMPONENTS = ("surface_bonus", "membrane_penalty", "ligandable_homolog")
 
 LIGAND_BONUS = 0.10
 PARTNER_BONUS = 0.05
@@ -109,6 +110,7 @@ class TriageComponents:
     drug_target: float = 0.0
     annotation_gap: float = 0.0
     surface_bonus: float = 0.0
+    ligandable_homolog: float = 0.0
     membrane_penalty: float = 0.0
     human_homolog_penalty: float = 0.0
 
@@ -158,6 +160,7 @@ def score_protein(
     annotation: Any = None,
     query_organism: str = "",
     query_taxonomy: Any = None,
+    chembl_targets: Sequence[str] = (),
 ) -> ProteinScore:
     """Score one protein from its PDB hits and M1 specialty rows.
 
@@ -195,6 +198,27 @@ def score_protein(
                 getattr(annotation, "surface_exposed", False) or getattr(annotation, "secreted", False)
             ) else 0.0
 
+    # Ligandability: a small molecule has been observed bound to the homolog, or compounds have
+    # been assayed against it. This is evidence the site is tractable, **not** evidence of
+    # potency — a ligand in a PDB entry is not a binding measurement, which is why additives,
+    # glycans and metals are already excluded from `ligands` upstream. M4 needs a holo template
+    # (pitfall #2); M3 prefers one to align to.
+    ligandable = 0.0
+    ligandable_basis = ""
+    ligandable_known = False
+    if top is not None:
+        ligandable_known = True
+        if top.ligands:
+            ligandable = 1.0
+            ligandable_basis = f"ligand bound in {top.entry_id}: {','.join(top.ligands[:3])}"
+    if chembl_targets:
+        ligandable_known = True
+        if not ligandable:
+            ligandable = 1.0
+            ligandable_basis = "compounds assayed against the mapped target: " + ";".join(
+                list(chembl_targets)[:3]
+            )
+
     amr_value, amr_basis = protein.amr_evidence
     virulence_amr = max(1.0 if protein.is_virulence_factor else 0.0, amr_value)
     components = TriageComponents(
@@ -204,6 +228,7 @@ def score_protein(
         drug_target=1.0 if protein.is_drug_target else 0.0,
         annotation_gap=1.0 if protein.is_uncharacterized else 0.0,
         surface_bonus=surface_value,
+        ligandable_homolog=ligandable,
         membrane_penalty=membrane_value,
         human_homolog_penalty=round(human_identity / 100.0, 6) if human_identity else 0.0,
     )
@@ -223,6 +248,7 @@ def score_protein(
         "essential_source": essential_source or "",
         "amr_basis": amr_basis,
         "antibiotic_target_not_resistance": protein.is_antibiotic_target,
+        "ligandable_basis": ligandable_basis,
         "surface_exposed_source": surface_source,
         "membrane_source": membrane_source,
         # "no qualifying hit" must not absorb "the search failed" — a network failure would
@@ -253,6 +279,7 @@ def score_protein(
         flags=flags,
         components_available={
             "surface_bonus": surface_known,
+            "ligandable_homolog": ligandable_known,
             "membrane_penalty": membrane_known,
         },
         error=error,
@@ -300,6 +327,9 @@ def _reason(score: ProteinScore) -> str:
         parts.append("known drug target")
     if score.components.annotation_gap:
         parts.append("uncharacterized product")
+    if score.components.ligandable_homolog:
+        parts.append("ligandable homolog" + (f" ({score.flags.get('ligandable_basis','')})"
+                                             if score.flags.get("ligandable_basis") else ""))
     if score.components.surface_bonus:
         parts.append("surface-exposed or secreted")
     if score.components.membrane_penalty:

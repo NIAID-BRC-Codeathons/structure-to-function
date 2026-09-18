@@ -86,9 +86,10 @@ HIT_COLUMNS = [
 PROTEIN_COLUMNS = [
     "rank", "feature_id", "product", "gene", "locus_tag", "pgfam", "triage_score",
     "pdb_evidence", "virulence_amr", "essential", "drug_target", "annotation_gap",
-    "surface_bonus", "membrane_penalty", "human_homolog_penalty",
+    "surface_bonus", "ligandable_homolog", "membrane_penalty", "human_homolog_penalty",
+    "ligandable_basis",
     "amr_basis", "antibiotic_target_not_resistance",
-    "surface_exposed_measured", "membrane_measured", "retrieval_status", "best_entity_id", "best_identity",
+    "surface_exposed_measured", "membrane_measured", "ligandable_measured", "retrieval_status", "best_entity_id", "best_identity",
     "best_coverage", "best_resolution", "best_method", "qualifying_hits", "distinct_entries",
     "has_ligand_in_entry", "holo_homolog", "metals_in_entry", "human_pdb_hit",
     "human_homolog_identity", "close_human_homolog", "human_homolog_source", "essential_source",
@@ -163,6 +164,7 @@ def _protein_row(score: ProteinScore, protein_meta: dict[str, str]) -> dict[str,
     row.update(
         {
             "surface_exposed_measured": score.components_available.get("surface_bonus", False),
+            "ligandable_measured": score.components_available.get("ligandable_homolog", False),
             "membrane_measured": score.components_available.get("membrane_penalty", False),
         }
     )
@@ -526,6 +528,11 @@ def run(args: argparse.Namespace) -> int:
                         ),
                         query_organism=query_organism,
                         query_taxonomy=query_taxonomy,
+                        chembl_targets=(
+                            xrefs_by_id[protein.feature_id].chembl
+                            if xrefs_by_id.get(protein.feature_id)
+                            else ()
+                        ),
                     )
                 )
                 hit_rows.extend(_hit_rows(protein.feature_id, hits, hit_score))

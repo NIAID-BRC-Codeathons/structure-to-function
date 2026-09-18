@@ -3,7 +3,9 @@ import pytest
 from s2f.m2_triage.bvbrc_input import Protein, SpecialtyHit, same_genus, same_species
 from s2f.m2_triage.pdb_evidence import SequenceHit
 from s2f.m2_triage.score import (
+    LIGAND_BONUS,
     MAX_HIT_SCORE,
+    WEIGHTS,
     TriageComponents,
     hit_qualifies,
     hit_score,
@@ -265,11 +267,15 @@ def test_an_unmeasured_flag_is_recorded_as_unmeasured_not_false() -> None:
     assert measured_false.components_available["membrane_penalty"] is True
 
 
-def test_no_annotation_at_all_leaves_both_components_unmeasured() -> None:
+def test_no_annotation_at_all_leaves_the_localization_components_unmeasured() -> None:
     scored = score_protein(make_protein(), [make_hit()], "found")
 
-    assert scored.components_available == {"surface_bonus": False, "membrane_penalty": False}
+    assert scored.components_available["surface_bonus"] is False
+    assert scored.components_available["membrane_penalty"] is False
     assert scored.components.surface_bonus == 0.0
+    # Ligandability does not need the annotation providers: a PDB hit is enough to know whether
+    # a ligand was observed bound, so it counts as measured here.
+    assert scored.components_available["ligandable_homolog"] is True
 
 
 def test_score_is_still_reproducible_from_the_recorded_components() -> None:
@@ -347,3 +353,54 @@ def test_without_a_query_organism_nothing_is_claimed() -> None:
 
     assert scored.flags["same_species_hit"] is False
     assert scored.flags["same_genus_hit"] is False
+
+
+# --- ligandable_homolog (#12's last component) ----------------------------------------
+
+
+def test_a_ligand_bound_homolog_is_ligandable() -> None:
+    holo = score_protein(make_protein(), [make_hit(ligands=["MK1"])], "found")
+    apo = score_protein(make_protein(), [make_hit(ligands=[])], "found")
+
+    assert holo.components.ligandable_homolog == 1.0
+    assert apo.components.ligandable_homolog == 0.0
+    # The same fact counts twice, by 0.133 in total: once as `ligandable_homolog` (0.10), and
+    # once inside `pdb_evidence`, whose per-hit LIGAND_BONUS raises the normalized hit score
+    # (0.40 x 0.10/1.20 = 0.033). Pinned here so the interaction is visible rather than folklore.
+    expected = 0.10 + WEIGHTS["pdb_evidence"] * (LIGAND_BONUS / MAX_HIT_SCORE)
+    assert holo.score - apo.score == pytest.approx(expected, abs=1e-5)
+    assert "MK1" in holo.flags["ligandable_basis"]
+
+
+def test_additives_glycans_and_metals_do_not_make_a_protein_ligandable() -> None:
+    """6M0J's non-polymer components are a glycan, a metal and an additive — not ligands."""
+    decorated = score_protein(make_protein(), [make_hit(ligands=[], metals=["ZN"])], "found")
+
+    assert decorated.components.ligandable_homolog == 0.0
+    assert decorated.flags["ligandable_basis"] == ""
+
+
+def test_a_chembl_target_counts_even_without_a_bound_structure() -> None:
+    scored = score_protein(
+        make_protein(), [make_hit(ligands=[])], "found", chembl_targets=["CHEMBL1826"]
+    )
+
+    assert scored.components.ligandable_homolog == 1.0
+    assert "CHEMBL1826" in scored.flags["ligandable_basis"]
+
+
+def test_ligandability_is_unmeasured_when_there_is_nothing_to_measure() -> None:
+    """No structural hit and no mapping: unknown, which is not the same as 'not ligandable'."""
+    nothing = score_protein(make_protein(), [], "no-hit")
+
+    assert nothing.components.ligandable_homolog == 0.0
+    assert nothing.components_available["ligandable_homolog"] is False
+
+
+def test_ligandability_is_tractability_not_potency() -> None:
+    """The basis names what was observed, so a reader cannot read it as an affinity."""
+    scored = score_protein(make_protein(), [make_hit(ligands=["ATP"])], "found")
+
+    assert "ligand bound in" in scored.flags["ligandable_basis"]
+    ranked = rank_and_select([scored], top_n=1)
+    assert "ligandable homolog" in ranked[0].reason
