@@ -43,58 +43,65 @@ TABS: list[tuple[str, str, str]] = [
 PROTEIN_ROWS = 400
 
 CSS = """
-:root{--bg:#f8fafc;--card:#fff;--line:#e2e8f0;--ink:#0f172a;--muted:#64748b;
---accent:#b91c1c;--ok:#166534;--warn:#b45309}
+:root{--bg:#f8fafc;--card:#fff;--ink:#0f172a;--muted:#64748b;--line:#e2e8f0;
+--brand:#0b5cad;--accent:#b91c1c}
 *{box-sizing:border-box}
 body{margin:0;background:var(--bg);color:var(--ink);
 font:15px/1.55 system-ui,Segoe UI,Arial,sans-serif}
-.wrap{max-width:1180px;margin:0 auto;padding:22px 18px 60px}
-header.hero{background:var(--card);border:1px solid var(--line);border-radius:14px;
-padding:20px 22px;margin-bottom:16px}
-h1{margin:0 0 4px;font-size:25px}
-.sub{color:var(--muted);font-size:13.5px}
-.badgebar{margin-top:12px;display:flex;flex-wrap:wrap;gap:8px}
-.badge{background:#f1f5f9;border:1px solid var(--line);border-radius:999px;
-padding:3px 11px;font-size:12.5px}
-nav.tabs{display:flex;flex-wrap:wrap;gap:6px;margin:0 0 14px}
-nav.tabs button{background:var(--card);border:1px solid var(--line);border-radius:10px;
-padding:9px 15px;font:inherit;font-size:14px;cursor:pointer;color:var(--ink)}
-nav.tabs button[aria-selected=true]{background:var(--ink);color:#fff;border-color:var(--ink)}
-nav.tabs button .tally{color:var(--muted);font-size:12px;margin-left:6px}
-nav.tabs button[aria-selected=true] .tally{color:#cbd5e1}
+a{color:var(--brand)}
+header.hero{background:linear-gradient(135deg,#0b5cad,#0e7490);color:#fff;padding:26px 32px}
+header.hero h1{margin:0 0 4px;font-size:24px}
+header.hero .sub{opacity:.9;font-size:14px}
+.badgebar{margin-top:14px;display:flex;flex-wrap:wrap;gap:8px}
+.badge{background:rgba(255,255,255,.16);border:1px solid rgba(255,255,255,.3);
+padding:4px 10px;border-radius:20px;font-size:12.5px}
+nav.tabs{position:sticky;top:0;z-index:5;background:#fff;border-bottom:1px solid var(--line);
+padding:0 32px;display:flex;flex-wrap:wrap;gap:20px}
+nav.tabs button{background:none;border:0;border-bottom:2.5px solid transparent;
+color:var(--muted);font:inherit;font-size:13.5px;font-weight:600;padding:12px 2px;
+cursor:pointer}
+nav.tabs button:hover{color:var(--brand)}
+nav.tabs button[aria-selected=true]{color:var(--brand);border-bottom-color:var(--brand)}
+nav.tabs button .tally{color:#94a3b8;font-weight:600;font-size:11.5px;margin-left:5px;
+background:#f1f5f9;border-radius:20px;padding:1px 7px}
+nav.tabs button[aria-selected=true] .tally{background:#e0f2fe;color:var(--brand)}
+main{max-width:1160px;margin:0 auto;padding:24px 32px 60px}
 section.pane{display:none}
 section.pane.on{display:block}
 .card{background:var(--card);border:1px solid var(--line);border-radius:12px;
-padding:18px 20px;margin-bottom:14px}
+padding:22px 24px;margin:20px 0;box-shadow:0 1px 2px rgba(15,23,42,.04)}
 .card h2{margin:0 0 4px;font-size:19px}
-.card h3{margin:14px 0 6px;font-size:15px}
-.lead{color:var(--muted);margin:0 0 14px;font-size:13.5px}
-.note{border-radius:10px;padding:10px 12px;font-size:13px;margin:0 0 14px;
-background:#ecfdf5;border:1px solid #a7f3d0;color:#065f46}
+.card h3{margin:18px 0 8px;font-size:15px;color:var(--brand)}
+.lead{color:var(--muted);margin:0 0 16px;font-size:13.5px}
+.note{border-radius:10px;padding:11px 13px;font-size:13px;margin:0 0 16px;
+background:#eff6ff;border:1px solid #bfdbfe;color:#1e3a8a}
 .note.warn{background:#fffbeb;border-color:#fde68a;color:#92400e}
-.grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:10px}
-.stat{background:#f8fafc;border:1px solid var(--line);border-radius:10px;padding:9px 12px}
-.stat .k{color:var(--muted);font-size:11.5px;text-transform:uppercase;letter-spacing:.04em}
-.stat .v{font-size:16px;font-weight:650;margin-top:2px}
-.cols{display:grid;grid-template-columns:1fr 1fr;gap:18px}
-@media(max-width:860px){.cols{grid-template-columns:1fr}}
+.grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:12px}
+.stat{background:#f8fafc;border:1px solid var(--line);border-radius:10px;padding:12px}
+.stat .k{font-size:12px;color:var(--muted)}
+.stat .v{font-size:19px;font-weight:700}
+.cols{display:grid;grid-template-columns:1fr 1fr;gap:20px}
+@media(max-width:820px){.cols{grid-template-columns:1fr}
+main,header.hero,nav.tabs{padding-left:16px;padding-right:16px}}
 .kv div{padding:3px 0;font-size:13.5px}
 table{border-collapse:collapse;width:100%;font-size:13px}
-th,td{border-bottom:1px solid var(--line);padding:6px 8px;text-align:left;
-vertical-align:top}
-th{position:sticky;top:0;background:#f8fafc;font-size:12px;z-index:1}
+th,td{border-bottom:1px solid var(--line);padding:7px 9px;text-align:left;vertical-align:top}
+th{background:#f1f5f9;position:sticky;top:0;white-space:nowrap;z-index:1}
+tbody tr:hover{background:#f8fafc}
 .tablewrap{max-height:620px;overflow:auto;border:1px solid var(--line);border-radius:10px}
-tr.sel{background:#fef2f2}
+tr.sel{background:#eff6ff}
+tr.sel:hover{background:#dbeafe}
 code{background:#f1f5f9;border-radius:5px;padding:1px 5px;font-size:12px}
 .muted{color:var(--muted)}
-.bar{height:9px;background:#f1f5f9;border-radius:5px;overflow:hidden;min-width:70px}
-.bar>i{display:block;height:100%;background:#94a3b8}
-.pill{display:inline-block;border-radius:999px;padding:1px 8px;font-size:11.5px;
-border:1px solid var(--line);background:#f8fafc;margin:1px 3px 1px 0}
+.bar{display:inline-block;height:9px;background:#e2e8f0;border-radius:5px;overflow:hidden;
+width:70px;vertical-align:middle}
+.bar>i{display:block;height:100%;background:var(--brand)}
+.pill{display:inline-block;border-radius:20px;padding:1px 9px;font-size:11.5px;
+border:1px solid #bfdbfe;background:#eff6ff;color:#1e3a8a;margin:1px 3px 1px 0}
 .pill.bad{background:#fef2f2;border-color:#fecaca;color:#991b1b}
 .pill.good{background:#ecfdf5;border-color:#a7f3d0;color:#065f46}
-.empty{background:#f8fafc;border:1px dashed var(--line);border-radius:10px;
-padding:24px;color:var(--muted);text-align:center}
+.empty{background:#f8fafc;border:1px dashed var(--line);border-radius:12px;
+padding:34px;color:var(--muted);text-align:center;margin:20px 0}
 input[type=search]{width:100%;max-width:420px;padding:8px 11px;border:1px solid var(--line);
 border-radius:9px;font:inherit;margin-bottom:10px}
 svg{max-width:100%;height:auto}
@@ -625,7 +632,7 @@ def build_page(report: dict[str, Any], m2_run: dict[str, Any] | None = None) -> 
         "<!doctype html><html lang='en'><head><meta charset='utf-8'>",
         "<meta name='viewport' content='width=device-width,initial-scale=1'>",
         f"<title>{esc(name)} — structure-to-function report</title>",
-        f"<style>{CSS}</style></head><body><div class='wrap'>",
+        f"<style>{CSS}</style></head><body>",
         "<header class='hero'>",
         f"<h1>{esc(name)}</h1>",
         f"<div class='sub'>Structure-to-function pipeline · run "
@@ -651,13 +658,13 @@ def build_page(report: dict[str, Any], m2_run: dict[str, Any] | None = None) -> 
         badge = f"<span class='tally'>{tally}</span>" if tally else ""
         out.append(f"<button role='tab' data-tab='{key}' aria-selected='false' "
                    f"onclick=\"showTab('{key}')\">{esc(label)}{badge}</button>")
-    out.append("</nav>")
+    out.append("</nav><main>")
 
     for key, label, empty_text in TABS:
         body = panes.get(key) or _empty(empty_text)
         out.append(f"<section class='pane' id='tab-{key}' role='tabpanel'>{body}</section>")
 
-    out.append("</div><script>" + JS + "</script></body></html>")
+    out.append("</main><script>" + JS + "</script></body></html>")
     return "".join(out)
 
 

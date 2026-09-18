@@ -532,30 +532,30 @@ def pathogenesis_flow_svg(priorities: list[dict[str, Any]],
                       members: list[str]) -> tuple[str, int]:
         """Mechanism box as HTML inside the SVG, so long member lists can scroll.
 
-        Up to `SCROLL_AFTER` members are shown in full and the box grows to fit; beyond
-        that the box stops growing and scrolls, because a diagram whose first column is
-        three times the height of the other two stops being a diagram.
+        The border sits on an outer box that never scrolls and the list scrolls inside
+        it, with room reserved on the right, so the scrollbar cannot land on the text or
+        clip the rounded edge. Up to `SCROLL_AFTER` members fit without scrolling; past
+        that the box stops growing, and the count in the heading already says how many
+        there are, so nothing needs to be said at the bottom where it cannot be seen.
         """
-        line_h, head_h, pad = 16, 24, 12
-        shown = len(members)
-        content_h = head_h + line_h * shown + pad * 2
-        max_h = head_h + line_h * SCROLL_AFTER + pad * 2
-        height = min(content_h, max_h)
-        scroll = "auto" if content_h > max_h else "hidden"
+        line_h, head_h, pad, gutter = 16, 22, 12, 10
+        inner_h = line_h * min(len(members), SCROLL_AFTER)
+        height = pad * 2 + head_h + inner_h
+        scroll = "auto" if len(members) > SCROLL_AFTER else "hidden"
         items = "".join(
             f'<div style="white-space:nowrap;overflow:hidden;text-overflow:ellipsis">'
             f'{esc(member)}</div>' for member in members)
-        more = ("" if scroll == "hidden" else
-                f'<div style="color:#64748b;padding-top:2px">scroll for all {shown}</div>')
         return (
             f'<foreignObject x="{x}" y="0" width="{w}" height="{height}">'
             f'<div xmlns="http://www.w3.org/1999/xhtml" style="box-sizing:border-box;'
-            f'height:{height}px;overflow-y:{scroll};border:1.5px solid {colour};'
-            f'border-radius:9px;background:{colour}20;padding:{pad}px;'
-            f'font:13px system-ui,Segoe UI,Arial;color:#0f172a">'
-            f'<div style="font-weight:600;padding-bottom:4px">{esc(title)}</div>'
-            f'<div style="font-size:11px;color:#475569;line-height:{line_h}px">'
-            f'{items}{more}</div></div></foreignObject>'), height
+            f'width:{w}px;height:{height}px;overflow:hidden;'
+            f'border:1.5px solid {colour};border-radius:9px;background:{colour}20;'
+            f'padding:{pad}px;font:13px system-ui,Segoe UI,Arial;color:#0f172a">'
+            f'<div style="font-weight:600;height:{head_h}px">{esc(title)}</div>'
+            f'<div style="height:{inner_h}px;overflow-y:{scroll};padding-right:{gutter}px;'
+            f'scrollbar-width:thin;font-size:11px;color:#475569;'
+            f'line-height:{line_h}px">{items}</div>'
+            f'</div></foreignObject>'), height
 
     rows = []
     for category in present:
