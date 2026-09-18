@@ -125,6 +125,12 @@ Useful flags: `--from-cga-dir DIR` reuses a job you already retrieved, `--job-id
 resumes polling a submitted job, `--only m1` / `--skip m2` select stages,
 `--map-ids` and `--kg` turn on M2's id resolution and knowledge graph.
 
+`--ani` turns the Mash distances in `genome.closest_genomes[]` into real identities: it
+downloads each close genome from BV-BRC over HTTPS and runs skani against the assembly.
+It needs the assembly FASTA — a retrieved CGA directory does not contain it — so pass
+`--contigs` or `--ani-query` alongside `--from-cga-dir`. See
+[docs/01-m1-genome.md](docs/01-m1-genome.md#ani-to-the-closest-genomes).
+
 ## Output
 
 ```
@@ -133,7 +139,10 @@ runs/<id>/
   m1/
     proteins.faa       one record per CDS, headers are fig| feature IDs
     genes_proteins.csv  specialty_genes_all.csv  taxon_call.json
+    ani.json           with --ani: skani version, argv, params, per-genome provenance
+    genomes/           with --ani: the close genomes' contigs, named <genome_id>.fna
   cga/                 the retrieved CGA output
+  cache/               downloads and API responses; what --offline replays
   m2_pdb/              proteins.tsv, hits.tsv, top50.tsv, no_pdb_hit.tsv, run.json
 ```
 
@@ -205,6 +214,7 @@ Not pip-installable, so record anything you add here with its version and what n
 | Tool | Version | Install | Needed by |
 | --- | --- | --- | --- |
 | DIAMOND | 2.2.7 | `brew install diamond` (or `conda install -c bioconda diamond`) | M2 human-homology search against the human proteome (#29). 542 × 20,600 proteins in seconds, where BLASTP takes minutes. |
+| skani | 0.3.2 | `conda install -c bioconda skani`, `cargo install skani`, or the single static binary from [the releases page](https://github.com/bluenote-1577/skani/releases/latest) | M1 `--ani`: ANI between the assembly and its closest genomes (#7). Six 580 kb genomes in under a second; accurate on fragmented drafts, where fastANI is not. |
 
 Everything else the pipeline uses is a web API reached through `s2f/common/http.py`, which caches
 responses, so a rerun costs nothing and `--offline` replays a run with no network at all.

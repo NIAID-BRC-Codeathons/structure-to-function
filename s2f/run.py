@@ -59,6 +59,13 @@ def build_parser() -> argparse.ArgumentParser:
     p.add_argument("--taxon-id", type=int, help="M1 CGA route: skip the Minhash call")
     p.add_argument("--genetic-code", type=int,
                    help="M1 CGA route: translation table; required with --taxon-id")
+    p.add_argument("--ani", action="store_true",
+                   help="M1: compute ANI to the closest genomes with skani (issue #7)")
+    p.add_argument("--ani-query", metavar="FASTA",
+                   help="M1: assembly FASTA for --ani (default: --contigs)")
+    p.add_argument("--skani", metavar="PATH", help="M1: skani executable for --ani")
+    p.add_argument("--ani-max-genomes", type=int,
+                   help="M1: how many closest genomes --ani fetches and compares")
     p.add_argument("--skip", action="append", default=[], metavar="STAGE",
                    help="skip a stage; repeatable")
     p.add_argument("--only", action="append", default=[], metavar="STAGE",
@@ -116,19 +123,24 @@ def stage_args(stage: str, args: argparse.Namespace) -> list[str]:
                             ("--seq-cap", args.seq_cap),
                             ("--tree-leaves", args.tree_leaves),
                             ("--taxon-id", args.taxon_id),
-                            ("--genetic-code", args.genetic_code)):
+                            ("--genetic-code", args.genetic_code),
+                            ("--ani-query", args.ani_query), ("--skani", args.skani),
+                            ("--ani-max-genomes", args.ani_max_genomes)):
             if value is not None:
                 out += [flag, str(value)]
         for flag, on in (("--allow-poor", args.allow_poor), ("--html", args.html),
-                         ("--figures", args.figures), ("--no-tree", args.no_tree)):
+                         ("--figures", args.figures), ("--no-tree", args.no_tree),
+                         ("--ani", args.ani)):
             if on:
                 out.append(flag)
         if args.from_bvbrc_api:
             out.append("--from-bvbrc-api")
-            # --offline only means anything on the API route; the CGA route's network is
-            # the p3 CLI, which has no cache to replay from.
-            if args.offline:
-                out.append("--offline")
+        # --offline replays a cache. The API route has one for every call it makes; the
+        # CGA route's own network is the p3 CLI, which has none — but --ani downloads
+        # reference genomes through the same cached client, so offline means something
+        # there too.
+        if args.offline and (args.from_bvbrc_api or args.ani):
+            out.append("--offline")
         return out
     if stage == "m2":
         # --report is not optional here: the point of the runner is one report.json

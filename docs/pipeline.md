@@ -36,8 +36,8 @@ Input: unknown bacterial genome assembly (contig FASTA). Output: coding genes an
 > precomputed public records. See `01a-cga-coverage.md`.
 | Phylogenetics | **CGA tree** (Newick, NEXUS) | Alternative: BV-BRC Phylogenetic Tree service (codon trees) |
 | Related species / genomes | **BV-BRC Similar Genome Finder** (Mash/MinHash) | Run *before* CGA — annotation needs a taxon at genus level or below |
-| Identity to relatives | **skani** (or fastANI) | CGA reports Mash distance, not ANI |
-| SNP distance | **Snippy `--ctgs`** or **Parsnp** | BV-BRC Variation Analysis requires reads, so it does not apply to an assembly |
+| Identity to relatives | **skani** (`--ani`) | CGA reports Mash distance, not ANI. Done: `01-m1-genome.md#ani-to-the-closest-genomes` |
+| SNP distance | **Snippy `--ctgs`**, **Parsnp** or MUMmer `dnadiff` | Not implemented; deferred out of #7 to its own issue. BV-BRC Variation Analysis requires reads, so it does not apply to an assembly |
 | Viral input (if scope widens) | BV-BRC annotation with VIGOR4 or LowVan; Subspecies Classification service | Bacterial gene callers are wrong for viruses |
 
 Access: `p3-login`, then `p3-submit-CGA`, `p3-get-genome-features` and related BV-BRC CLI commands.

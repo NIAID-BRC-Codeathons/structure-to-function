@@ -43,6 +43,8 @@ from ..common.http import (CachedJsonClient, HttpError, JsonCache,
                            OfflineCacheMiss)
 from ..common.io import init_report, update_proteins, update_section
 from . import cga
+from .distances import (DEFAULT_MAX_GENOMES, DEFAULT_MIN_AF, DEFAULT_THREADS, PRESETS,
+                        SELF_ANI, SkaniError, add_ani)
 from .parse import load_cga, genome_section, proteins_section, run_fields, write_m1_dir
 from .taxon import TaxonCallError, call_taxon
 
@@ -109,6 +111,36 @@ def build_parser() -> argparse.ArgumentParser:
                      help="ignore HTTP_PROXY/HTTPS_PROXY for BV-BRC requests; use when a "
                           "stale or broken proxy intermittently drops connections")
 
+    ani = p.add_argument_group(
+        "ANI to the closest genomes (issue #7)",
+        "Turns the Mash distances in genome.closest_genomes[] into real identities. "
+        "Downloads each closest genome's contigs from BV-BRC over HTTPS (no p3- CLI, no "
+        "token) and runs skani against the analysed assembly. Needs the assembly FASTA, "
+        "so pass --contigs or --ani-query when re-parsing a retrieved CGA directory.")
+    ani.add_argument("--ani", action="store_true",
+                     help="compute ANI for the closest genomes and write it into "
+                          "genome.closest_genomes[]")
+    ani.add_argument("--ani-query", metavar="FASTA",
+                     help="assembly FASTA to compare (default: --contigs, else the "
+                          "blinded copy in <run>/m1/)")
+    ani.add_argument("--skani", default="skani", metavar="PATH",
+                     help="skani executable (default: skani on PATH)")
+    ani.add_argument("--ani-max-genomes", type=int, default=DEFAULT_MAX_GENOMES,
+                     help=f"how many closest genomes to fetch and compare "
+                          f"(default {DEFAULT_MAX_GENOMES})")
+    ani.add_argument("--ani-threads", type=int, default=DEFAULT_THREADS,
+                     help=f"skani threads (default {DEFAULT_THREADS})")
+    ani.add_argument("--ani-preset", choices=PRESETS, default="default",
+                     help="skani speed/accuracy preset; --medium or --slow are worth it "
+                          "for fragmented drafts (default: skani's own defaults)")
+    ani.add_argument("--ani-min-af", type=float, default=DEFAULT_MIN_AF,
+                     help=f"skani --min-af: below this aligned fraction skani reports no "
+                          f"ANI at all, and the row records why (default {DEFAULT_MIN_AF})")
+    ani.add_argument("--ani-self-threshold", type=float, default=SELF_ANI, metavar="ANI",
+                     help=f"at or above this ANI a hit is called the assembly matching "
+                          f"itself (default {SELF_ANI}). It is still reported; the flag "
+                          f"only decides what counts as a distinct relative")
+
     out = p.add_argument_group("reporting")
     out.add_argument("--html", action="store_true",
                      help="write the interactive HTML report to <run>/m1/report.html")
@@ -138,6 +170,83 @@ def _api_session(args: argparse.Namespace):
     if args.no_proxy:
         session.trust_env = False
     return session
+
+
+def _ani_query_fasta(args: argparse.Namespace, m1_dir: Path, run_id: str) -> Path | None:
+    """The assembly to compare, or None with the reason printed.
+
+    `--from-cga-dir` is the common case and carries no FASTA: CGA's output directory has
+    an annotated genome and a tree but not the contigs that were submitted. So the query
+    has to be named, and saying so is better than comparing whatever is lying around.
+    """
+    for candidate in (args.ani_query, args.contigs,
+                      str(m1_dir / f"{run_id}.contigs.fna")):
+        if candidate and Path(candidate).exists():
+            return Path(candidate)
+    print("--ani needs the analysed assembly: pass --contigs or --ani-query. "
+          "A retrieved CGA directory does not contain the submitted contigs.",
+          file=sys.stderr)
+    return None
+
+
+def _run_ani(args: argparse.Namespace, run_dir: Path, m1_dir: Path, run_id: str) -> int:
+    """ANI for `genome.closest_genomes[]`. 0 on success, 5 on failure.
+
+    Runs after the contract is already on disk and never rewrites anything but
+    `closest_genomes`, so a missing binary or a BV-BRC outage costs the identities and
+    nothing else. It still returns non-zero: `--ani` was asked for explicitly, and a run
+    that quietly produced no ANI would look exactly like a run that was never asked.
+    """
+    query = _ani_query_fasta(args, m1_dir, run_id)
+    if query is None:
+        return 5
+
+    section = dict(init_report(run_dir, run_id).get("genome") or {})
+    closest = section.get("closest_genomes") or []
+    if not closest:
+        print("--ani: closest_genomes is empty, nothing to compare. Similar Genome "
+              "Finder has to have run first (--taxon-call, or a taxon_call.json beside "
+              "the CGA directory).", file=sys.stderr)
+        return 5
+
+    client = CachedJsonClient(
+        cache=JsonCache(Path(args.cache) if getattr(args, "cache", "") else m1_dir / "cache.sqlite"),
+        offline=args.offline, session=_api_session(args),
+        timeout_seconds=max(args.timeout, 120.0), max_attempts=max(1, args.retries))
+    try:
+        rows, meta = add_ani(closest, query, client=client, run_dir=run_dir,
+                             exe=args.skani, threads=args.ani_threads,
+                             preset=args.ani_preset, min_af=args.ani_min_af,
+                             max_genomes=args.ani_max_genomes,
+                             self_ani=args.ani_self_threshold)
+    except SkaniError as exc:
+        print(f"--ani failed: {exc}", file=sys.stderr)
+        return 5
+
+    section["closest_genomes"] = rows
+    update_section(run_dir, "genome", section)
+    (m1_dir / "ani.json").write_text(json.dumps(meta, indent=1), encoding="utf-8")
+
+    report = init_report(run_dir, run_id)
+    run_section = dict(report.get("run") or {})
+    versions = dict(run_section.get("tool_versions") or {})
+    versions["skani"] = meta["version"]
+    run_section["tool_versions"] = versions
+    update_section(run_dir, "run", run_section)
+
+    print(f"ANI ({meta['version']}): {meta['genomes_with_ani']} of "
+          f"{meta['genomes_considered']} closest genomes scored, "
+          f"{meta['non_self_with_ani']} of them distinct from the assembly "
+          f"-> {m1_dir / 'ani.json'}")
+    if meta["self_match"]:
+        hit = meta["self_match"]
+        print(f"  self-match: {hit['genome_id']} ({hit['name']}) at {hit['ani']}% ANI — "
+              "this assembly is already public")
+    for gid, reason in meta["no_ani_reason"].items():
+        print(f"  {gid}: no ANI — {reason}", file=sys.stderr)
+    if meta.get("warning"):
+        print(f"  WARNING: {meta['warning']}", file=sys.stderr)
+    return 0
 
 
 def _rank_for(proteins: list[dict], features: list[dict],
@@ -330,6 +439,8 @@ def _run_api_route(args: argparse.Namespace, run_dir: Path, m1_dir: Path,
         for failure in api.failures[:5]:
             print(f"  {failure.get('facet')}: {failure.get('error')}", file=sys.stderr)
 
+    ani_status = _run_ani(args, run_dir, m1_dir, run_dir.name) if args.ani else 0
+
     _report_outputs(run_dir, m1_dir, tree=tree, want_html=args.html,
                     want_figures=args.figures, seq_limit=args.seq_cap)
 
@@ -338,7 +449,7 @@ def _run_api_route(args: argparse.Namespace, run_dir: Path, m1_dir: Path,
     print("NOTE: the API route describes a reference genome for this organism, not the "
           "submitted assembly. Do not treat gene presence or absence here as a property "
           "of your isolate.")
-    return 0
+    return ani_status
 
 
 def _taxon_call_beside(cga_dir: str) -> Path | None:
@@ -384,6 +495,22 @@ def _load_taxon_call(path: Path | str | None) -> dict | None:
         return None
 
     hits = [h for h in (data.get("hits") or []) if isinstance(h, dict) and h.get("genome_id")]
+    if not hits:
+        # The older format wrote the hit list to its own file next to the call. Reading it
+        # matters more than it looks: without it `closest_genomes` holds the top hit alone,
+        # which for a genome that is already public is the assembly matching itself — so
+        # --ani would have exactly one row to score, and it would be the self-match.
+        beside = source.with_name("minhash_hits.json")
+        if beside.is_file():
+            try:
+                recorded = json.loads(beside.read_text(encoding="utf-8"))
+            except (json.JSONDecodeError, OSError) as exc:
+                print(f"hit list at {beside} unreadable — {exc}", file=sys.stderr)
+                recorded = []
+            hits = [h for h in (recorded if isinstance(recorded, list) else [])
+                    if isinstance(h, dict) and h.get("genome_id")]
+            if hits:
+                print(f"taxon call at {source} has no `hits`; took {len(hits)} from {beside}")
     if not hits:
         top = data.get("top_hit")
         if isinstance(top, dict) and top.get("genome_id"):
@@ -562,6 +689,8 @@ def main(argv: list[str] | None = None) -> int:
     except Exception as exc:
         print(f"species metadata skipped — {type(exc).__name__}: {exc}", file=sys.stderr)
 
+    ani_status = _run_ani(args, run_dir, m1_dir, run_id) if args.ani else 0
+
     _report_outputs(run_dir, m1_dir, tree=None, want_html=args.html,
                     want_figures=args.figures, seq_limit=1200)
 
@@ -577,7 +706,7 @@ def main(argv: list[str] | None = None) -> int:
             print("Refusing to hand this downstream. Re-run with --allow-poor to override.",
                   file=sys.stderr)
             return 4
-    return 0
+    return ani_status
 
 
 if __name__ == "__main__":

@@ -36,7 +36,8 @@ The known taxon was passed directly, so this run is not blinded.
 | Gap | Owned by |
 | --- | --- |
 | Closest genomes, predicted taxon. `close_genomes` is **empty**; the tree ingroup gives 10 genome IDs and branch lengths but no Mash distance | #5, and the new access-path issue |
-| ANI and SNP distance | #7 |
+| ANI to the closest genomes | #7 — done, `--ani` (skani); see [01-m1-genome.md](01-m1-genome.md#ani-to-the-closest-genomes) |
+| SNP distance to the closest genomes | deferred out of #7 to its own issue |
 | Essentiality and human homology. Confirmed absent from all 43 output files | new issue |
 | Localization and membrane flags (`flags.secreted`, `flags.membrane`) | #10 |
 | Structures, pockets, ligands, docking | #8, #9, #13-#18 |

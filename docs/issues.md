@@ -935,3 +935,55 @@ than a feature:
 not an affinity. The limitations block already says both; a 3D view makes them look far
 more authoritative than they are, so the caveat has to sit next to the viewer, not only at
 the bottom of the page.
+
+## M1: SNP distance to the closest genomes
+
+labels: module:m1, priority:p2, type:code
+
+**Goal:** a SNP count per close genome, to sit beside the ANI that #7 landed.
+
+**Docs:** `docs/01-m1-genome.md`, `docs/pipeline.md`
+
+Issue #7 asked for ANI *and* SNP distance. ANI shipped (`--ani`, skani); SNP distance did
+not, and `genome.closest_genomes[].snp_distance` is still `null` on every row —
+`<run>/m1/ani.json` records the deferral so the gap is stated rather than silent.
+
+Two things were left open, and both need deciding before code:
+
+**Which aligner.** Snippy `--ctgs` and Parsnp are what `01-m1-genome.md` originally named.
+Snippy is genuinely pairwise — one run per reference, which is the shape
+`closest_genomes[]` wants — but it shreds the contigs into synthetic reads and pulls in the
+bwa/samtools/freebayes stack, and its counts are reference-biased. Parsnp aligns all ~11
+genomes at once and gives every pair from one core alignment, but the core genome collapses
+as divergence grows, so the distant rows come back empty anyway. MUMmer4 `dnadiff`
+(`nucmer` → `delta-filter` → `show-snps`) is the third option: pairwise, reports
+`TotalSNPs` and aligned bases directly, installs from a release tarball with no conda, and
+is the lightest of the three. It is not what the original issue named, which is the only
+argument against it.
+
+**What the number means below the species boundary.** A SNP count between genomes at 87%
+ANI over 76% of their length is not a distance anyone should quote — the alignable
+fraction, not the substitutions, is what differs. Whatever lands should refuse to emit a
+number below a stated ANI floor (95% is the conventional species line), the same way
+`--ani` leaves `ani: null` and records the reason when skani drops a pair below `--min-af`.
+
+**Scope**
+- Pick the aligner, write down why in `docs/01-m1-genome.md`.
+- Reuse the reference genomes `--ani` already downloaded into `<run>/m1/genomes/` — they
+  are cached, and re-fetching them would be the only slow part of this.
+- Write `snp_distance`, plus the aligned length the count is over, onto each row; a count
+  with no denominator is not comparable between pairs.
+- Record the tool, version and argv in `<run>/m1/` beside `ani.json`, as `--ani` does.
+- Refuse to emit a number below the ANI floor, and record the reason instead.
+
+**Definition of done**
+- [ ] `snp_distance` populated for every close genome above the ANI floor, `null` with a
+      recorded reason below it
+- [ ] Every count carries the aligned length it was measured over
+- [ ] Tool, version and command in the run record; a second run makes no network calls
+- [ ] Calibrated the way `--ani` was: run against copies of a fixture genome mutated at a
+      known substitution rate, and check the recovered count against the number injected
+
+**Watch out for:** counting SNPs against a reference whose own assembly is poor.
+`243273.27` in the *M. genitalium* hit list is `genome_quality: Poor` — its SNP distance
+would be measuring that assembly's errors as much as real divergence.

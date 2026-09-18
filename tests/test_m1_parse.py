@@ -89,7 +89,10 @@ def test_genome_section_carries_a_minhash_call_when_given_one(run):
     genome = genome_section(run, call)
     assert genome["taxonomy"]["called_by"] == "minhash"
     assert genome["closest_genomes"][0]["mash_distance"] == 0.0
-    assert genome["closest_genomes"][0]["ani"] is None  # issue #7 still owes us this
+    # Parsing a CGA directory yields Mash distances only. ANI is a separate step with a
+    # separate cost (a genome download and an alignment each), so it stays null until
+    # `--ani` runs (issue #7; `s2f/m1_genome/distances.py`, `tests/test_m1_ani.py`).
+    assert genome["closest_genomes"][0]["ani"] is None
 
 
 def test_run_fields_report_the_job_and_its_tools(run):
