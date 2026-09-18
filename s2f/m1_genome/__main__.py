@@ -60,6 +60,9 @@ def build_parser() -> argparse.ArgumentParser:
     p.add_argument("--out-name", default=None, help="CGA output name (default: the run id)")
     p.add_argument("--from-cga-dir", help="parse an already-retrieved CGA directory; no network")
     p.add_argument("--job-id", help="resume: skip submission and poll this job id")
+    p.add_argument("--taxon-call", default="",
+                   help="a recorded Minhash/Similar Genome Finder result to reuse with "
+                        "--from-cga-dir; found automatically beside the CGA directory")
     p.add_argument("--taxon-id", type=int, help="skip the Minhash call and use this taxon")
     p.add_argument("--genetic-code", type=int, help="translation table; required with --taxon-id")
     p.add_argument("--scientific-name", help="overrides the name from the taxon call")
@@ -338,6 +341,62 @@ def _run_api_route(args: argparse.Namespace, run_dir: Path, m1_dir: Path,
     return 0
 
 
+def _taxon_call_beside(cga_dir: str) -> Path | None:
+    """A recorded Minhash result sitting next to a pre-fetched CGA directory.
+
+    A live run writes `taxon_call.json` into `<run>/m1/`, but `--from-cga-dir` replays a
+    directory someone kept, and the matching call is usually kept alongside it. Three
+    conventional places are tried; `--taxon-call` is the explicit route when it is
+    somewhere else. `data/cga_sgf` pairing with `data/sgf` is the third of these.
+    """
+    base = Path(cga_dir)
+    name = base.name
+    stem = name[4:] if name.startswith("cga_") else name
+    for candidate in (base / "taxon_call.json",
+                      base.parent / "taxon_call.json",
+                      base.parent / stem / "taxon_call.json"):
+        if candidate.is_file():
+            return candidate
+    return None
+
+
+def _load_taxon_call(path: Path | str | None) -> dict | None:
+    """Read a recorded taxon call, tolerating the shape older runs wrote.
+
+    `call_taxon` returns `called_by`, `service` and a full `hits` list. Files written by
+    earlier versions carry `called_at`, `lineage` and `minhash_params` instead, with only
+    `top_hit` and no `hits` — so the keys are checked rather than assumed, and a file that
+    cannot supply a taxon is ignored loudly instead of half-used.
+    """
+    if not path:
+        return None
+    source = Path(path)
+    if not source.is_file():
+        print(f"taxon call not found at {source}", file=sys.stderr)
+        return None
+    try:
+        data = json.loads(source.read_text(encoding="utf-8"))
+    except (json.JSONDecodeError, OSError) as exc:
+        print(f"taxon call at {source} unreadable — {exc}", file=sys.stderr)
+        return None
+    if not isinstance(data, dict) or not data.get("taxon_id"):
+        print(f"taxon call at {source} has no taxon_id; ignored", file=sys.stderr)
+        return None
+
+    hits = [h for h in (data.get("hits") or []) if isinstance(h, dict) and h.get("genome_id")]
+    if not hits:
+        top = data.get("top_hit")
+        if isinstance(top, dict) and top.get("genome_id"):
+            hits = [top]
+            print(f"taxon call at {source} predates the current format "
+                  f"(no `hits`); using `top_hit` alone")
+    data["hits"] = hits
+    data["source_path"] = str(source)
+    data.setdefault("called_by", "minhash-recorded")
+    data.setdefault("n_hits", len(hits))
+    return data
+
+
 def main(argv: list[str] | None = None) -> int:
     args = build_parser().parse_args(argv)
     run_dir = Path(args.run)
@@ -423,6 +482,19 @@ def main(argv: list[str] | None = None) -> int:
         cga_dir = str(run_dir / "cga")
         cga.fetch(args.ws_dir, out_name, cga_dir)
         print(f"retrieved -> {cga_dir}")
+
+    if taxon_call is None:
+        # Similar Genome Finder did run for this assembly — it is what produced the CGA
+        # submission's taxon — but --from-cga-dir skips the block that calls it, so the
+        # distances end up on disk and unread. Recover them rather than letting
+        # closest_genomes stay empty and the metadata donor be chosen by tree order alone.
+        recorded = args.taxon_call or _taxon_call_beside(cga_dir)
+        taxon_call = _load_taxon_call(recorded)
+        if taxon_call:
+            top = taxon_call.get("top_hit") or {}
+            print(f"taxon call reused from {taxon_call['source_path']}: "
+                  f"{taxon_call.get('n_hits')} hits, top {top.get('genome_id')} "
+                  f"at d={top.get('distance')}")
 
     parsed = load_cga(cga_dir)
     proteins = proteins_section(parsed)
