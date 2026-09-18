@@ -60,6 +60,9 @@ def build_parser() -> argparse.ArgumentParser:
     p.add_argument("--out-name", default=None, help="CGA output name (default: the run id)")
     p.add_argument("--from-cga-dir", help="parse an already-retrieved CGA directory; no network")
     p.add_argument("--job-id", help="resume: skip submission and poll this job id")
+    p.add_argument("--taxon-call", default="",
+                   help="a recorded Minhash/Similar Genome Finder result to reuse with "
+                        "--from-cga-dir; found automatically beside the CGA directory")
     p.add_argument("--taxon-id", type=int, help="skip the Minhash call and use this taxon")
     p.add_argument("--genetic-code", type=int, help="translation table; required with --taxon-id")
     p.add_argument("--scientific-name", help="overrides the name from the taxon call")
@@ -338,6 +341,67 @@ def _run_api_route(args: argparse.Namespace, run_dir: Path, m1_dir: Path,
     return 0
 
 
+def _taxon_call_beside(cga_dir: str) -> Path | None:
+    """A recorded Minhash result sitting next to a pre-fetched CGA directory.
+
+    A live run writes `taxon_call.json` into `<run>/m1/`, but `--from-cga-dir` replays a
+    directory someone kept, and the matching call is usually kept alongside it. Three
+    conventional places are tried; `--taxon-call` is the explicit route when it is
+    somewhere else. `data/cga_sgf` pairing with `data/sgf` is the third of these.
+    """
+    base = Path(cga_dir)
+    name = base.name
+    stem = name[4:] if name.startswith("cga_") else name
+    for candidate in (base / "taxon_call.json",
+                      base.parent / "taxon_call.json",
+                      base.parent / stem / "taxon_call.json"):
+        if candidate.is_file():
+            return candidate
+    return None
+
+
+def _load_taxon_call(path: Path | str | None) -> dict | None:
+    """Read a recorded taxon call, tolerating the shape older runs wrote.
+
+    `call_taxon` returns `called_by`, `service` and a full `hits` list. Files written by
+    earlier versions carry `called_at`, `lineage` and `minhash_params` instead, with only
+    `top_hit` and no `hits` — so the keys are checked rather than assumed, and a file that
+    cannot supply a taxon is ignored loudly instead of half-used.
+    """
+    if not path:
+        return None
+    source = Path(path)
+    if not source.is_file():
+        print(f"taxon call not found at {source}", file=sys.stderr)
+        return None
+    try:
+        data = json.loads(source.read_text(encoding="utf-8"))
+    except (json.JSONDecodeError, OSError) as exc:
+        print(f"taxon call at {source} unreadable — {exc}", file=sys.stderr)
+        return None
+    if not isinstance(data, dict) or not data.get("taxon_id"):
+        print(f"taxon call at {source} has no taxon_id; ignored", file=sys.stderr)
+        return None
+
+    hits = [h for h in (data.get("hits") or []) if isinstance(h, dict) and h.get("genome_id")]
+    if not hits:
+        top = data.get("top_hit")
+        if isinstance(top, dict) and top.get("genome_id"):
+            hits = [top]
+            print(f"taxon call at {source} predates the current format "
+                  f"(no `hits`); using `top_hit` alone")
+    # `n_hits` is a true fact about the original call and is kept as recorded, but it is
+    # not how many hits we actually hold: an older file yields only `top_hit`, so six
+    # recorded hits can become one usable relative. Reporting the recorded number alone
+    # would overstate closest_genomes.
+    data["hits"] = hits
+    data["hits_usable"] = len(hits)
+    data["source_path"] = str(source)
+    data.setdefault("called_by", "minhash-recorded")
+    data.setdefault("n_hits", len(hits))
+    return data
+
+
 def main(argv: list[str] | None = None) -> int:
     args = build_parser().parse_args(argv)
     run_dir = Path(args.run)
@@ -424,6 +488,22 @@ def main(argv: list[str] | None = None) -> int:
         cga.fetch(args.ws_dir, out_name, cga_dir)
         print(f"retrieved -> {cga_dir}")
 
+    if taxon_call is None:
+        # Similar Genome Finder did run for this assembly — it is what produced the CGA
+        # submission's taxon — but --from-cga-dir skips the block that calls it, so the
+        # distances end up on disk and unread. Recover them rather than letting
+        # closest_genomes stay empty and the metadata donor be chosen by tree order alone.
+        recorded = args.taxon_call or _taxon_call_beside(cga_dir)
+        taxon_call = _load_taxon_call(recorded)
+        if taxon_call:
+            top = taxon_call.get("top_hit") or {}
+            recorded = taxon_call.get("n_hits")
+            usable = taxon_call.get("hits_usable")
+            count = (f"{usable} of {recorded} recorded hits" if usable != recorded
+                     else f"{usable} hits")
+            print(f"taxon call reused from {taxon_call['source_path']}: {count}, "
+                  f"top {top.get('genome_id')} at d={top.get('distance')}")
+
     parsed = load_cga(cga_dir)
     proteins = proteins_section(parsed)
     counts = write_m1_dir(parsed, m1_dir)
@@ -446,6 +526,41 @@ def main(argv: list[str] | None = None) -> int:
                      "elapsed_seconds": round(time.time() - started, 1), **counts}
     run_section["modules"] = modules
     update_section(run_dir, "run", run_section)
+
+    # Species-level metadata. CGA analyses an assembly BV-BRC has never seen — `2097.118`
+    # is the id CGA minted for our own submission and has no public record — so growth,
+    # isolation, host and disease cannot be looked up against our own genome id. They come
+    # from a public record instead, and `metadata_provenance` records which one and how
+    # close it is. Optional by design: the contract above is already on disk, and a network
+    # failure here must not cost it. The catch is deliberately broad for that reason; the
+    # exception type is printed so a real bug is still visible.
+    try:
+        from .bvbrc_api import BvbrcApi
+        from .collect import collect_cga_metadata
+        from .pathogens import resolve_disease_profile
+        from ..common.http import CachedJsonClient, JsonCache
+        cache_path = Path(args.cache) if getattr(args, "cache", "") else m1_dir / "cache.sqlite"
+        api = BvbrcApi(CachedJsonClient(
+            cache=JsonCache(cache_path), offline=args.offline, session=_api_session(args),
+            timeout_seconds=args.timeout, max_attempts=max(1, args.retries)))
+        section = dict((init_report(run_dir, run_id).get("genome")) or {})
+        metadata = collect_cga_metadata(api, section)
+        section.update(metadata)
+        species = metadata["metadata_provenance"].get("species") or ""
+        if species:
+            section.setdefault("species", species)
+            section.setdefault("genus", species.split(" ")[0])
+        update_section(run_dir, "genome", section)
+        profile = resolve_disease_profile({"species": species,
+                                           "genus": section.get("genus") or "",
+                                           "disease": metadata["disease"]})
+        (m1_dir / "disease_profile.json").write_text(
+            json.dumps(profile, indent=1, default=str), encoding="utf-8")
+        p = metadata["metadata_provenance"]
+        where = f" from {p['genome_id']} ({p['genome_name']})" if p["genome_id"] else ""
+        print(f"species metadata: {p['basis']}{where}")
+    except Exception as exc:
+        print(f"species metadata skipped — {type(exc).__name__}: {exc}", file=sys.stderr)
 
     _report_outputs(run_dir, m1_dir, tree=None, want_html=args.html,
                     want_figures=args.figures, seq_limit=1200)

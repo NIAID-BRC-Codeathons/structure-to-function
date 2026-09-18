@@ -815,3 +815,52 @@ for single-genome work.
 **Definition of done**
 - [ ] Every command in the doc runs as written on lambda0
 - [ ] Pass-one runtime recorded, closing that part of #10's definition of done
+
+## M1: report genome distance when metadata comes from a relative
+
+labels: module:m1, priority:p1, type:code
+
+**Goal:** when the isolate metadata in the report belongs to a different genome, say how
+different that genome is.
+
+**Docs:** `docs/01-m1-genome.md`, `docs/00a-data-contract.md`
+
+A CGA run analyses an assembly BV-BRC has never seen. `2097.118` is the id CGA minted for our
+own submission and `eq(genome_id,2097.118)` returns nothing, so growth, isolation, host and
+disease are fetched from the nearest public relative instead. `genome.metadata_provenance`
+now records the basis (`this-genome` / `relative` / `species` / `none`) and the report warns
+when the metadata is borrowed.
+
+What it cannot yet state is **how close the donor is**. "Isolated from a human in Australia,
+according to a relative" means something very different at 99.9% ANI than at 85%, and the
+report currently gives the reader no way to tell.
+
+Most of the plumbing exists. `parse.genome_section` already writes `closest_genomes` from the
+Minhash taxon call with `mash_distance`, `pvalue` and `shared_kmers`, plus `ani: None` and
+`snp_distance: None` as placeholders. Three gaps:
+
+- **`ani` is never filled.** Mash distance is a k-mer sketch estimate, not ANI. Either compute
+  ANI properly (skani or fastANI against the donor) or drop the key rather than leave a null
+  that looks like a missing measurement.
+- **A supplied taxon leaves no distance at all.** With `--taxon-id`, `call_taxon` never runs,
+  `hits` is `[]`, and `closest_genomes` is empty — which is exactly the configuration used for
+  the 2026-09-18 lambda0 runs. The donor is then chosen with no distance recorded.
+- **The distance is not carried onto the donor.** `metadata_provenance` copies
+  `mash_distance` and `ani` from the matching `closest_genomes` entry when there is one, so it
+  is null in the common case.
+
+**Scope**
+- Fill `ani` from a real calculation, or remove the key and say why in the data-contract doc.
+- Guarantee a distance to the metadata donor even when the taxon was supplied — a targeted
+  Mash or skani comparison against that one genome is cheap.
+- Surface distance and its method in the report's provenance banner, next to the existing
+  warning, with the method named rather than implied.
+
+**Definition of done**
+- [ ] `genome.metadata_provenance` carries a distance and the method that produced it
+- [ ] The report states the distance whenever `basis` is `relative`
+- [ ] A run with `--taxon-id` still reports a distance to the donor
+- [ ] `ani` is either a real number or absent, never a null placeholder
+
+**Watch out for:** Mash distance and ANI are not interchangeable and must not be relabelled as
+each other. A reader who sees "ANI 0.02" will assume the donor is unrelated.
