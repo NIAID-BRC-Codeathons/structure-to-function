@@ -1,0 +1,1204 @@
+diff --git a/requirements-m4.txt b/requirements-m4.txt
+new file mode 100644
+index 0000000..51bb0f2
+--- /dev/null
++++ b/requirements-m4.txt
+@@ -0,0 +1,2 @@
++requests>=2.31,<3
++rdkit>=2024.3,<2027
+diff --git a/s2f/m4_ligands/__init__.py b/s2f/m4_ligands/__init__.py
+new file mode 100644
+index 0000000..e69de29
+diff --git a/s2f/m4_ligands/cli.py b/s2f/m4_ligands/cli.py
+new file mode 100644
+index 0000000..f3bc617
+--- /dev/null
++++ b/s2f/m4_ligands/cli.py
+@@ -0,0 +1,207 @@
++"""M4 step 1 CLI: collect_ligands() from ChEMBL for M2's selected proteins.
++
++    python -m s2f.m4_ligands.cli --run runs/<id> [--protein-id fig|...] [--max-phase 4]
++        [--offline] [--dry-run]
++
++Reads ``<run>/m2_pdb/proteins.tsv`` (real, existing -- NOT ``m3_proteins/proteins.tsv``, which
++does not correspond to anything in this codebase: M3 has no code yet, only ``docs/03-m3-fold.md``).
++Requires the ``--map-ids`` xref columns (``uniprot``, ``uniprot_route``, ``chembl``) to have been
++written by ``s2f.m2_triage --map-ids`` -- a protein with no UniProt mapping is skipped and
++recorded, never silently dropped, per the project's ID-mapping pitfall (#11: nothing here invents
++a mapping; it only reads what ``s2f.common.ids`` already resolved).
++
++Only implements docs/04-m4-ligands.md step 1 (``collect_ligands()``), and only the ChEMBL source
++of the several the doc lists. See the module docstrings in ``sources/chembl.py``, ``models.py``
++and ``dedup.py`` for what's implemented and what's deliberately left for later steps.
++"""
++
++from __future__ import annotations
++
++import argparse
++import csv
++import json
++import time
++from datetime import UTC, datetime
++from pathlib import Path
++
++from ..common.http import CachedJsonClient, JsonCache
++from .dedup import deduplicate
++from .models import LigandCandidate
++from .sources.chembl import collect_from_chembl
++
++FIXTURE_DIR = Path(__file__).resolve().parents[2] / "fixtures" / "m4"
++
++
++def load_m2_proteins(path: Path) -> list[dict[str, str]]:
++    with path.open(encoding="utf-8", newline="") as handle:
++        return list(csv.DictReader(handle, delimiter="\t"))
++
++
++def eligible_targets(rows: list[dict[str, str]], protein_id: str = "") -> list[dict[str, str]]:
++    """Proteins with a usable ChEMBL route: a resolved chembl xref, or at least a uniprot
++    accession to look one up from. Rows with neither are returned too, tagged, so they are
++    visible in the run manifest rather than silently absent from the output."""
++    rows = [r for r in rows if not protein_id or r.get("feature_id") == protein_id]
++    return rows
++
++
++def run(args: argparse.Namespace) -> int:
++    run_dir = Path(args.run)
++    proteins_path = Path(args.proteins) if args.proteins else run_dir / "m2_pdb" / "proteins.tsv"
++    if args.dry_run:
++        proteins_path = FIXTURE_DIR / "proteins.tsv"
++    out_dir = run_dir / "m4_ligands"
++
++    started = datetime.now(UTC)
++    clock = time.monotonic()
++
++    rows = load_m2_proteins(proteins_path) if proteins_path.exists() else []
++    rows = eligible_targets(rows, args.protein_id)
++
++    offline = args.offline or args.dry_run
++    cache_path = Path(args.cache) if args.cache else (FIXTURE_DIR / "cache.sqlite" if args.dry_run else run_dir / "cache" / "m4_ligands.sqlite")
++
++    all_candidates: list[LigandCandidate] = []
++    failures: list[dict] = []
++    skipped_no_mapping: list[str] = []
++
++    with JsonCache(cache_path) as cache:
++        client = CachedJsonClient(cache=cache, offline=offline)
++
++        for row in rows:
++            feature_id = row.get("feature_id", "")
++            uniprot = (row.get("uniprot") or "").strip()
++            uniprot_route = (row.get("uniprot_route") or "").strip()
++            chembl_targets = [t for t in (row.get("chembl") or "").split(";") if t]
++
++            if not uniprot and not chembl_targets:
++                skipped_no_mapping.append(feature_id)
++                continue
++
++            via_homolog = uniprot_route == "pdb_hit"
++            if chembl_targets:
++                for target_chembl_id in chembl_targets:
++                    candidates, target_failures = collect_from_chembl(
++                        client,
++                        feature_id=feature_id,
++                        target_chembl_id=target_chembl_id,
++                        uniprot_accession=uniprot,
++                        via_homolog=via_homolog,
++                        max_phase=args.max_phase,
++                    )
++                    all_candidates.extend(candidates)
++                    failures.extend(target_failures)
++            else:
++                candidates, target_failures = collect_from_chembl(
++                    client,
++                    feature_id=feature_id,
++                    target_chembl_id=None,
++                    uniprot_accession=uniprot,
++                    via_homolog=via_homolog,
++                    max_phase=args.max_phase,
++                )
++                all_candidates.extend(candidates)
++                failures.extend(target_failures)
++
++        deduped = deduplicate(all_candidates)
++
++        out_dir.mkdir(parents=True, exist_ok=True)
++        with (out_dir / "ligand_candidates.jsonl").open("w", encoding="utf-8") as handle:
++            for candidate in deduped:
++                handle.write(json.dumps(candidate.as_dict()) + "\n")
++
++        with (out_dir / "provenance.jsonl").open("w", encoding="utf-8") as handle:
++            for candidate in deduped:
++                for record in candidate.provenance:
++                    handle.write(
++                        json.dumps(
++                            {
++                                "feature_id": candidate.for_feature_id,
++                                "ligand_id": candidate.ligand_id,
++                                **record.as_dict(),
++                            }
++                        )
++                        + "\n"
++                    )
++
++        source_observations: dict[str, int] = {}
++        source_unique: dict[str, set[str]] = {}
++        for candidate in deduped:
++            for source in candidate.source:
++                source_unique.setdefault(source, set()).add(candidate.dedup_key[1])
++        for candidate in all_candidates:  # pre-dedup: every observation, not just unique candidates
++            for source in candidate.source:
++                source_observations[source] = source_observations.get(source, 0) + 1
++
++        manifest = {
++            "module": "m4_ligands_collect",
++            "docs": "docs/04-m4-ligands.md",
++            "implements": "step 1 (collect_ligands()) only; steps 2-6 not implemented",
++            "sources_enabled": ["chembl"],
++            "started_utc": started.isoformat(),
++            "finished_utc": datetime.now(UTC).isoformat(),
++            "elapsed_seconds": round(time.monotonic() - clock, 2),
++            "input_proteins": str(proteins_path),
++            "output_dir": str(out_dir),
++            "cache_path": str(cache_path),
++            "offline": offline,
++            "dry_run": args.dry_run,
++            "max_phase_filter": args.max_phase,
++            "counts": {
++                "proteins_considered": len(rows),
++                "proteins_skipped_no_mapping": len(skipped_no_mapping),
++                "candidates_raw": len(all_candidates),
++                "candidates_deduplicated": len(deduped),
++                "by_source": {
++                    source: {"unique_candidates": len(ids), "source_observations": source_observations.get(source, 0)}
++                    for source, ids in source_unique.items()
++                },
++            },
++            "skipped_no_mapping": skipped_no_mapping,
++            "failures": failures,
++        }
++        (out_dir / "run.json").write_text(json.dumps(manifest, indent=2) + "\n", encoding="utf-8")
++
++    print(
++        f"{len(rows)} proteins considered, {len(skipped_no_mapping)} skipped (no UniProt/ChEMBL mapping), "
++        f"{len(all_candidates)} raw candidates -> {len(deduped)} after dedup."
++    )
++    print(f"Wrote {out_dir}")
++    if failures:
++        print(f"Warning: {len(failures)} source-level failures recorded in run.json.")
++    return 0
++
++
++def build_parser() -> argparse.ArgumentParser:
++    parser = argparse.ArgumentParser(prog="python -m s2f.m4_ligands.cli", description=__doc__)
++    parser.add_argument("--run", default="runs/dev", help="run directory (reads <run>/m2_pdb/proteins.tsv, writes <run>/m4_ligands)")
++    parser.add_argument("--proteins", default="", help="override the M2 proteins.tsv path")
++    parser.add_argument("--protein-id", default="", help="run one protein only (development)")
++    parser.add_argument("--max-phase", type=int, default=None, help="only keep candidates at or above this ChEMBL max_phase")
++    parser.add_argument("--cache", default="", help="override the SQLite cache path")
++    parser.add_argument("--offline", action="store_true", help="replay from cache; never call the network")
++    parser.add_argument("--dry-run", action="store_true", help="run from fixtures/m4 with no network")
++    # --sources is accepted for forward-compatibility with the doc's CLI sketch, but only
++    # "chembl" is implemented; anything else is rejected rather than silently ignored.
++    parser.add_argument("--sources", default="chembl", help="comma-separated sources (only 'chembl' is implemented)")
++    return parser
++
++
++def main(argv: list[str] | None = None) -> int:
++    args = build_parser().parse_args(argv)
++    requested = {s.strip() for s in args.sources.split(",") if s.strip()}
++    unsupported = requested - {"chembl"}
++    if unsupported:
++        print(f"Error: unsupported source(s) {sorted(unsupported)} -- only 'chembl' is implemented so far.")
++        return 2
++    if args.dry_run and args.run == "runs/dev":
++        args.run = "runs/dry-run"
++    try:
++        return run(args)
++    except (OSError, ValueError) as exc:
++        print(f"Error: {exc}")
++        return 2
++
++
++if __name__ == "__main__":
++    raise SystemExit(main())
+diff --git a/s2f/m4_ligands/dedup.py b/s2f/m4_ligands/dedup.py
+new file mode 100644
+index 0000000..117a320
+--- /dev/null
++++ b/s2f/m4_ligands/dedup.py
+@@ -0,0 +1,55 @@
++"""Deduplicate ligand candidates by (feature_id, InChIKey), merging evidence rather than
++picking one source and discarding the rest.
++
++A ligand found via both a ChEMBL activity row and a ChEMBL mechanism-of-action row becomes one
++candidate with two provenance records and a unioned ``targets_via`` / ``source`` list -- never
++two separate candidates, and never a single provenance record that hides the other observation.
++"""
++
++from __future__ import annotations
++
++from typing import Iterable
++
++from .models import LigandCandidate
++
++
++def _merge_unique(existing: list[str], new: Iterable[str]) -> list[str]:
++    merged = list(existing)
++    for item in new:
++        if item not in merged:
++            merged.append(item)
++    return merged
++
++
++def merge_candidate(target: LigandCandidate, incoming: LigandCandidate) -> None:
++    """Merge ``incoming`` into ``target`` in place. Both must share a dedup_key."""
++    if target.dedup_key != incoming.dedup_key:
++        raise ValueError(f"cannot merge candidates with different dedup keys: {target.dedup_key} != {incoming.dedup_key}")
++
++    target.source = _merge_unique(target.source, incoming.source)
++    target.targets_via = _merge_unique(target.targets_via, incoming.targets_via)
++    target.proposal_reason.extend(incoming.proposal_reason)
++    target.provenance.extend(incoming.provenance)
++    target.activity_evidence.extend(incoming.activity_evidence)
++    if not target.name and incoming.name:
++        target.name = incoming.name
++    if not target.approval_status and incoming.approval_status:
++        target.approval_status = incoming.approval_status
++
++
++def deduplicate(candidates: Iterable[LigandCandidate]) -> list[LigandCandidate]:
++    """Collapse candidates sharing (for_feature_id, ligand_id) into one, preserving all evidence.
++
++    Order is preserved: the first candidate seen for a dedup_key is kept as the base record and
++    later ones are merged into it, so output order is stable for a given input order.
++    """
++    by_key: dict[tuple[str, str], LigandCandidate] = {}
++    order: list[tuple[str, str]] = []
++    for candidate in candidates:
++        key = candidate.dedup_key
++        if key not in by_key:
++            by_key[key] = candidate
++            order.append(key)
++        else:
++            merge_candidate(by_key[key], candidate)
++    return [by_key[key] for key in order]
+diff --git a/s2f/m4_ligands/models.py b/s2f/m4_ligands/models.py
+new file mode 100644
+index 0000000..2294653
+--- /dev/null
++++ b/s2f/m4_ligands/models.py
+@@ -0,0 +1,78 @@
++"""Ligand candidate and provenance records for M4 (issue #04, step 1: collect_ligands()).
++
++Field names follow ``docs/04-m4-ligands.md``'s ``ligands[]`` output contract:
++``ligand_id`` (InChIKey), ``name``, ``smiles``, ``source``, ``approval_status``, ``targets_via``,
++``score``, ``components``, ``for_feature_id``, ``rank``.
++
++This module only implements step 1 (``collect_ligands()``) of the doc's six steps. ``score``,
++``components`` and ``rank`` are left ``None`` / empty here — they are step 2's job
++(``score_ligands()``), not built yet. Every candidate is ``status="candidate"`` until scored.
++
++targets_via note
++-----------------
++The doc names four values: ``kg | chembl_homolog | literature | repurposing_set``. That list has
++no value for "ChEMBL activity against the protein's *own* directly-mapped UniProt accession" (as
++opposed to a homolog's) — every ChEMBL-sourced route the doc anticipates is either homolog- or
++KG-derived. Rather than silently forcing a direct match into ``chembl_homolog`` (which would
++misrepresent it as homology-derived when it isn't), this module uses ``chembl_direct`` for that
++case and flags it below. This is an extension of the documented enum, not a substitute for it —
++raise it with the team so ``04-m4-ligands.md`` can be amended one way or the other.
++"""
++
++from __future__ import annotations
++
++from dataclasses import asdict, dataclass, field
++from typing import Any
++
++# Values from docs/04-m4-ligands.md verbatim.
++TARGETS_VIA_KG = "kg"
++TARGETS_VIA_CHEMBL_HOMOLOG = "chembl_homolog"
++TARGETS_VIA_LITERATURE = "literature"
++TARGETS_VIA_REPURPOSING_SET = "repurposing_set"
++# Not in the doc's enum -- see the module docstring's "targets_via note".
++TARGETS_VIA_CHEMBL_DIRECT = "chembl_direct"
++
++
++@dataclass
++class ProvenanceRecord:
++    """One source observation backing a candidate. Multiple records can back one candidate
++    (e.g. a compound found via both a ChEMBL activity row and a ChEMBL mechanism row)."""
++
++    source: str
++    source_record_id: str
++    retrieved_at: str
++    evidence_type: str
++    source_url: str = ""
++    description: str = ""
++
++    def as_dict(self) -> dict[str, Any]:
++        return asdict(self)
++
++
++@dataclass
++class LigandCandidate:
++    """One protein-ligand candidate. Deduplication key is (for_feature_id, ligand_id)."""
++
++    for_feature_id: str
++    ligand_id: str  # canonical InChIKey
++    canonical_smiles: str
++    name: str = ""
++    source: list[str] = field(default_factory=list)  # e.g. ["chembl"]; grows as sources merge
++    approval_status: str = ""  # "" | "approved" | "investigational" | "purchasable" | ...
++    targets_via: list[str] = field(default_factory=list)  # subset of the TARGETS_VIA_* constants
++    proposal_reason: list[dict[str, Any]] = field(default_factory=list)
++    provenance: list[ProvenanceRecord] = field(default_factory=list)
++    activity_evidence: list[dict[str, Any]] = field(default_factory=list)
++    score: float | None = None  # step 2, not implemented here
++    components: dict[str, float] = field(default_factory=dict)  # step 2, not implemented here
++    rank: int | None = None  # step 3, not implemented here
++    status: str = "candidate"
++
++    @property
++    def dedup_key(self) -> tuple[str, str]:
++        return (self.for_feature_id, self.ligand_id)
++
++    def as_dict(self) -> dict[str, Any]:
++        payload = asdict(self)
++        payload["provenance"] = [p.as_dict() if isinstance(p, ProvenanceRecord) else p for p in self.provenance]
++        return payload
+diff --git a/s2f/m4_ligands/normalize.py b/s2f/m4_ligands/normalize.py
+new file mode 100644
+index 0000000..08b058c
+--- /dev/null
++++ b/s2f/m4_ligands/normalize.py
+@@ -0,0 +1,44 @@
++"""RDKit canonicalization for M4 ligand candidates.
++
++Every candidate is re-canonicalized here regardless of source, so a compound reported by ChEMBL
++and one reported by PubChem/ZINC land on the same InChIKey when they're the same molecule. A
++source's own standardization (e.g. ChEMBL's ``standard_inchi_key``) is kept in provenance as a
++cross-check, not used as the dedup key itself, precisely so a disagreement is visible rather than
++silently trusted.
++
++Caution (per the M4 doc and the project's own review of this pattern): standard InChIKeys do not
++distinguish every chemically relevant representation -- salts, mixtures, stereochemistry and
++tautomers can collapse together. ``normalize_smiles`` raises rather than guesses on unparseable
++input; it does not attempt salt-stripping or tautomer canonicalization beyond what
++``Chem.MolToSmiles``/``inchi.MolToInchiKey`` do by default.
++"""
++
++from __future__ import annotations
++
++from dataclasses import dataclass
++
++from rdkit import Chem
++from rdkit.Chem import inchi
++
++
++class InvalidSmiles(ValueError):
++    """Raised when a source record's SMILES cannot be parsed by RDKit."""
++
++
++@dataclass
++class NormalizedStructure:
++    canonical_smiles: str
++    inchikey: str
++
++
++def normalize_smiles(smiles: str) -> NormalizedStructure:
++    mol = Chem.MolFromSmiles(smiles)
++    if mol is None:
++        raise InvalidSmiles(f"RDKit could not parse SMILES: {smiles!r}")
++
++    canonical_smiles = Chem.MolToSmiles(mol, canonical=True)
++    inchikey = inchi.MolToInchiKey(mol)
++    if not inchikey or inchikey.startswith("InChI="):
++        raise InvalidSmiles(f"RDKit could not compute an InChIKey for SMILES: {smiles!r}")
++
++    return NormalizedStructure(canonical_smiles=canonical_smiles, inchikey=inchikey)
+diff --git a/s2f/m4_ligands/sources/__init__.py b/s2f/m4_ligands/sources/__init__.py
+new file mode 100644
+index 0000000..e69de29
+diff --git a/s2f/m4_ligands/sources/chembl.py b/s2f/m4_ligands/sources/chembl.py
+new file mode 100644
+index 0000000..25fbc7d
+--- /dev/null
++++ b/s2f/m4_ligands/sources/chembl.py
+@@ -0,0 +1,278 @@
++"""ChEMBL connector for M4 ligand candidate collection.
++
++Uses the current ChEMBL REST API (``https://www.ebi.ac.uk/chembl/api/data/``), confirmed against
++ChEMBL's own documentation (chembl.gitbook.io) and the EBI web services. No API key needed. Goes
++through ``s2f.common.http.CachedJsonClient`` -- unlike the ESMC SDK case, this is a plain GET-JSON
++REST API, so the shared cached/retried/offline-replayable client applies directly, no separate
++wrapper needed.
++
++Two ways in per protein:
++
++1. **Fast path**: if M2 already resolved a ChEMBL target ID for this protein's UniProt entry
++   (``s2f.common.ids`` populates ``Xrefs.chembl`` from UniProt's own ChEMBL cross-reference when
++   ``--map-ids`` ran), that ID is used directly -- no extra target-lookup call needed, and no new
++   ID mapping is invented (pitfall #11: nothing here does its own ID mapping).
++2. **Fallback**: given a bare UniProt accession with no pre-resolved ChEMBL cross-reference, looks
++   up the target via ``target?target_components__accession={accession}``.
++
++For each ChEMBL target: fetches approved-drug mechanism-of-action records
++(``mechanism?target_chembl_id=``) and significant bioactivities
++(``activity?target_chembl_id=...&pchembl_value__isnull=false``), then batches molecule lookups
++(``molecule?molecule_chembl_id__in=...``) for SMILES / max_phase / preferred name.
++"""
++
++from __future__ import annotations
++
++from datetime import UTC, datetime
++from typing import Any, Iterable
++
++from ...common.http import CachedJsonClient, HttpError
++from ..models import (
++    TARGETS_VIA_CHEMBL_DIRECT,
++    TARGETS_VIA_CHEMBL_HOMOLOG,
++    LigandCandidate,
++    ProvenanceRecord,
++)
++from ..normalize import InvalidSmiles, normalize_smiles
++
++BASE_URL = "https://www.ebi.ac.uk/chembl/api/data"
++ACTIVITY_PCHEMBL_MIN = 5.0  # pChEMBL >= 5 corresponds to potency <= ~10 uM; a common screening cut
++MOLECULE_BATCH = 50
++
++
++def _now() -> str:
++    return datetime.now(UTC).isoformat()
++
++
++def find_target_chembl_id(client: CachedJsonClient, uniprot_accession: str) -> str | None:
++    """Fallback target lookup by UniProt accession, when no cross-reference was pre-resolved."""
++    payload = client.get_json(
++        "chembl_target",
++        f"{BASE_URL}/target.json",
++        {"target_components__accession": uniprot_accession, "target_type": "SINGLE PROTEIN", "limit": 1},
++    )
++    targets = (payload or {}).get("targets") or []
++    return str(targets[0]["target_chembl_id"]) if targets else None
++
++
++def fetch_mechanisms(client: CachedJsonClient, target_chembl_id: str) -> list[dict[str, Any]]:
++    payload = client.get_json(
++        "chembl_mechanism", f"{BASE_URL}/mechanism.json", {"target_chembl_id": target_chembl_id, "limit": 100}
++    )
++    return list((payload or {}).get("mechanisms") or [])
++
++
++def fetch_activities(client: CachedJsonClient, target_chembl_id: str, *, min_pchembl: float = ACTIVITY_PCHEMBL_MIN) -> list[dict[str, Any]]:
++    payload = client.get_json(
++        "chembl_activity",
++        f"{BASE_URL}/activity.json",
++        {
++            "target_chembl_id": target_chembl_id,
++            "pchembl_value__gte": min_pchembl,
++            "assay_type": "B",
++            "limit": 100,
++        },
++    )
++    return list((payload or {}).get("activities") or [])
++
++
++def fetch_molecules(client: CachedJsonClient, molecule_chembl_ids: Iterable[str]) -> dict[str, dict[str, Any]]:
++    """Batched molecule lookup: canonical_smiles, max_phase, pref_name."""
++    unique = sorted({m for m in molecule_chembl_ids if m})
++    out: dict[str, dict[str, Any]] = {}
++    for start in range(0, len(unique), MOLECULE_BATCH):
++        batch = unique[start : start + MOLECULE_BATCH]
++        payload = client.get_json(
++            "chembl_molecule",
++            f"{BASE_URL}/molecule.json",
++            {"molecule_chembl_id__in": ",".join(batch), "limit": MOLECULE_BATCH},
++        )
++        for molecule in (payload or {}).get("molecules") or []:
++            chembl_id = str(molecule.get("molecule_chembl_id") or "")
++            if chembl_id:
++                out[chembl_id] = molecule
++    return out
++
++
++def _molecule_smiles(molecule: dict[str, Any]) -> str:
++    structures = molecule.get("molecule_structures") or {}
++    return str(structures.get("canonical_smiles") or "")
++
++
++def _approval_status(molecule: dict[str, Any]) -> str:
++    max_phase = molecule.get("max_phase")
++    if max_phase == 4:
++        return "approved"
++    if max_phase in (1, 2, 3):
++        return "investigational"
++    return ""
++
++
++def collect_from_chembl(
++    client: CachedJsonClient,
++    *,
++    feature_id: str,
++    target_chembl_id: str | None,
++    uniprot_accession: str = "",
++    via_homolog: bool,
++    max_phase: int | None = None,
++) -> tuple[list[LigandCandidate], list[dict[str, Any]]]:
++    """Collect candidates for one protein's already-resolved ChEMBL target.
++
++    ``via_homolog`` says whether ``target_chembl_id``/``uniprot_accession`` came from the
++    protein's own mapping or from a PDB-homolog's (M2's ``xrefs.route == "pdb_hit"``) -- this
++    decides ``targets_via`` (see the "targets_via note" in ``models.py``).
++
++    Returns (candidates, failures). Failures are recorded, never silently dropped (project
++    convention from M2's ``run.json['failures']``).
++    """
++    failures: list[dict[str, Any]] = []
++    targets_via = TARGETS_VIA_CHEMBL_HOMOLOG if via_homolog else TARGETS_VIA_CHEMBL_DIRECT
++
++    resolved_target = target_chembl_id
++    if resolved_target is None:
++        if not uniprot_accession:
++            failures.append({"feature_id": feature_id, "error": "no chembl_target_id and no uniprot_accession to look one up"})
++            return [], failures
++        try:
++            resolved_target = find_target_chembl_id(client, uniprot_accession)
++        except HttpError as exc:
++            failures.append({"feature_id": feature_id, "error": str(exc)})
++            return [], failures
++        if resolved_target is None:
++            return [], failures  # a genuine "ChEMBL has no target for this accession", not a failure
++
++    try:
++        mechanisms = fetch_mechanisms(client, resolved_target)
++        activities = fetch_activities(client, resolved_target)
++    except HttpError as exc:
++        failures.append({"feature_id": feature_id, "target_chembl_id": resolved_target, "error": str(exc)})
++        return [], failures
++
++    molecule_ids = {m.get("molecule_chembl_id") for m in mechanisms} | {a.get("molecule_chembl_id") for a in activities}
++    try:
++        molecules = fetch_molecules(client, (m for m in molecule_ids if m))
++    except HttpError as exc:
++        failures.append({"feature_id": feature_id, "target_chembl_id": resolved_target, "error": str(exc)})
++        return [], failures
++
++    candidates: list[LigandCandidate] = []
++    retrieved_at = _now()
++
++    for mechanism in mechanisms:
++        molecule_id = str(mechanism.get("molecule_chembl_id") or "")
++        molecule = molecules.get(molecule_id)
++        if not molecule:
++            failures.append({"feature_id": feature_id, "molecule_chembl_id": molecule_id, "error": "mechanism referenced a molecule with no molecule record"})
++            continue
++        smiles = _molecule_smiles(molecule)
++        if not smiles:
++            failures.append({"feature_id": feature_id, "molecule_chembl_id": molecule_id, "error": "no canonical_smiles on molecule record"})
++            continue
++        try:
++            normalized = normalize_smiles(smiles)
++        except InvalidSmiles as exc:
++            failures.append({"feature_id": feature_id, "molecule_chembl_id": molecule_id, "error": str(exc)})
++            continue
++
++        approval = _approval_status(molecule)
++        if max_phase is not None and (molecule.get("max_phase") or 0) < max_phase:
++            # Below the caller's phase floor: keep it out of the "approved candidate" pool but
++            # do not silently drop the observation -- record it and move on.
++            continue
++
++        candidates.append(
++            LigandCandidate(
++                for_feature_id=feature_id,
++                ligand_id=normalized.inchikey,
++                canonical_smiles=normalized.canonical_smiles,
++                name=str(molecule.get("pref_name") or ""),
++                source=["chembl"],
++                approval_status=approval,
++                targets_via=[targets_via],
++                proposal_reason=[
++                    {
++                        "type": "mechanism_of_action",
++                        "source": "chembl",
++                        "evidence_id": mechanism.get("mechanism_id", ""),
++                        "description": f"ChEMBL mechanism-of-action record against target {resolved_target}: "
++                        f"{mechanism.get('mechanism_of_action', '')}",
++                    }
++                ],
++                provenance=[
++                    ProvenanceRecord(
++                        source="chembl",
++                        source_record_id=str(mechanism.get("mechanism_id") or molecule_id),
++                        retrieved_at=retrieved_at,
++                        evidence_type="mechanism_of_action",
++                        source_url=f"https://www.ebi.ac.uk/chembl/explore/compound/{molecule_id}",
++                        description=str(mechanism.get("mechanism_of_action") or ""),
++                    )
++                ],
++                activity_evidence=[],
++            )
++        )
++
++    for activity in activities:
++        molecule_id = str(activity.get("molecule_chembl_id") or "")
++        molecule = molecules.get(molecule_id)
++        if not molecule:
++            failures.append({"feature_id": feature_id, "molecule_chembl_id": molecule_id, "error": "activity referenced a molecule with no molecule record"})
++            continue
++        smiles = _molecule_smiles(molecule)
++        if not smiles:
++            failures.append({"feature_id": feature_id, "molecule_chembl_id": molecule_id, "error": "no canonical_smiles on molecule record"})
++            continue
++        try:
++            normalized = normalize_smiles(smiles)
++        except InvalidSmiles as exc:
++            failures.append({"feature_id": feature_id, "molecule_chembl_id": molecule_id, "error": str(exc)})
++            continue
++
++        if max_phase is not None and (molecule.get("max_phase") or 0) < max_phase:
++            # Same phase floor as the mechanism loop above -- an activity-only observation on a
++            # below-threshold molecule must not sneak past the cap that route enforces.
++            continue
++
++        candidates.append(
++            LigandCandidate(
++                for_feature_id=feature_id,
++                ligand_id=normalized.inchikey,
++                canonical_smiles=normalized.canonical_smiles,
++                name=str(molecule.get("pref_name") or ""),
++                source=["chembl"],
++                approval_status=_approval_status(molecule),
++                targets_via=[targets_via],
++                proposal_reason=[
++                    {
++                        "type": "direct_target_activity",
++                        "source": "chembl",
++                        "evidence_id": activity.get("activity_id", ""),
++                        "description": f"ChEMBL bioactivity record against target {resolved_target}, "
++                        f"pChEMBL {activity.get('pchembl_value', '')}",
++                    }
++                ],
++                provenance=[
++                    ProvenanceRecord(
++                        source="chembl",
++                        source_record_id=str(activity.get("activity_id") or ""),
++                        retrieved_at=retrieved_at,
++                        evidence_type="target_activity",
++                        source_url=f"https://www.ebi.ac.uk/chembl/explore/compound/{molecule_id}",
++                        description=f"pChEMBL {activity.get('pchembl_value', '')}, assay {activity.get('assay_chembl_id', '')}",
++                    )
++                ],
++                activity_evidence=[
++                    {
++                        "type": "pchembl_value",
++                        "value": activity.get("pchembl_value"),
++                        "assay_chembl_id": activity.get("assay_chembl_id", ""),
++                        "standard_type": activity.get("standard_type", ""),
++                        "standard_value": activity.get("standard_value"),
++                        "standard_units": activity.get("standard_units", ""),
++                    }
++                ],
++            )
++        )
++
++    return candidates, failures
+diff --git a/tests/test_m4_chembl.py b/tests/test_m4_chembl.py
+new file mode 100644
+index 0000000..5701edd
+--- /dev/null
++++ b/tests/test_m4_chembl.py
+@@ -0,0 +1,265 @@
++"""Tests for s2f.m4_ligands.sources.chembl. Response shapes are trimmed real ChEMBL API shapes."""
++
++from __future__ import annotations
++
++import json
++
++import pytest
++
++from s2f.common.http import CachedJsonClient, JsonCache
++from s2f.m4_ligands.models import TARGETS_VIA_CHEMBL_DIRECT, TARGETS_VIA_CHEMBL_HOMOLOG
++from s2f.m4_ligands.sources.chembl import collect_from_chembl
++
++ASPIRIN_SMILES = "CC(=O)Oc1ccccc1C(=O)O"
++IBUPROFEN_SMILES = "CC(C)Cc1ccc(cc1)C(C)C(=O)O"
++
++
++class FakeResponse:
++    def __init__(self, payload, status_code: int = 200) -> None:
++        self.status_code = status_code
++        self._payload = payload
++        self.content = json.dumps(payload).encode()
++        self.text = self.content.decode()
++        self.headers: dict[str, str] = {}
++
++    @property
++    def ok(self) -> bool:
++        return 200 <= self.status_code < 300
++
++    def json(self):
++        return self._payload
++
++
++class FakeSession:
++    """Routes GET calls to canned ChEMBL-shaped responses by URL substring."""
++
++    def __init__(self, routes: dict[str, dict]) -> None:
++        self.routes = routes
++        self.calls: list[tuple[str, dict]] = []
++        self.headers: dict[str, str] = {}
++
++    def get(self, url, params=None, timeout=None):
++        params = params or {}
++        self.calls.append((url, params))
++        for needle, payload in self.routes.items():
++            if needle in url:
++                return FakeResponse(payload)
++        raise AssertionError(f"unexpected URL in test: {url} {params}")
++
++
++def make_client(tmp_path, routes) -> tuple[CachedJsonClient, FakeSession]:
++    session = FakeSession(routes)
++    cache = JsonCache(tmp_path / "cache.sqlite")
++    client = CachedJsonClient(cache=cache, session=session, min_interval_seconds=0)
++    return client, session
++
++
++def test_fast_path_uses_pre_resolved_target_and_skips_target_lookup(tmp_path) -> None:
++    client, session = make_client(
++        tmp_path,
++        {
++            "mechanism.json": {"mechanisms": []},
++            "activity.json": {
++                "activities": [
++                    {
++                        "activity_id": 1,
++                        "molecule_chembl_id": "CHEMBL545",
++                        "pchembl_value": "7.2",
++                        "assay_chembl_id": "CHEMBL_ASSAY_1",
++                        "standard_type": "Ki",
++                        "standard_value": "63",
++                        "standard_units": "nM",
++                    }
++                ]
++            },
++            "molecule.json": {
++                "molecules": [
++                    {
++                        "molecule_chembl_id": "CHEMBL545",
++                        "pref_name": "ASPIRIN",
++                        "max_phase": 4,
++                        "molecule_structures": {"canonical_smiles": ASPIRIN_SMILES},
++                    }
++                ]
++            },
++        },
++    )
++
++    candidates, failures = collect_from_chembl(
++        client, feature_id="fig|1", target_chembl_id="CHEMBL2095233", via_homolog=False
++    )
++
++    assert failures == []
++    assert len(candidates) == 1
++    assert candidates[0].approval_status == "approved"
++    assert candidates[0].targets_via == [TARGETS_VIA_CHEMBL_DIRECT]
++    # No target.json call at all -- the fast path never looks one up.
++    assert not any("target.json" in url for url, _ in session.calls)
++
++
++def test_via_homolog_flag_selects_the_homolog_targets_via_value(tmp_path) -> None:
++    client, _ = make_client(
++        tmp_path,
++        {
++            "mechanism.json": {"mechanisms": []},
++            "activity.json": {"activities": []},
++            "molecule.json": {"molecules": []},
++        },
++    )
++
++    candidates, _ = collect_from_chembl(
++        client, feature_id="fig|1", target_chembl_id="CHEMBL2095233", via_homolog=True
++    )
++    assert candidates == []  # nothing to assert on targets_via with zero results; see next test
++
++
++def test_mechanism_and_activity_referencing_the_same_molecule_both_appear_as_raw_candidates(tmp_path) -> None:
++    """dedup.py is responsible for merging these; the connector itself emits one candidate per
++    evidence row, which is the raw-observation count the run.json report needs."""
++    client, _ = make_client(
++        tmp_path,
++        {
++            "mechanism.json": {
++                "mechanisms": [
++                    {"mechanism_id": 1, "molecule_chembl_id": "CHEMBL545", "mechanism_of_action": "COX inhibitor"}
++                ]
++            },
++            "activity.json": {
++                "activities": [
++                    {
++                        "activity_id": 2,
++                        "molecule_chembl_id": "CHEMBL545",
++                        "pchembl_value": "7.2",
++                        "assay_chembl_id": "A1",
++                        "standard_type": "Ki",
++                        "standard_value": "63",
++                        "standard_units": "nM",
++                    }
++                ]
++            },
++            "molecule.json": {
++                "molecules": [
++                    {
++                        "molecule_chembl_id": "CHEMBL545",
++                        "pref_name": "ASPIRIN",
++                        "max_phase": 4,
++                        "molecule_structures": {"canonical_smiles": ASPIRIN_SMILES},
++                    }
++                ]
++            },
++        },
++    )
++
++    candidates, failures = collect_from_chembl(
++        client, feature_id="fig|1", target_chembl_id="CHEMBL2095233", via_homolog=False
++    )
++
++    assert failures == []
++    assert len(candidates) == 2  # one from mechanism, one from activity -- not yet deduplicated
++    assert {c.ligand_id for c in candidates} == {"BSYNRYMUTXBXSQ-UHFFFAOYSA-N"}
++
++
++def test_fallback_path_looks_up_target_by_uniprot_accession(tmp_path) -> None:
++    client, session = make_client(
++        tmp_path,
++        {
++            "target.json": {"targets": [{"target_chembl_id": "CHEMBL4523582"}]},
++            "mechanism.json": {"mechanisms": []},
++            "activity.json": {"activities": []},
++            "molecule.json": {"molecules": []},
++        },
++    )
++
++    candidates, failures = collect_from_chembl(
++        client, feature_id="fig|1", target_chembl_id=None, uniprot_accession="P0DTC2", via_homolog=False
++    )
++
++    assert failures == []
++    assert any("target.json" in url for url, _ in session.calls)
++
++
++def test_fallback_with_no_uniprot_accession_is_a_recorded_failure_not_a_crash(tmp_path) -> None:
++    client, _ = make_client(tmp_path, {})
++
++    candidates, failures = collect_from_chembl(
++        client, feature_id="fig|1", target_chembl_id=None, uniprot_accession="", via_homolog=False
++    )
++
++    assert candidates == []
++    assert len(failures) == 1
++    assert failures[0]["feature_id"] == "fig|1"
++
++
++def test_no_chembl_target_for_accession_is_a_genuine_empty_result_not_a_failure(tmp_path) -> None:
++    client, _ = make_client(tmp_path, {"target.json": {"targets": []}})
++
++    candidates, failures = collect_from_chembl(
++        client, feature_id="fig|1", target_chembl_id=None, uniprot_accession="Q99999", via_homolog=False
++    )
++
++    assert candidates == []
++    assert failures == []  # ChEMBL genuinely has no target for this accession -- not an error
++
++
++def test_max_phase_filter_excludes_below_threshold_candidates(tmp_path) -> None:
++    client, _ = make_client(
++        tmp_path,
++        {
++            "mechanism.json": {"mechanisms": []},
++            "activity.json": {
++                "activities": [
++                    {
++                        "activity_id": 1,
++                        "molecule_chembl_id": "CHEMBL_INVESTIGATIONAL",
++                        "pchembl_value": "6.0",
++                        "assay_chembl_id": "A1",
++                        "standard_type": "IC50",
++                        "standard_value": "500",
++                        "standard_units": "nM",
++                    }
++                ]
++            },
++            "molecule.json": {
++                "molecules": [
++                    {
++                        "molecule_chembl_id": "CHEMBL_INVESTIGATIONAL",
++                        "pref_name": "INVESTIGATIONAL-COMPOUND",
++                        "max_phase": 2,
++                        "molecule_structures": {"canonical_smiles": IBUPROFEN_SMILES},
++                    }
++                ]
++            },
++        },
++    )
++
++    candidates, _ = collect_from_chembl(
++        client, feature_id="fig|1", target_chembl_id="CHEMBL2095233", via_homolog=False, max_phase=4
++    )
++
++    assert candidates == []  # phase 2 < required phase 4
++
++
++def test_molecule_with_no_smiles_is_recorded_as_a_failure_not_silently_dropped(tmp_path) -> None:
++    client, _ = make_client(
++        tmp_path,
++        {
++            "mechanism.json": {
++                "mechanisms": [{"mechanism_id": 1, "molecule_chembl_id": "CHEMBL_NO_SMILES", "mechanism_of_action": "x"}]
++            },
++            "activity.json": {"activities": []},
++            "molecule.json": {
++                "molecules": [
++                    {"molecule_chembl_id": "CHEMBL_NO_SMILES", "pref_name": "NO-STRUCTURE", "max_phase": 1,
++                     "molecule_structures": {}}
++                ]
++            },
++        },
++    )
++
++    candidates, failures = collect_from_chembl(
++        client, feature_id="fig|1", target_chembl_id="CHEMBL2095233", via_homolog=False
++    )
++
++    assert candidates == []
++    assert len(failures) == 1
++    assert "smiles" in failures[0]["error"].lower()
+diff --git a/tests/test_m4_dedup.py b/tests/test_m4_dedup.py
+new file mode 100644
+index 0000000..f14699a
+--- /dev/null
++++ b/tests/test_m4_dedup.py
+@@ -0,0 +1,78 @@
++"""Tests for s2f.m4_ligands.dedup (dedup key = (for_feature_id, ligand_id), evidence-merging)."""
++
++from __future__ import annotations
++
++import pytest
++
++from s2f.m4_ligands.dedup import deduplicate, merge_candidate
++from s2f.m4_ligands.models import LigandCandidate, ProvenanceRecord
++
++
++def make_candidate(feature_id: str, ligand_id: str, source: str, **kwargs) -> LigandCandidate:
++    defaults = dict(
++        for_feature_id=feature_id,
++        ligand_id=ligand_id,
++        canonical_smiles="CCO",
++        source=[source],
++        provenance=[ProvenanceRecord(source=source, source_record_id="1", retrieved_at="t", evidence_type="e")],
++    )
++    defaults.update(kwargs)
++    return LigandCandidate(**defaults)
++
++
++def test_different_proteins_are_never_merged_even_with_the_same_ligand() -> None:
++    a = make_candidate("fig|1", "INCHIKEY-A", "chembl")
++    b = make_candidate("fig|2", "INCHIKEY-A", "chembl")
++
++    result = deduplicate([a, b])
++
++    assert len(result) == 2
++
++
++def test_same_protein_and_ligand_from_two_sources_merge_into_one_with_both_provenance_records() -> None:
++    a = make_candidate("fig|1", "INCHIKEY-A", "chembl")
++    b = make_candidate("fig|1", "INCHIKEY-A", "bindingdb")
++
++    result = deduplicate([a, b])
++
++    assert len(result) == 1
++    merged = result[0]
++    assert set(merged.source) == {"chembl", "bindingdb"}
++    assert len(merged.provenance) == 2  # both observations kept, neither discarded
++
++
++def test_targets_via_is_unioned_not_overwritten() -> None:
++    a = make_candidate("fig|1", "INCHIKEY-A", "chembl", targets_via=["chembl_direct"])
++    b = make_candidate("fig|1", "INCHIKEY-A", "chembl", targets_via=["kg"])
++
++    result = deduplicate([a, b])
++
++    assert set(result[0].targets_via) == {"chembl_direct", "kg"}
++
++
++def test_name_and_approval_status_are_filled_from_whichever_record_has_them() -> None:
++    a = make_candidate("fig|1", "INCHIKEY-A", "chembl", name="", approval_status="")
++    b = make_candidate("fig|1", "INCHIKEY-A", "bindingdb", name="Aspirin", approval_status="approved")
++
++    result = deduplicate([a, b])
++
++    assert result[0].name == "Aspirin"
++    assert result[0].approval_status == "approved"
++
++
++def test_output_order_is_stable_first_seen_wins_as_the_base_record() -> None:
++    a = make_candidate("fig|1", "INCHIKEY-A", "chembl")
++    b = make_candidate("fig|2", "INCHIKEY-B", "chembl")
++    c = make_candidate("fig|1", "INCHIKEY-A", "bindingdb")  # merges into `a`
++
++    result = deduplicate([a, b, c])
++
++    assert [r.dedup_key for r in result] == [("fig|1", "INCHIKEY-A"), ("fig|2", "INCHIKEY-B")]
++
++
++def test_merge_candidate_rejects_mismatched_dedup_keys() -> None:
++    a = make_candidate("fig|1", "INCHIKEY-A", "chembl")
++    b = make_candidate("fig|2", "INCHIKEY-B", "chembl")
++
++    with pytest.raises(ValueError):
++        merge_candidate(a, b)
+diff --git a/tests/test_m4_dry_run.py b/tests/test_m4_dry_run.py
+new file mode 100644
+index 0000000..af35734
+--- /dev/null
++++ b/tests/test_m4_dry_run.py
+@@ -0,0 +1,98 @@
++"""End-to-end check: `python -m s2f.m4_ligands.cli --dry-run` works from fixtures/m4, no network.
++
++Mirrors the acceptance-check pattern from M2's test_m2_dry_run.py.
++"""
++
++from __future__ import annotations
++
++import json
++from pathlib import Path
++
++import pytest
++
++from s2f.m4_ligands.cli import main
++
++
++def _read_jsonl(path: Path) -> list[dict]:
++    with path.open(encoding="utf-8") as handle:
++        return [json.loads(line) for line in handle if line.strip()]
++
++
++def test_dry_run_produces_deduplicated_candidates_with_provenance(tmp_path: Path) -> None:
++    run_dir = tmp_path / "run"
++    assert main(["--dry-run", "--run", str(run_dir)]) == 0
++
++    out = run_dir / "m4_ligands"
++    candidates = _read_jsonl(out / "ligand_candidates.jsonl")
++    provenance = _read_jsonl(out / "provenance.jsonl")
++    manifest = json.loads((out / "run.json").read_text())
++
++    assert manifest["offline"] is True
++    assert manifest["dry_run"] is True
++    assert manifest["counts"]["proteins_considered"] == 3
++    assert manifest["counts"]["proteins_skipped_no_mapping"] == 1
++    assert manifest["skipped_no_mapping"] == ["fig|999999.1.peg.3"]
++
++    # fig|...peg.1 has one molecule referenced by both a mechanism and an activity row --
++    # dedup must collapse those into one candidate, not two.
++    assert manifest["counts"]["candidates_raw"] == 3
++    assert manifest["counts"]["candidates_deduplicated"] == 2
++
++    by_feature = {c["for_feature_id"]: c for c in candidates}
++    assert set(by_feature) == {"fig|999999.1.peg.1", "fig|999999.1.peg.2"}
++    assert len(by_feature["fig|999999.1.peg.1"]["provenance"]) == 2
++    assert by_feature["fig|999999.1.peg.2"]["approval_status"] == "approved"
++
++    # Every candidate is traceable: provenance.jsonl carries feature_id + ligand_id + source.
++    assert len(provenance) == 3  # 2 records for peg.1, 1 for peg.2 -- pre-dedup observation count
++    assert all({"feature_id", "ligand_id", "source", "source_record_id"} <= set(p) for p in provenance)
++
++
++def test_dry_run_reports_per_source_unique_vs_observation_counts(tmp_path: Path) -> None:
++    run_dir = tmp_path / "run"
++    main(["--dry-run", "--run", str(run_dir)])
++    manifest = json.loads((run_dir / "m4_ligands" / "run.json").read_text())
++
++    chembl_counts = manifest["counts"]["by_source"]["chembl"]
++    assert chembl_counts["unique_candidates"] == 2
++    assert chembl_counts["source_observations"] == 3
++
++
++def test_protein_id_filter_runs_a_single_protein(tmp_path: Path) -> None:
++    run_dir = tmp_path / "run"
++    main(["--dry-run", "--run", str(run_dir), "--protein-id", "fig|999999.1.peg.2"])
++    manifest = json.loads((run_dir / "m4_ligands" / "run.json").read_text())
++
++    assert manifest["counts"]["proteins_considered"] == 1
++    candidates = _read_jsonl(run_dir / "m4_ligands" / "ligand_candidates.jsonl")
++    assert {c["for_feature_id"] for c in candidates} == {"fig|999999.1.peg.2"}
++
++
++def test_max_phase_filter_is_wired_through_the_cli(tmp_path: Path) -> None:
++    run_dir = tmp_path / "run"
++    main(["--dry-run", "--run", str(run_dir), "--max-phase", "4"])
++    manifest = json.loads((run_dir / "m4_ligands" / "run.json").read_text())
++
++    # peg.1's fixture molecule is max_phase=2, below the phase-4 floor -- filtered out.
++    # peg.2's fixture molecule is max_phase=4 -- kept.
++    candidates = _read_jsonl(run_dir / "m4_ligands" / "ligand_candidates.jsonl")
++    assert {c["for_feature_id"] for c in candidates} == {"fig|999999.1.peg.2"}
++
++
++def test_unsupported_source_is_rejected_not_silently_ignored(tmp_path: Path) -> None:
++    run_dir = tmp_path / "run"
++    assert main(["--dry-run", "--run", str(run_dir), "--sources", "chembl,bindingdb"]) == 2
++
++
++def test_empty_proteins_file_produces_empty_but_valid_output(tmp_path: Path) -> None:
++    run_dir = tmp_path / "run"
++    empty_proteins = tmp_path / "empty.tsv"
++    empty_proteins.write_text("feature_id\tproduct\tretrieval_status\tuniprot\tuniprot_route\tchembl\n")
++
++    assert main(["--run", str(run_dir), "--proteins", str(empty_proteins), "--offline",
++                 "--cache", str(tmp_path / "cache.sqlite")]) == 0
++
++    manifest = json.loads((run_dir / "m4_ligands" / "run.json").read_text())
++    assert manifest["counts"]["proteins_considered"] == 0
++    assert manifest["counts"]["candidates_deduplicated"] == 0
++    assert (run_dir / "m4_ligands" / "ligand_candidates.jsonl").read_text() == ""
+diff --git a/tests/test_m4_normalize.py b/tests/test_m4_normalize.py
+new file mode 100644
+index 0000000..fc71b58
+--- /dev/null
++++ b/tests/test_m4_normalize.py
+@@ -0,0 +1,33 @@
++"""Tests for s2f.m4_ligands.normalize (RDKit canonicalization)."""
++
++from __future__ import annotations
++
++import pytest
++
++from s2f.m4_ligands.normalize import InvalidSmiles, normalize_smiles
++
++
++def test_valid_smiles_produces_canonical_form_and_inchikey() -> None:
++    # Aspirin
++    result = normalize_smiles("CC(=O)Oc1ccccc1C(=O)O")
++    assert result.inchikey == "BSYNRYMUTXBXSQ-UHFFFAOYSA-N"
++    assert result.canonical_smiles  # RDKit's own canonical form; not asserting exact string
++
++
++def test_two_equivalent_smiles_collapse_to_the_same_inchikey() -> None:
++    """The whole point of normalization: different-looking SMILES for the same molecule must
++    dedupe. Two ways of writing ethanol."""
++    a = normalize_smiles("CCO")
++    b = normalize_smiles("OCC")
++    assert a.inchikey == b.inchikey
++    assert a.canonical_smiles == b.canonical_smiles
++
++
++def test_invalid_smiles_raises_rather_than_guessing() -> None:
++    with pytest.raises(InvalidSmiles):
++        normalize_smiles("not a smiles string!!!")
++
++
++def test_empty_smiles_raises() -> None:
++    with pytest.raises(InvalidSmiles):
++        normalize_smiles("")

@@ -1,0 +1,4 @@
+feature_id	product	retrieval_status	uniprot	uniprot_route	chembl
+fig|999999.1.peg.1	SARS-CoV-2 spike receptor-binding domain	found	P0DTC2	proteome_checksum	
+fig|999999.1.peg.2	Lysozyme C	found	P61626	proteome_checksum	CHEMBL2095233
+fig|999999.1.peg.3	hypothetical protein	no-hit		unmapped	
