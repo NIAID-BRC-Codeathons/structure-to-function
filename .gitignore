@@ -44,3 +44,6 @@ htmlcov/
 # the global file; it is a no-op for anyone who does not have that rule.
 !docs/
 !docs/**
+
+# ...but not OS cruft, which the negation above would otherwise re-include.
+docs/**/.DS_Store
