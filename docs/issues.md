@@ -894,3 +894,44 @@ hand-written `m2_triage` invocation afterwards, and then a re-render of the repo
 
 **Watch out for:** the two rankings look equally finished. Nothing downstream can tell that
 0.40 of the weight mass was absent.
+
+## Report: structure and ligand viewers, once there is something to view
+
+labels: module:m6, priority:p2, type:code
+
+**Goal:** the two items of #66's scope that could not be built while the modules feeding
+them did not exist.
+
+**Docs:** `docs/06-m6-report.md`, `docs/pitfalls.md` (#2, #5)
+
+#66 shipped and closed on its definition of done: renders from the fixture, from a partial
+report and with no network, nothing computed in the template, opens offline. Two scope
+items were deliberately left, because a viewer with nothing to display is a stub rather
+than a feature:
+
+- **3Dmol.js receptor / pocket / pose views.** M3 collects existing PDB and AlphaFold
+  structures but defines no pockets yet, and poses need M4, which is not written. A
+  self-contained report also means 3Dmol.js has to be vendored into the file rather than
+  loaded from a CDN — `tests/test_m6_report.py::test_the_file_has_no_external_references`
+  and the full report's equivalent both pin that, and they should keep passing.
+- **RDKit ligand SVGs.** Needs `ligands` from M4. Depictions are generated at render time
+  from SMILES and inlined; RDKit is a build-time dependency of the report, not a runtime
+  one for the reader.
+
+**Scope**
+- Vendor 3Dmol.js (or an equivalent small viewer) inline; render receptor, pocket and pose
+  for each candidate that has a structure.
+- Inline RDKit-generated SVG per ligand.
+- Keep both behind the same "not run" treatment every other section has, so a run without
+  M3 or M4 renders exactly as it does today.
+
+**Definition of done**
+- [ ] A report with structures shows them; one without renders unchanged
+- [ ] The no-external-references tests still pass with the viewer vendored
+- [ ] Ligand depictions are inline SVG, never a link or a runtime fetch
+- [ ] File size with a full run recorded, since a vendored viewer is not small
+
+**Watch out for:** a predicted structure has no cofactors and a docking pose is a ranking,
+not an affinity. The limitations block already says both; a 3D view makes them look far
+more authoritative than they are, so the caveat has to sit next to the viewer, not only at
+the bottom of the page.
