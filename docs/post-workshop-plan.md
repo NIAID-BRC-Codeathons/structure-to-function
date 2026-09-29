@@ -1,7 +1,20 @@
 # Post-workshop plan
 
-**29 September 2026.** The codeathon ran 16–18 September. The team agreed to continue, with most
-people available from **mid-October**.
+**29 September 2026.** The codeathon ran 16–18 September. Five of the eight participants are
+continuing, most of them available from **mid-October**.
+
+| Continuing | GitHub | Worked on |
+| --- | --- | --- |
+| **Jiahui Chen** (lead) | `Jiahuic` | M2 triage, `common/` contract, M6 report |
+| Carla Mann | `cmmann21` | M1, M2 functional annotation, most of the documentation |
+| Alexander Partin | `adpartin` | M3 structure collection |
+| Ping Hu | `PingPnG` | M1 scripts, the docking and pocket prototype |
+| Ashita Jawali | `Ashita2619` | ESMC embeddings |
+
+Not continuing: Moises Gualapuro (co-lead), MD Shakhaowat Hossain, Heng Ma, Archit Vasan.
+**There is no longer a co-lead**, so sequencing decisions land in one place.
+
+Five people working evenings is the constraint every proposal below is measured against.
 
 This is a proposal, not a decision. It exists so the restart argues about a written thing.
 
@@ -60,10 +73,13 @@ Generalizing the pipeline means making (2) pluggable. It is not a rewrite of (1)
 
 Sparse-time work, suitable for everyone. In rough order of value:
 
-- [ ] **Decide the three stale PRs.** #76 is a dependency declaration and should just land. #62 is
-      the only *measurement* work anyone did, and its findings stand on their own even if the
-      code does not merge — including that M1's `--seq-cap` drops 58% of hypothetical proteins
-      before M2 sees them, in a project named after hypothetical proteins.
+- [ ] **Decide the three stale PRs.** #76 is a dependency declaration and should just land; #77
+      is M1's, and Carla is continuing. **#62 is the awkward one**: it is the only *measurement*
+      work anyone did, it is ~7,900 lines, and its author is not continuing — so merging it
+      means owning it. Its most important finding is now filed separately as **#85** (M1's
+      `--seq-cap` removes 58% of hypothetical proteins before M2 sees them), so the finding
+      survives whichever way the PR goes. Closing it with thanks is a reasonable outcome;
+      leaving it open indefinitely is not.
 - [ ] **The defect backlog** — #67, #68, #69, #72, #80, #81. Each is one sitting. #68 matters
       most: essentiality transferred from a reference set that can contain the query genome is
       circular, and it is in a number we have quoted.
@@ -77,7 +93,15 @@ Sparse-time work, suitable for everyone. In rough order of value:
 
 **M4: ligand candidates, scoring and docking** (#15, #16, #17). This is the one gap that changes
 what the pipeline *claims to be*, and it needs sustained attention rather than spare evenings.
-Starting point is Ping's existing script rather than a blank file.
+
+**It is also the best-staffed gap we have**, which was not obvious until the team shrank:
+Ping's `bacteria_structure_docking.py` already produces prepared receptors, pocket boxes and
+Boltz-2 inputs; Alex holds #18 (Boltz-2 co-folding) and built M3's structure collection, which
+is what M4 consumes; and Ashita holds #15 (ligand candidate collection). Three of the five
+continuing people are already pointed at this.
+
+The work is less "build M4" than "bring Ping's prototype inside the contract" — it currently has
+its own ranking and its own output directories, and reads none of `report.json`.
 
 M5 (#19, #20) is the same shape but one step further out; it can wait.
 
@@ -127,8 +151,12 @@ What should not happen is building B and C at once on an unvalidated core.
 ## Open questions for the restart
 
 1. Do we finish the bacterial case first, or is a second domain more motivating for people
-   working evenings?
-2. Is anyone willing to own M4 with sustained time, or should it stay out of scope?
-3. What do we do with #62 — merge, or keep the findings and close it?
+   working evenings? With five people this is a real trade, not a both-at-once.
+2. **M4**: does Ping's prototype come inside the contract, and who drives it — Ping, Alex, or
+   the two together? This is the highest-value thing on the board and the only one with three
+   people already adjacent to it.
+3. What do we do with #62? Merging ~7,900 lines whose author has left means owning them.
+   The key finding is preserved in #85 either way.
 4. Which CEPI services, concretely, and do they have a callable API?
-5. Do we need a genome that is **not** in the PDB before any of this means anything?
+5. Do we need a genome that is **not** in the PDB before any of this means anything? Nothing
+   we have measured so far survives that question unchanged.
