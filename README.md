@@ -10,15 +10,15 @@ Project page: https://niaid-brc-codeathons.github.io/projects/structure-to-funct
 
 ## Status
 
-| Stage | Module | State |
-| --- | --- | --- |
-| M1 genome | `s2f.m1_genome` | taxon call, CGA submit/poll/parse, quality gate, BV-BRC Data API route, priority ranking, interactive report |
-| M2 triage | `s2f.m2_triage` | PDB evidence, AlphaFold, knowledge graph, triage scoring |
-| M3 fold | - | not started |
-| M4 ligands | - | not started |
-| M5 disease | - | not started |
-| M6 report | - | not started |
-| shared | `s2f.common` | `report.json` schema, atomic section writer, HTTP cache, id mapping |
+| Stage      | Module          | State                                                                                                                                                   |
+| ---        | ---             | ---                                                                                                                                                     |
+| M1 genome  | `s2f.m1_genome` | taxon call, CGA submit/poll/parse, quality gate, BV-BRC Data API route, priority ranking, interactive report                                            |
+| M2 triage  | `s2f.m2_triage` | PDB evidence, AlphaFold, knowledge graph, triage scoring                                                                                                |
+| M3 fold    | `s2f.m3_fold`   | Collects existing PDB/AFDB structures and applies preliminary quality checks; Pending: new structure prediction, pocket detection, receptor preparation |
+| M4 ligands | -               | not started                                                                                                                                             |
+| M5 disease | -               | not started                                                                                                                                             |
+| M6 report  | -               | not started                                                                                                                                             |
+| shared     | `s2f.common`    | `report.json` schema, atomic section writer, HTTP cache, id mapping                                                                                     |
 
 `python -m s2f.run` runs the stages that exist, in order, into one
 `runs/<id>/report.json`.
