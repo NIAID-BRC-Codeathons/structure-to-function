@@ -113,6 +113,15 @@ phylogeny, the reports and the figures. Everything after that point is a figure 
 convenience, and a transient HTTP error while building one must not leave a run with no
 `genome` and no `proteins`.
 
+**`--seq-cap` never removes an uncharacterized protein** (#85). The cap keeps the top annotated
+proteins by `m1_priority` rank. That rank scores a hypothetical protein 0, while M2's
+`annotation_gap` pays it the second-largest weight, so a plain rank cap removed 773 of 1,333
+hypotheticals on *K. pneumoniae* HS11286 before M2 saw them. Uncharacterized proteins are
+therefore exempt, so a run can fetch more than `--seq-cap` sequences. Both modules use the
+same test for "uncharacterized" (`s2f/common/annotation.py`).
+`run.json` → `modules.m1.seq_cap` records the cap, the candidates, how many proteins were
+kept and dropped, and how many were exempt.
+
 ## Inferences, labelled as such
 
 Two sections are derived, not measured, and both say so in the data as well as the report.

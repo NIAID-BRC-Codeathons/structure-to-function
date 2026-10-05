@@ -51,7 +51,8 @@ def build_parser() -> argparse.ArgumentParser:
     p.add_argument("--annotation", choices=["PATRIC", "RefSeq"],
                    help="M1 API route: annotation source for CDS features")
     p.add_argument("--max-features", type=int, help="M1 API route: cap on CDS features")
-    p.add_argument("--seq-cap", type=int, help="M1 API route: cap on protein sequences")
+    p.add_argument("--seq-cap", type=int, help="M1 API route: cap on annotated protein sequences; "
+                   "uncharacterized proteins are never capped")
     p.add_argument("--tree-leaves", type=int,
                    help="M1 API route: max genomes on the gene-content phylogeny")
     p.add_argument("--no-tree", action="store_true",

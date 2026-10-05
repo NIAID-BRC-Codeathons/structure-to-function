@@ -89,7 +89,8 @@ def build_parser() -> argparse.ArgumentParser:
     api.add_argument("--max-features", type=int, default=25000,
                      help="cap on CDS features to fetch (default 25000)")
     api.add_argument("--seq-cap", type=int, default=4000,
-                     help="max protein sequences to fetch (default 4000)")
+                     help="max annotated protein sequences to fetch (default 4000); "
+                          "uncharacterized proteins are never capped (#85)")
     api.add_argument("--tree-leaves", type=int, default=14,
                      help="max genomes on the gene-content phylogeny (default 14)")
     api.add_argument("--no-tree", action="store_true",
@@ -210,7 +211,8 @@ def _run_api_route(args: argparse.Namespace, run_dir: Path, m1_dir: Path,
                    started: float) -> int:
     """The Data API route: resolve a genome, collect, and write the same contract."""
     from .bvbrc_api import BvbrcApi, GenomeResolutionError, read_fasta_defline
-    from .collect import (collect_all, fetch_sequences, genome_section as api_genome_section,
+    from .collect import (collect_all, fetch_sequences, select_sequence_features,
+                          genome_section as api_genome_section,
                           proteins_section as api_proteins_section,
                           run_fields as api_run_fields, taxonomy_tree_text,
                           write_m1_dir as api_write_m1_dir, write_section_csvs)
@@ -270,7 +272,10 @@ def _run_api_route(args: argparse.Namespace, run_dir: Path, m1_dir: Path,
     try:
         sequences = fetch_sequences(api, bundle["features"], cap=args.seq_cap,
                                     priority=ranked)
-        print(f"  {len(sequences)} sequences")
+        _, seq_cap = select_sequence_features(bundle["features"], cap=args.seq_cap,
+                                              priority=ranked)
+        print(f"  {len(sequences)} sequences ({seq_cap['uncharacterized_exempt']} "
+              f"uncharacterized exempt from --seq-cap, {seq_cap['dropped']} dropped)")
     except OfflineCacheMiss as exc:
         print(f"offline: {exc}", file=sys.stderr)
         return 5
@@ -289,7 +294,8 @@ def _run_api_route(args: argparse.Namespace, run_dir: Path, m1_dir: Path,
     run_section.update(api_run_fields(genome, bundle, resolution))
     modules = dict(run_section.get("modules") or {})
     modules["m1"] = {"status": "ok", "route": "api", "finished_at": _now(),
-                     "elapsed_seconds": round(time.time() - started, 1), **counts}
+                     "elapsed_seconds": round(time.time() - started, 1), **counts,
+                     "seq_cap": seq_cap}
     run_section["modules"] = modules
     update_section(run_dir, "run", run_section)
 
