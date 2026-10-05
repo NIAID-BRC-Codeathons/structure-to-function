@@ -63,7 +63,11 @@ def build_parser() -> argparse.ArgumentParser:
                    help="skip a stage; repeatable")
     p.add_argument("--only", action="append", default=[], metavar="STAGE",
                    help="run only these stages; repeatable")
-    p.add_argument("--limit", type=int, help="passed to M2 as --limit")
+    # One flag per stage (#80). --limit used to reach M3 as well, so capping structure
+    # downloads silently capped how many proteins M2 scored.
+    p.add_argument("--limit", type=int, help="M2: score only the first N proteins")
+    p.add_argument("--structure-limit", type=int,
+                   help="M3: collect structures for only the first N selected proteins")
     p.add_argument("--map-ids", action="store_true", help="M2: resolve UniProt/ChEMBL xrefs")
     p.add_argument("--kg", action="store_true", help="M2: assemble the knowledge subgraph")
     p.add_argument("--annotate", action="store_true",
@@ -185,8 +189,8 @@ def stage_args(stage: str, args: argparse.Namespace) -> list[str]:
         return out
     if stage == "m3":
         out = list(common)
-        if args.limit:
-            out += ["--limit", str(args.limit)]
+        if args.structure_limit:
+            out += ["--limit", str(args.structure_limit)]
         if args.offline:
             out.append("--offline")
         return out
@@ -223,6 +227,29 @@ def missing_evidence(run_dir: str) -> list[str]:
     return lines
 
 
+def stage_caps(args: argparse.Namespace, stages: list[str]) -> dict[str, dict]:
+    """The caps the runner applied, per stage, for `run.caps` in report.json.
+
+    A truncated run validates exactly like a complete one, so the caps have to be in the
+    report, not only on the console. `None` means the stage ran uncapped or with its own
+    default.
+    """
+    caps = {"m1": {"max_features": args.max_features, "seq_cap": args.seq_cap},
+            "m2": {"limit": args.limit or None},
+            "m3": {"limit": args.structure_limit or None}}
+    return {stage: caps[stage] for stage in stages if stage in caps}
+
+
+def _record_caps(args: argparse.Namespace, stages: list[str]) -> None:
+    from .common.io import read_report, update_section
+
+    run = dict(read_report(args.run).get("run") or {})
+    if not run:
+        return  # M1 creates the run section; nothing to annotate before it exists
+    run["caps"] = {**(run.get("caps") or {}), **stage_caps(args, stages)}
+    update_section(args.run, "run", run)
+
+
 def main(argv: list[str] | None = None) -> int:
     args = build_parser().parse_args(argv)
     Path(args.run).mkdir(parents=True, exist_ok=True)
@@ -245,6 +272,7 @@ def main(argv: list[str] | None = None) -> int:
         if code != 0:
             print(f"=== {name} failed (exit {code}) after {elapsed:.1f}s", file=sys.stderr)
             return code
+        _record_caps(args, [name for name, _ in selected])
         print(f"=== {name} ok in {elapsed:.1f}s\n", flush=True)
 
     if not args.dry_run and any(name == "m2" for name, _ in selected):

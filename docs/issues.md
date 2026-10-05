@@ -847,9 +847,9 @@ triage presented exactly like a complete one.
   from the report rather than only from the console.
 
 **Definition of done**
-- [ ] Capping structure collection leaves protein scoring untouched
-- [ ] `run` records the per-stage caps actually applied
-- [ ] A test pins that a cap meant for one stage does not reach another
+- [x] Capping structure collection leaves protein scoring untouched
+- [x] `run` records the per-stage caps actually applied
+- [x] A test pins that a cap meant for one stage does not reach another
 
 **Watch out for:** a truncated run that still validates is the dangerous shape here. The
 schema cannot tell 10 proteins from 530.
