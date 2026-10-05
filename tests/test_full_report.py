@@ -98,6 +98,25 @@ def test_the_limitations_are_always_present() -> None:
     assert "not comparable across proteins" in html
 
 
+def test_essentiality_relatedness_is_available_to_the_report() -> None:
+    html = build_page({}, {
+        "essentiality": {
+            "enabled": True,
+            "reference_genomes": 10,
+            "essential_calls": 158,
+            "relatedness_measured": True,
+            "same_species_reference_genomes": 1,
+            "same_genus_reference_genomes": 2,
+            "same_species_essential_calls": 12,
+            "same_genus_essential_calls": 20,
+        },
+    })
+
+    assert "Essentiality" in html
+    assert "same species reference genomes" in html
+    assert "same genus essential calls" in html
+
+
 def test_cli_writes_the_file_and_records_its_own_section(tmp_path: Path) -> None:
     run_dir = tmp_path / "run"
     run_dir.mkdir()

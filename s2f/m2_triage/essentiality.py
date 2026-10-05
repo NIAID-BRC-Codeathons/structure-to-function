@@ -103,6 +103,7 @@ class ReferenceProtein:
     gene: str
     product: str
     sequence: str
+    genome_id: str = ""
 
 
 @dataclass
@@ -115,6 +116,11 @@ class EssentialitySearch:
     min_coverage: float = DEFAULT_MIN_COVERAGE
     elapsed_seconds: float = 0.0
     diamond_version: str = ""
+    relatedness_measured: bool = False
+    same_species_reference_genomes: int = 0
+    same_genus_reference_genomes: int = 0
+    same_species_essential_calls: int = 0
+    same_genus_essential_calls: int = 0
 
     def summary(self) -> dict[str, Any]:
         return {
@@ -132,10 +138,16 @@ class EssentialitySearch:
             # transfer that found nothing (observed on lambda0, 2026-09-18, with an empty
             # --essentiality-keyword sending `keyword()` to BV-BRC).
             "not_run": sum(1 for c in self.calls.values() if c.status == STATUS_NOT_RUN),
+            "relatedness_measured": self.relatedness_measured,
+            "same_species_reference_genomes": self.same_species_reference_genomes,
+            "same_genus_reference_genomes": self.same_genus_reference_genomes,
+            "same_species_essential_calls": self.same_species_essential_calls,
+            "same_genus_essential_calls": self.same_genus_essential_calls,
             "elapsed_seconds": round(self.elapsed_seconds, 2),
             "caveat": (
                 "FBA essentiality is a metabolic-model prediction, transferred here by homology. "
-                "Not an experimental knockout."
+                "Not an experimental knockout. Same-species references are retained and flagged; "
+                "same-genus counts include same-species references."
             ),
         }
 
@@ -210,6 +222,7 @@ def fetch_reference_set(
                 gene=row.get("gene") or "",
                 product=row.get("product") or "",
                 sequence=sequence,
+                genome_id=row.get("genome_id") or "",
             )
         )
     return reference
@@ -334,11 +347,48 @@ def parse_calls(
     return {feature_id: call for feature_id, (_score, call) in best.items()}
 
 
+def record_relatedness(
+    result: EssentialitySearch,
+    reference: Sequence[ReferenceProtein],
+    taxonomy: Any,
+) -> None:
+    """Record how close the reference evidence is to the query organism.
+
+    Genus counts include the same-species subset, matching
+    :meth:`QueryTaxonomy.same_genus_as`.  A false ``relatedness_measured`` means the
+    zeroes below are unknown, rather than measured absences.
+    """
+    if not getattr(taxonomy, "determined", False):
+        return
+
+    result.relatedness_measured = True
+    genomes: dict[str, str] = {}
+    for protein in reference:
+        key = protein.genome_id or protein.genome_name
+        if key and protein.genome_name:
+            genomes.setdefault(key, protein.genome_name)
+    result.same_species_reference_genomes = sum(
+        taxonomy.same_species_as(name) for name in genomes.values()
+    )
+    result.same_genus_reference_genomes = sum(
+        taxonomy.same_genus_as(name) for name in genomes.values()
+    )
+
+    essential_calls = [call for call in result.calls.values() if call.essential]
+    result.same_species_essential_calls = sum(
+        taxonomy.same_species_as(call.reference_genome) for call in essential_calls
+    )
+    result.same_genus_essential_calls = sum(
+        taxonomy.same_genus_as(call.reference_genome) for call in essential_calls
+    )
+
+
 def search(
     proteins: Iterable[tuple[str, str]],
     reference: Sequence[ReferenceProtein],
     *,
     reference_query: str = "",
+    taxonomy: Any = None,
     min_identity: float = DEFAULT_MIN_IDENTITY,
     min_coverage: float = DEFAULT_MIN_COVERAGE,
     evalue: float = DEFAULT_EVALUE,
@@ -353,7 +403,9 @@ def search(
     )
     result.diamond_version = diamond_version()
     result.reference_proteins = len(reference)
-    result.reference_genomes = len({r.genome_name for r in reference})
+    result.reference_genomes = len(
+        {r.genome_id or r.genome_name for r in reference if r.genome_id or r.genome_name}
+    )
     if not reference:
         result.calls = {
             feature_id: EssentialityCall(
@@ -361,6 +413,7 @@ def search(
             )
             for feature_id, _ in proteins
         }
+        record_relatedness(result, reference, taxonomy)
         return result
 
     by_id = {r.patric_id: r for r in reference}
@@ -403,4 +456,5 @@ def search(
                 note=f"no ortholog in the reference set at e-value <= {evalue:g}",
             )
     result.elapsed_seconds = time.monotonic() - started
+    record_relatedness(result, reference, taxonomy)
     return result

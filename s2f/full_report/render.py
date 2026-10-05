@@ -626,7 +626,9 @@ def tab_evidence(report: dict[str, Any], m2_run: dict[str, Any]) -> str:
         out.append("<h3>Essentiality</h3><div class='kv'>")
         for key in ("reference", "reference_query", "reference_proteins",
                     "reference_genomes", "min_identity", "min_coverage",
-                    "essential_calls", "no_call", "not_run"):
+                    "essential_calls", "no_call", "not_run", "relatedness_measured",
+                    "same_species_reference_genomes", "same_genus_reference_genomes",
+                    "same_species_essential_calls", "same_genus_essential_calls"):
             if key in essentiality:
                 out.append(f"<div><b>{esc(key.replace('_', ' '))}:</b> "
                            f"{esc(_fmt(essentiality[key]))}</div>")

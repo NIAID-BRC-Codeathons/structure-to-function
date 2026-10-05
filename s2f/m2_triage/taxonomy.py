@@ -100,12 +100,15 @@ class QueryTaxonomy:
             return False
         if self.has_lineage:
             # Authoritative genus spelling, so this is a plain comparison rather than a
-            # stem-similarity guess.
+            # stem-similarity guess. BV-BRC may still carry the query's former genus name,
+            # though, so keep the report's scientific name as the alias of last resort.
             hit_genus, hit_epithet = organism_key(hit_organism)
             query_epithet = organism_key(self.scientific_name)[1]
             if not hit_epithet or not query_epithet:
                 return False
-            return hit_epithet == query_epithet and hit_genus == self.genus
+            return (
+                hit_epithet == query_epithet and hit_genus == self.genus
+            ) or same_species_by_name(self.scientific_name, hit_organism)
         return same_species_by_name(self.scientific_name, hit_organism)
 
     def same_genus_as(self, hit_organism: str, hit_taxon_id: int | None = None) -> bool:
@@ -114,7 +117,10 @@ class QueryTaxonomy:
         if not self.determined or not hit_organism:
             return False
         if self.has_lineage:
-            return organism_key(hit_organism)[0] == self.genus
+            return (
+                organism_key(hit_organism)[0] == self.genus
+                or same_genus_by_name(self.scientific_name, hit_organism)
+            )
         return same_genus_by_name(self.scientific_name, hit_organism)
 
     def as_dict(self) -> dict[str, Any]:
