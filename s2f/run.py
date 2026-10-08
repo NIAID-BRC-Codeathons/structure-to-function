@@ -69,6 +69,8 @@ def build_parser() -> argparse.ArgumentParser:
     # One flag per stage (#80). --limit used to reach M3 as well, so capping structure
     # downloads silently capped how many proteins M2 scored.
     p.add_argument("--limit", type=int, help="M2: score only the first N proteins")
+    p.add_argument("--profile", help="M2: scoring profile, e.g. evidence-only (#93)")
+    p.add_argument("--weights", metavar="JSON", help="M2: custom weights file (#93)")
     p.add_argument("--structure-limit", type=int,
                    help="M3: collect structures for only the first N selected proteins")
     p.add_argument("--map-ids", action="store_true", help="M2: resolve UniProt/ChEMBL xrefs")
@@ -170,7 +172,8 @@ def stage_args(stage: str, args: argparse.Namespace) -> list[str]:
                          ("--essentiality", args.essentiality or args.full_evidence)):
             if on:
                 out.append(flag)
-        for flag, value in (("--human-proteome", args.human_proteome),
+        for flag, value in (("--profile", args.profile), ("--weights", args.weights),
+                            ("--human-proteome", args.human_proteome),
                             ("--human-min-coverage", args.human_min_coverage),
                             ("--essentiality-keyword", args.essentiality_keyword),
                             ("--essentiality-limit", args.essentiality_limit),

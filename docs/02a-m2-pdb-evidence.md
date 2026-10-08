@@ -404,6 +404,29 @@ Written to `runs/<run_id>/m2_pdb/`:
 | `no_pdb_hit.tsv` | proteins with no qualifying hit — the input to the Foldseek step (issue #9) |
 | `run.json` | timestamps, parameters, weights, endpoints, counts, cache path, and every failed query with its error |
 
+## Scoring profiles
+
+The weights above are one policy, **`bacterial-target`**: antibacterial target selection. The
+section before this one shows they do not even transfer between bacterial genomes, and they are
+wrong for other questions, such as a viral protein, a single hypothetical, or a human target. So the
+policy is a choice (#93):
+
+- `--profile bacterial-target` (default) is exactly `WEIGHTS`; this change log governs it.
+- `--profile evidence-only` ranks by structural evidence alone (`pdb_evidence` 0.40,
+  `ligandable_homolog` 0.10) with no penalties and no human-homolog disqualification.
+  **Provisional and uncalibrated.**
+- `--weights FILE` takes `{"name": ..., "weights": {...}, "disqualify_human_homologs": bool}`.
+  Every component must be named, so a typo cannot silently drop one to 0.
+
+`run.json` records the profile and its weights, and each protein's `weights_version` reads
+`<profile>@<version>`. To compare policies on recorded evidence without re-querying anything:
+
+    python -m s2f.m2_triage.rescore --run runs/<id> --profile evidence-only
+
+This writes `m2_pdb/rescored/<profile>.tsv` and leaves the run's own ranking untouched. Rescoring
+under the default profile reproduces M2's ranking exactly. Runs that predate per-component output
+(missing `surface_bonus`, `ligandable_homolog` or `membrane_penalty`) are refused, not guessed.
+
 ## Weight change log
 
 | Date | Change | Reason |

@@ -152,11 +152,15 @@ class ProteinScore:
     error: str = ""
 
 
-def triage_score_from_components(components: TriageComponents) -> float:
-    """The single definition of the score; used by the pipeline and by the tests."""
+def triage_score_from_components(components: TriageComponents,
+                                 weights: dict[str, float] | None = None) -> float:
+    """The single definition of the score; used by the pipeline and by the tests.
+
+    ``weights`` defaults to ``WEIGHTS``; a scoring profile (``profiles.py``, #93) passes its own.
+    """
     values = components.as_dict()
     # human_homolog_penalty carries a negative weight, so one loop covers every component.
-    return round(sum(weight * values[name] for name, weight in WEIGHTS.items()), 6)
+    return round(sum(weight * values[name] for name, weight in (weights or WEIGHTS).items()), 6)
 
 
 def score_protein(
@@ -173,6 +177,7 @@ def score_protein(
     query_organism: str = "",
     query_taxonomy: Any = None,
     chembl_targets: Sequence[str] = (),
+    weights: dict[str, float] | None = None,
 ) -> ProteinScore:
     """Score one protein from its PDB hits and M1 specialty rows.
 
@@ -294,7 +299,7 @@ def score_protein(
         feature_id=protein.feature_id,
         product=protein.product,
         components=components,
-        score=triage_score_from_components(components),
+        score=triage_score_from_components(components, weights),
         retrieval_status=retrieval_status,
         best_hit=top,
         distinct_entries=len({hit.entry_id for hit in qualifying}),
@@ -382,7 +387,8 @@ def human_homolog_disqualification(score: ProteinScore) -> str:
     return f"human homolog {identity:.1f}% identity ({source})"
 
 
-def rank_and_select(scores: list[ProteinScore], *, top_n: int = 50) -> list[ProteinScore]:
+def rank_and_select(scores: list[ProteinScore], *, top_n: int = 50,
+                    disqualify_human_homologs: bool = True) -> list[ProteinScore]:
     """Rank every protein, mark the top N *eligible* ones, and give each one a reason.
 
     A disqualified protein keeps its rank and its score — the ranking still records what the
@@ -402,7 +408,8 @@ def rank_and_select(scores: list[ProteinScore], *, top_n: int = 50) -> list[Prot
     selected = 0
     for index, score in enumerate(ordered, start=1):
         score.rank = index
-        score.disqualified = human_homolog_disqualification(score)
+        score.disqualified = (human_homolog_disqualification(score)
+                              if disqualify_human_homologs else "")
         if score.disqualified:
             score.selected = False
         elif selected < top_n:
