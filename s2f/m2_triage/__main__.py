@@ -11,6 +11,7 @@ from __future__ import annotations
 import argparse
 import csv
 import json
+import sys
 import time
 from datetime import datetime, timezone
 from pathlib import Path
@@ -18,6 +19,8 @@ from pathlib import Path
 from ..common.http import CachedJsonClient, JsonCache
 from ..common.ids import IdMapper
 from ..common.io import init_report, read_report, update_proteins, update_section
+from .availability import annotation_route, not_available
+from .profiles import DEFAULT_PROFILE, PROFILES, load_profile
 from .report_adapter import kg_section, protein_enrichment, seed_proteins
 from .afdb import AlphaFoldClient
 from .human_homology import DEFAULT_MIN_COVERAGE, DiamondMissing, fetch_human_proteome
@@ -64,7 +67,6 @@ from .score import (
     ANNOTATION_BONUS,
     OPTIONAL_COMPONENTS,
     best_hit,
-    WEIGHTS_VERSION,
     LIGAND_BONUS,
     MIN_EVALUE,
     MIN_QUERY_COVERAGE,
@@ -324,6 +326,13 @@ def _load_annotation_providers(
 def run(args: argparse.Namespace) -> int:
     from .score import hit_score  # local import keeps the module import list readable
 
+    # Fail before any network work if the profile or weights file is wrong (#93).
+    try:
+        profile = load_profile(args.profile, args.weights or None)
+    except (OSError, ValueError) as exc:
+        print(f"scoring profile: {exc}", file=sys.stderr)
+        return 2
+
     run_dir = Path(args.run)
     m1_dir = FIXTURE_DIR if args.dry_run else (Path(args.m1) if args.m1 else run_dir / "m1")
     out_dir = run_dir / "m2_pdb"
@@ -541,6 +550,7 @@ def run(args: argparse.Namespace) -> int:
                             if xrefs_by_id.get(protein.feature_id)
                             else ()
                         ),
+                        weights=profile.weights,
                     )
                 )
                 hit_rows.extend(_hit_rows(protein.feature_id, hits, hit_score))
@@ -629,7 +639,8 @@ def run(args: argparse.Namespace) -> int:
                 ),
             }
 
-        ranked = rank_and_select(scores, top_n=args.top)
+        ranked = rank_and_select(scores, top_n=args.top,
+                                 disqualify_human_homologs=profile.disqualify_human_homologs)
 
         kg_summary: dict[str, object] = {"enabled": False}
         if args.kg:
@@ -770,7 +781,7 @@ def run(args: argparse.Namespace) -> int:
                             if annotation_run is not None
                             else None
                         ),
-                        weights_version=WEIGHTS_VERSION,
+                        weights_version=f"{profile.name}@{profile.version}" if profile.version else profile.name,
                     )
                     for score in ranked
                 },
@@ -780,6 +791,7 @@ def run(args: argparse.Namespace) -> int:
                     run_dir, "kg", kg_section(graph.to_dict(caps=builder.caps()), path=str(kg_path))
                 )
 
+        route = annotation_route(run_dir)
         manifest = {
             "module": "m2_pdb_evidence",
             "docs": "docs/02a-m2-pdb-evidence.md",
@@ -808,7 +820,10 @@ def run(args: argparse.Namespace) -> int:
                     "annotation": ANNOTATION_BONUS,
                 },
             },
-            "weights": WEIGHTS,
+            # Which policy produced this ranking (#93): two runs under different profiles
+            # must never be confused, and the weights are recorded, not just named.
+            "profile": profile.as_dict(),
+            "weights": profile.weights,
             # Which components actually had evidence behind them. A component that measured
             # nothing contributed 0 to every protein, which is indistinguishable from "absent"
             # in the score alone — so a reader can tell a genome with no membrane proteins from
@@ -895,6 +910,13 @@ def run(args: argparse.Namespace) -> int:
             "foldseek": foldseek_summary,
             "human_homology": human_summary,
             "essentiality": essentiality_summary,
+            # Components nothing could have measured on this route (#90). Distinct from
+            # components_available, which counts proteins a provider that *ran* measured.
+            "annotation_route": route or None,
+            "not_available": not_available(route, {
+                "human_homology": bool(human_summary.get("enabled")),
+                "essentiality": bool(essentiality_summary.get("enabled")),
+            }),
             "knowledge_graph": kg_summary,
             "functional_annotation": (
                 {"enabled": True, "terms_written": terms_written, **annotation_run.summary()}
@@ -930,6 +952,10 @@ def build_parser() -> argparse.ArgumentParser:
     parser.add_argument("--m1", default="", help="override the M1 input directory")
     parser.add_argument("--limit", type=int, default=0, help="score only the first N proteins")
     parser.add_argument("--top", type=int, default=50, help="how many proteins to select")
+    parser.add_argument("--profile", default=DEFAULT_PROFILE, choices=sorted(PROFILES),
+                        help=f"scoring profile (default {DEFAULT_PROFILE}); see s2f/m2_triage/profiles.py")
+    parser.add_argument("--weights", default="", metavar="JSON",
+                        help="custom weights file; overrides --profile (#93)")
     parser.add_argument("--rows", type=int, default=ROWS_PER_QUERY, help="hits requested per search")
     parser.add_argument("--workers", type=int, default=4, help="concurrent RCSB searches")
     parser.add_argument("--cache", default="", help="override the SQLite cache path")
