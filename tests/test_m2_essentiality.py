@@ -12,9 +12,12 @@ from s2f.m2_triage.essentiality import (
     STATUS_NO_CALL,
     EssentialityCall,
     ReferenceProtein,
+    EssentialitySearch,
     fetch_reference_set,
     parse_calls,
+    record_relatedness,
 )
+from s2f.m2_triage.taxonomy import QueryTaxonomy
 
 REFERENCE = {
     "fig|1.1.peg.1": ReferenceProtein("fig|1.1.peg.1", "Mycoplasma pirum ATCC 25960", "atpD",
@@ -156,7 +159,68 @@ def test_reference_set_is_fetched_and_joined_to_sequences(tmp_path) -> None:
     assert len(reference) == 1
     assert reference[0].sequence == "MKALIVMKALIV"
     assert reference[0].genome_name == "Mycoplasma pirum"
+    assert reference[0].genome_id == "1.1"
     # BV-BRC's RQL: FBA evidence, keyword-selected relatives, in three joined calls.
     assert any("eq(evidence,FBA)" in u and "keyword(Mycoplasma)" in u for u in session.urls)
     assert any("/genome_feature/" in u and "in(patric_id," in u for u in session.urls)
     assert any("/feature_sequence/" in u and "in(md5," in u for u in session.urls)
+
+
+def test_manifest_distinguishes_same_species_essentiality_transfer() -> None:
+    taxonomy = QueryTaxonomy(
+        scientific_name="Mycoplasma genitalium G37",
+        lineage_names=[
+            "Bacteria",
+            "Mycoplasmoides",
+            "Mycoplasmoides genitalium",
+            "Mycoplasmoides genitalium G37",
+        ],
+        lineage_ids=[2, 2995234, 2097, 243273],
+    )
+    reference = [
+        ReferenceProtein(
+            "fig|1.1.peg.1", "Mycoplasma genitalium G37", "a", "A", "MA",
+            genome_id="243273.25",
+        ),
+        ReferenceProtein(
+            "fig|1.1.peg.2", "Mycoplasma genitalium G37", "a", "A", "MA",
+            genome_id="243273.25",
+        ),
+        ReferenceProtein(
+            "fig|2.2.peg.1", "Mycoplasma pneumoniae M129", "b", "B", "MA",
+            genome_id="272634.6",
+        ),
+        ReferenceProtein(
+            "fig|3.3.peg.1", "Escherichia coli K-12", "c", "C", "MA",
+            genome_id="83333.1",
+        ),
+    ]
+    result = EssentialitySearch(calls={
+        "query-1": EssentialityCall(
+            "query-1", status=STATUS_ESSENTIAL,
+            reference_patric_id="fig|1.1.peg.1",
+            reference_genome="Mycoplasma genitalium G37",
+        ),
+        "query-2": EssentialityCall(
+            "query-2", status=STATUS_ESSENTIAL,
+            reference_patric_id="fig|2.2.peg.1",
+            reference_genome="Mycoplasma pneumoniae M129",
+        ),
+    })
+
+    record_relatedness(result, reference, taxonomy)
+    summary = result.summary()
+
+    assert summary["relatedness_measured"] is True
+    assert summary["same_species_reference_genomes"] == 1
+    assert summary["same_genus_reference_genomes"] == 2
+    assert summary["same_species_essential_calls"] == 1
+    assert summary["same_genus_essential_calls"] == 2
+
+
+def test_zero_relatedness_is_not_reported_as_measured_without_query_taxonomy() -> None:
+    result = EssentialitySearch()
+
+    record_relatedness(result, list(REFERENCE.values()), QueryTaxonomy())
+
+    assert result.summary()["relatedness_measured"] is False

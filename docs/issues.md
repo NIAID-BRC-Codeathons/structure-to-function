@@ -639,8 +639,8 @@ needs the same treatment.
   reported both ways. Flagging is the smaller change and loses nothing.
 
 **Definition of done**
-- [ ] `essentiality` in `run.json` carries same-species and same-genus counts
-- [ ] A run on a genome with a same-species relative and one without are
+- [x] `essentiality` in `run.json` carries same-species and same-genus counts
+- [x] A run on a genome with a same-species relative and one without are
       distinguishable from the manifest alone
 
 **Watch out for:** excluding same-species relatives silently would make the G37

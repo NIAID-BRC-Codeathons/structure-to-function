@@ -417,6 +417,7 @@ def run(args: argparse.Namespace) -> int:
                     [(p.feature_id, p.sequence) for p in proteins],
                     reference,
                     reference_query=keyword,
+                    taxonomy=query_taxonomy,
                     min_identity=args.essentiality_min_identity,
                     min_coverage=args.essentiality_min_coverage,
                     threads=args.workers,

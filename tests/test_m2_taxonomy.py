@@ -67,6 +67,13 @@ def test_a_species_level_hit_matches_a_strain_level_query(tmp_path: Path) -> Non
     assert taxonomy.same_species_as("Mycoplasmoides genitalium G37", 243273) is True
 
 
+def test_a_bvbrc_former_genus_matches_the_ncbi_lineage(tmp_path: Path) -> None:
+    taxonomy = from_report(write_report(tmp_path, G37_GENOME))
+
+    assert taxonomy.same_species_as("Mycoplasma genitalium G37") is True
+    assert taxonomy.same_genus_as("Mycoplasma pneumoniae M129") is True
+
+
 def test_same_genus_without_same_species(tmp_path: Path) -> None:
     taxonomy = from_report(write_report(tmp_path, G37_GENOME))
 
