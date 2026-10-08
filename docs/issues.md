@@ -847,9 +847,9 @@ triage presented exactly like a complete one.
   from the report rather than only from the console.
 
 **Definition of done**
-- [ ] Capping structure collection leaves protein scoring untouched
-- [ ] `run` records the per-stage caps actually applied
-- [ ] A test pins that a cap meant for one stage does not reach another
+- [x] Capping structure collection leaves protein scoring untouched
+- [x] `run` records the per-stage caps actually applied
+- [x] A test pins that a cap meant for one stage does not reach another
 
 **Watch out for:** a truncated run that still validates is the dangerous shape here. The
 schema cannot tell 10 proteins from 530.
@@ -889,8 +889,8 @@ hand-written `m2_triage` invocation afterwards, and then a re-render of the repo
 
 **Definition of done**
 - [ ] One `s2f.run` invocation reproduces a hand-run M2 with the same flags
-- [ ] A run where a weighted component could not be computed says so at the end
-- [ ] A test pins that every M2 flag the runner claims to support actually arrives
+- [x] A run where a weighted component could not be computed says so at the end
+- [x] A test pins that every M2 flag the runner claims to support actually arrives
 
 **Watch out for:** the two rankings look equally finished. Nothing downstream can tell that
 0.40 of the weight mass was absent.

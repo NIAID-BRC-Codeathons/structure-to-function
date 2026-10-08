@@ -99,8 +99,7 @@ Then:
 python -m s2f.run \
     --run runs/mgen_G37 \
     --contigs fixtures/genomes/mgen_G37/mgen_G37.fna \
-    --ws-dir "/$un/home/s2f" \
-    --limit 50
+    --ws-dir "/$un/home/s2f"
 ```
 
 What M1 does, in order:
@@ -124,6 +123,12 @@ length and produced a `Poor` genome — `docs/01a-cga-coverage.md` has the numbe
 Useful flags: `--from-cga-dir DIR` reuses a job you already retrieved, `--job-id ID`
 resumes polling a submitted job, `--only m1` / `--skip m2` select stages,
 `--map-ids` and `--kg` turn on M2's id resolution and knowledge graph.
+`--full-evidence` turns on M2's DIAMOND human-homology check and essentiality transfer
+(`--human-homology`, `--essentiality`). Together these carry 0.40 of the triage weight. A run
+without them warns at the end, naming every weighted component that had no evidence (#81).
+`--limit N` scores only the first N proteins in M2, and `--structure-limit N` collects
+structures for only the first N selected proteins in M3. Each flag reaches only its own
+stage, and the caps are recorded in `report.json` under `run.caps` (#80).
 
 ## Output
 
