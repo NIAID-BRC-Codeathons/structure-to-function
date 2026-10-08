@@ -120,7 +120,8 @@ Step 3 is not optional ceremony. Annotating this project's test genome with no
 taxon (so genetic code 11 instead of 4) doubled the CDS count, halved mean protein
 length and produced a `Poor` genome — `docs/01a-cga-coverage.md` has the numbers.
 
-Useful flags: `--from-cga-dir DIR` reuses a job you already retrieved, `--job-id ID`
+Useful flags: `--from-fasta FAA` starts from protein sequences with no genome and no BV-BRC (#89),
+`--from-cga-dir DIR` reuses a job you already retrieved, `--job-id ID`
 resumes polling a submitted job, `--only m1` / `--skip m2` select stages,
 `--map-ids` and `--kg` turn on M2's id resolution and knowledge graph.
 `--full-evidence` turns on M2's DIAMOND human-homology check and essentiality transfer

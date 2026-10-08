@@ -40,6 +40,9 @@ def build_parser() -> argparse.ArgumentParser:
     p.add_argument("--contigs", help="assembly FASTA for M1")
     p.add_argument("--ws-dir", help="BV-BRC workspace dir, e.g. /USER@bvbrc/home/s2f")
     p.add_argument("--from-cga-dir", help="M1 parses this directory instead of submitting a job")
+    p.add_argument("--from-fasta", metavar="FAA",
+                   help="M1 starts from protein sequences: no genome, no BV-BRC (#89)")
+    p.add_argument("--organism", help="M1 --from-fasta route: organism of the sequences")
     p.add_argument("--from-bvbrc-api", action="store_true",
                    help="M1 uses the BV-BRC Data API route instead of the CGA service")
     p.add_argument("--species", help="M1 API route: species name to resolve")
@@ -133,6 +136,8 @@ def stage_args(stage: str, args: argparse.Namespace) -> list[str]:
         out = list(common)
         for flag, value in (("--contigs", args.contigs), ("--ws-dir", args.ws_dir),
                             ("--from-cga-dir", args.from_cga_dir),
+                            ("--from-fasta", args.from_fasta),
+                            ("--organism", args.organism),
                             ("--species", args.species), ("--genome-id", args.genome_id),
                             ("--annotation", args.annotation),
                             ("--max-features", args.max_features),
