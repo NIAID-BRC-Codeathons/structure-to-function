@@ -18,6 +18,7 @@ from pathlib import Path
 from ..common.http import CachedJsonClient, JsonCache
 from ..common.ids import IdMapper
 from ..common.io import init_report, read_report, update_proteins, update_section
+from .availability import annotation_route, not_available
 from .report_adapter import kg_section, protein_enrichment, seed_proteins
 from .afdb import AlphaFoldClient
 from .human_homology import DEFAULT_MIN_COVERAGE, DiamondMissing, fetch_human_proteome
@@ -780,6 +781,7 @@ def run(args: argparse.Namespace) -> int:
                     run_dir, "kg", kg_section(graph.to_dict(caps=builder.caps()), path=str(kg_path))
                 )
 
+        route = annotation_route(run_dir)
         manifest = {
             "module": "m2_pdb_evidence",
             "docs": "docs/02a-m2-pdb-evidence.md",
@@ -895,6 +897,13 @@ def run(args: argparse.Namespace) -> int:
             "foldseek": foldseek_summary,
             "human_homology": human_summary,
             "essentiality": essentiality_summary,
+            # Components nothing could have measured on this route (#90). Distinct from
+            # components_available, which counts proteins a provider that *ran* measured.
+            "annotation_route": route or None,
+            "not_available": not_available(route, {
+                "human_homology": bool(human_summary.get("enabled")),
+                "essentiality": bool(essentiality_summary.get("enabled")),
+            }),
             "knowledge_graph": kg_summary,
             "functional_annotation": (
                 {"enabled": True, "terms_written": terms_written, **annotation_run.summary()}

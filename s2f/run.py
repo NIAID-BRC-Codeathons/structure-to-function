@@ -220,7 +220,14 @@ def missing_evidence(run_dir: str) -> list[str]:
         return []
     weights = manifest.get("weights") or {}
     lines = []
+    # Nothing could have measured these on this route (#90): say that, not "BV-BRC rows".
+    unavailable = manifest.get("not_available") or {}
+    for component, reason in unavailable.items():
+        if weights.get(component):
+            lines.append(f"{component} (weight {weights[component]:+.2f}) not available: {reason}")
     for component, section, flag in EVIDENCE_COMPONENTS:
+        if component in unavailable:
+            continue
         summary = manifest.get(section) or {}
         if summary.get("enabled") or not weights.get(component):
             continue
