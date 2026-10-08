@@ -20,6 +20,7 @@ import csv
 from pathlib import Path
 from typing import Any
 
+from ..common.annotation import is_uncharacterized
 from ..common.http import HttpError
 from .bvbrc_api import (GENOME_URL, BvbrcApi, nonempty_facets, rql_value, top_nonempty)
 from .parse import FEATURE_COLUMNS, SPECIALTY_COLUMNS, _as_float
@@ -463,21 +464,22 @@ def collect_close_pathogens(api: BvbrcApi, genome: dict[str, Any]) -> dict[str, 
             "basis": "count of BV-BRC genomes with host_name=Homo sapiens"}
 
 
-def fetch_sequences(api: BvbrcApi, features: list[dict[str, Any]], *, cap: int = 4000,
-                    priority: dict[str, dict[str, Any]] | None = None) -> dict[str, str]:
-    """`{feature_id: aa_sequence}` for up to `cap` features, de-duplicated by md5.
+def select_sequence_features(features: list[dict[str, Any]], *, cap: int = 4000,
+                             priority: dict[str, dict[str, Any]] | None = None
+                             ) -> tuple[list[dict[str, Any]], dict[str, int]]:
+    """The features `fetch_sequences` keeps under `cap`, and a count of what it dropped.
 
-    Identical proteins share one md5 in BV-BRC, so fetching by md5 rather than by feature
-    collapses paralogue families into a single request each.
+    Uncharacterized proteins are never capped (issue #85). `m1_priority` scores a
+    hypothetical protein 0, so a cap by rank removes them first, while M2's
+    `annotation_gap` pays them its second-largest weight. On *K. pneumoniae* HS11286 the
+    rank cap removed 773 of 1,333 hypotheticals. `cap` limits the annotated proteins only,
+    so a run can fetch more than `cap` sequences; the summary goes in `run.json`.
 
-    `cap` truncates by **priority** when a ranking is supplied, not by genome coordinate.
-    `collect_features` sorts by `+start`, so a coordinate-ordered cap on a genome with
-    more CDS than `cap` would drop whichever proteins happen to sit late on the
-    chromosome — possibly every top-ranked candidate — from `m1/proteins.faa`, which is
+    The annotated proteins are cut by **priority** when a ranking is supplied, not by
+    genome coordinate. `collect_features` sorts by `+start`, so a coordinate-ordered cap on
+    a genome with more CDS than `cap` would drop whichever proteins happen to sit late on
+    the chromosome — possibly every top-ranked candidate — from `m1/proteins.faa`, which is
     M2's input. Selected proteins come first, then by rank.
-
-    A failed chunk costs its sequences, not the run: sequences are an output, and the
-    contract in `report.json` and the two CSVs does not depend on them.
     """
     candidates = [f for f in features if f.get("aa_sequence_md5") and f.get("patric_id")]
     if priority:
@@ -485,7 +487,34 @@ def fetch_sequences(api: BvbrcApi, features: list[dict[str, Any]], *, cap: int =
             entry = priority.get(feature["patric_id"]) or {}
             return (0 if entry.get("selected") else 1, entry.get("rank") or 10**9)
         candidates.sort(key=order)
-    wanted = candidates[:cap]
+    exempt = [f for f in candidates if is_uncharacterized(f.get("product"))]
+    annotated = [f for f in candidates if not is_uncharacterized(f.get("product"))]
+    kept = annotated[:cap]
+    kept_ids = {f["patric_id"] for f in kept} | {f["patric_id"] for f in exempt}
+    wanted = [f for f in candidates if f["patric_id"] in kept_ids]
+    summary = {
+        "cap": cap,
+        "candidates": len(candidates),
+        "kept": len(wanted),
+        "dropped": len(candidates) - len(wanted),
+        "uncharacterized_exempt": len(exempt),
+        "annotated_dropped": len(annotated) - len(kept),
+    }
+    return wanted, summary
+
+
+def fetch_sequences(api: BvbrcApi, features: list[dict[str, Any]], *, cap: int = 4000,
+                    priority: dict[str, dict[str, Any]] | None = None) -> dict[str, str]:
+    """`{feature_id: aa_sequence}` for the features `select_sequence_features` keeps,
+    de-duplicated by md5.
+
+    Identical proteins share one md5 in BV-BRC, so fetching by md5 rather than by feature
+    collapses paralogue families into a single request each.
+
+    A failed chunk costs its sequences, not the run: sequences are an output, and the
+    contract in `report.json` and the two CSVs does not depend on them.
+    """
+    wanted, _ = select_sequence_features(features, cap=cap, priority=priority)
 
     unique: list[str] = []
     seen: set[str] = set()
