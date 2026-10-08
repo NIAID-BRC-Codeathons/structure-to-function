@@ -59,6 +59,11 @@ def build_parser() -> argparse.ArgumentParser:
     p.add_argument("--ws-dir", help="BV-BRC workspace dir, e.g. /USER@bvbrc/home/s2f")
     p.add_argument("--out-name", default=None, help="CGA output name (default: the run id)")
     p.add_argument("--from-cga-dir", help="parse an already-retrieved CGA directory; no network")
+    p.add_argument("--from-fasta", metavar="FAA",
+                   help="start from protein sequences: no genome, no BV-BRC (#89)")
+    p.add_argument("--organism",
+                   help="--from-fasta: organism of the sequences, if known; never read from "
+                        "the FASTA headers")
     p.add_argument("--job-id", help="resume: skip submission and poll this job id")
     p.add_argument("--taxon-call", default="",
                    help="a recorded Minhash/Similar Genome Finder result to reuse with "
@@ -341,6 +346,45 @@ def _run_api_route(args: argparse.Namespace, run_dir: Path, m1_dir: Path,
     return 0
 
 
+def _run_fasta_route(args: argparse.Namespace, run_dir: Path, m1_dir: Path,
+                     started: float) -> int:
+    """Protein sequences in, no genome: write `proteins.faa` and record what is missing."""
+    from .fasta_route import (genome_section, proteins_section, query_proteins,
+                              read_protein_fasta, write_fasta_m1_dir)
+
+    try:
+        proteins = query_proteins(read_protein_fasta(args.from_fasta))
+    except (OSError, ValueError) as exc:
+        print(f"--from-fasta: {exc}", file=sys.stderr)
+        return 2
+    if not proteins:
+        print(f"--from-fasta: no protein sequences in {args.from_fasta}", file=sys.stderr)
+        return 2
+
+    written = write_fasta_m1_dir(proteins, m1_dir)
+    update_section(run_dir, "genome", genome_section(
+        source=str(args.from_fasta), n_proteins=written, organism=args.organism,
+        taxon_id=args.taxon_id))
+    update_section(run_dir, "proteins", proteins_section(proteins))
+
+    report = init_report(run_dir, run_dir.name)
+    run_section = dict(report.get("run") or {})
+    run_section["input_file"] = str(args.from_fasta)
+    modules = dict(run_section.get("modules") or {})
+    modules["m1"] = {"status": "ok", "route": "fasta", "finished_at": _now(),
+                     "elapsed_seconds": round(time.time() - started, 1),
+                     "proteins": written, "bvbrc_used": False}
+    run_section["modules"] = modules
+    update_section(run_dir, "run", run_section)
+
+    print(f"wrote {written} proteins -> {m1_dir / 'proteins.faa'}")
+    print("NOTE: --from-fasta has no genome. Specialty genes, subsystems, coordinates and the "
+          "taxonomy tree are recorded as not available, not as empty.")
+    if not args.organism:
+        print("no --organism given: same-species and same-genus flags will be off in M2.")
+    return 0
+
+
 def _taxon_call_beside(cga_dir: str) -> Path | None:
     """A recorded Minhash result sitting next to a pre-fetched CGA directory.
 
@@ -412,11 +456,15 @@ def main(argv: list[str] | None = None) -> int:
 
     init_report(run_dir, run_id, input_file=args.contigs, modules={})
 
+    routes = [flag for flag, on in (("--from-bvbrc-api", args.from_bvbrc_api),
+                                    ("--from-cga-dir", args.from_cga_dir),
+                                    ("--from-fasta", args.from_fasta)) if on]
+    if len(routes) > 1:
+        print(f"{' and '.join(routes)} are different routes; pick one", file=sys.stderr)
+        return 2
+    if args.from_fasta:
+        return _run_fasta_route(args, run_dir, m1_dir, started)
     if args.from_bvbrc_api:
-        if args.from_cga_dir:
-            print("--from-bvbrc-api and --from-cga-dir are different routes; pick one",
-                  file=sys.stderr)
-            return 2
         return _run_api_route(args, run_dir, m1_dir, started)
 
     taxon_call: dict | None = None
