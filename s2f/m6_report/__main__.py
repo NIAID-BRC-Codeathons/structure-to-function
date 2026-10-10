@@ -16,7 +16,7 @@ from __future__ import annotations
 
 import argparse
 import json
-from datetime import UTC, datetime
+from datetime import datetime, timezone
 from pathlib import Path
 
 from jinja2 import Environment, FileSystemLoader, StrictUndefined
@@ -76,7 +76,7 @@ def main(argv: list[str] | None = None) -> int:
             "report",
             {
                 "rendered_path": str(out_path),
-                "rendered_at": datetime.now(UTC).isoformat(timespec="seconds"),
+                "rendered_at": datetime.now(timezone.utc).isoformat(timespec="seconds"),
                 "counts": built.counts,
                 "sections": status,
             },
