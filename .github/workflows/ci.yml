@@ -28,6 +28,8 @@ jobs:
         with:
           python-version: ${{ matrix.python-version }}
           cache: pip
+          # The default looks for requirements.txt; this repo has one file per module.
+          cache-dependency-path: requirements-*.txt
 
       - name: Install every module's requirements
         # The same glob scripts/setup_env.sh uses, so a module that adds a requirements file
