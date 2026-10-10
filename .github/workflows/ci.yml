@@ -1,0 +1,54 @@
+# Tests, schema validation and dry-runs on every pull request and every push to main (#22).
+# Nothing here touches the network: the suite and the dry-runs run from committed fixtures.
+name: CI
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        python-version: ["3.10", "3.12"]
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: ${{ matrix.python-version }}
+          cache: pip
+
+      - name: Install every module's requirements
+        # The same glob scripts/setup_env.sh uses, so a module that adds a requirements file
+        # is picked up here too. jinja2 is listed explicitly until M6 has its own file (#76).
+        run: |
+          python -m pip install --upgrade pip
+          python -m pip install $(for f in requirements-*.txt; do echo "-r $f"; done) \
+            "jinja2>=3.1,<4" pytest ruff
+
+      - name: Lint (errors only)
+        # Syntax errors and undefined names, not style: a style rule nobody agreed to would
+        # fail every open PR on day one.
+        run: ruff check --select E9,F63,F7,F82 s2f tests
+
+      - name: Unit tests, including schema validation of the committed fixtures
+        run: python -m pytest -q
+
+      - name: Every module's --dry-run completes from fixtures
+        run: |
+          for module in m2_triage m3_fold m6_report full_report; do
+            echo "::group::$module --dry-run"
+            python -m "s2f.$module" --run "$RUNNER_TEMP/dry/$module" --dry-run
+            echo "::endgroup::"
+          done
