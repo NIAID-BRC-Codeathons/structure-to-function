@@ -192,6 +192,21 @@ DESCRIPTION_RANK = {
 }
 
 
+UNCOVERED = "uncovered"
+
+#: Flags reported with a source and a confidence each (#72).
+FLAG_NAMES = ("membrane", "signal_peptide", "lipoprotein", "localization", "secreted",
+              "surface_exposed")
+
+
+def _weakest(*sources: str) -> str:
+    """Confidence of the lowest-ranked source among those given; "" when none answered."""
+    present = [source for source in sources if source]
+    if not present:
+        return ""
+    return CONFIDENCE.get(min(present, key=lambda source: SOURCE_RANK.get(source, 0)), "")
+
+
 def best_call(calls: Iterable[Call], ranking: dict[str, int] | None = None) -> Call:
     """Highest-ranked provider that actually answered; ties go to the first listed."""
     known = [call for call in calls if call.known]
@@ -236,6 +251,8 @@ class FunctionalAnnotation:
     membrane_evidence: str = ""
     signal_source: str = ""
     signal_evidence: str = ""
+    lipoprotein_source: str = ""
+    lipoprotein_evidence: str = ""
     localization_source: str = ""
     localization_evidence: str = ""
     description_source: str = ""
@@ -244,11 +261,41 @@ class FunctionalAnnotation:
 
     @property
     def confidence(self) -> str:
-        """Weakest confidence among the calls that set the two required flags."""
-        sources = [source for source in (self.membrane_source, self.signal_source) if source]
-        if not sources:
-            return ""
-        return CONFIDENCE.get(min(sources, key=lambda source: SOURCE_RANK.get(source, 0)), "")
+        """Weakest confidence among the calls that set the two required flags.
+
+        Per protein, and only over ``membrane`` and ``signal_peptide``: it says nothing about
+        ``lipoprotein``, ``secreted`` or ``surface_exposed``. Use ``flag_confidence`` for those
+        (#72).
+        """
+        return _weakest(self.membrane_source, self.signal_source)
+
+    def flag_sources(self) -> dict[str, list[str]]:
+        """The provider(s) behind each flag. Derived flags list every input they combine."""
+        return {
+            "membrane": [self.membrane_source],
+            "signal_peptide": [self.signal_source],
+            "lipoprotein": [self.lipoprotein_source],
+            "localization": [self.localization_source],
+            # secreted: localization, or signal peptide with no TM segment and no lipid anchor.
+            "secreted": [self.localization_source, self.signal_source, self.membrane_source,
+                         self.lipoprotein_source],
+            # surface_exposed: secreted, a surface localization, or a lipoprotein.
+            "surface_exposed": [self.localization_source, self.signal_source,
+                                self.membrane_source, self.lipoprotein_source],
+        }
+
+    def flag_source_label(self, flag: str) -> str:
+        """The sources behind one flag as a single label, e.g. ``deeptmhmm+signalp``."""
+        return "+".join(sorted({s for s in self.flag_sources()[flag] if s})) or "none"
+
+    def flag_confidence(self) -> dict[str, str]:
+        """Confidence per flag (#72): the weakest source behind it, or ``uncovered``.
+
+        A single per-protein number let a flag no provider covers (``lipoprotein`` under
+        DeepTMHMM) read as predicted. Here every flag answers for itself.
+        """
+        return {flag: _weakest(*sources) or UNCOVERED
+                for flag, sources in self.flag_sources().items()}
 
     def terms_of(self, kind: str) -> list[str]:
         seen: list[str] = []
@@ -268,7 +315,7 @@ class FunctionalAnnotation:
             "membrane": self.membrane if self.membrane_source else "",
             "tm_helices": self.tm_helices if self.membrane_source else "",
             "signal_peptide": self.signal_peptide if self.signal_source else "",
-            "lipoprotein": self.lipoprotein,
+            "lipoprotein": self.lipoprotein if self.lipoprotein_source else "",
             "secreted": self.secreted if (self.signal_source or self.localization_source) else "",
             "surface_exposed": (
                 self.surface_exposed if (self.signal_source or self.localization_source) else ""
@@ -286,16 +333,20 @@ class FunctionalAnnotation:
             "membrane_evidence": self.membrane_evidence,
             "signal_source": self.signal_source,
             "signal_evidence": self.signal_evidence,
+            "lipoprotein_source": self.lipoprotein_source,
+            "lipoprotein_evidence": self.lipoprotein_evidence,
             "localization_source": self.localization_source,
             "function_source": self.description_source,
             "annotation_sources": ";".join(self.sources),
             "annotation_confidence": self.confidence,
+            **{f"{flag}_confidence": value for flag, value in self.flag_confidence().items()},
         }
 
     def as_dict(self) -> dict[str, Any]:
         payload = asdict(self)
         payload["terms"] = [asdict(term) for term in self.terms]
         payload["confidence"] = self.confidence
+        payload["flag_confidence"] = self.flag_confidence()
         return payload
 
 
@@ -303,8 +354,10 @@ FLAG_COLUMNS = [
     "membrane", "tm_helices", "signal_peptide", "lipoprotein", "secreted", "surface_exposed",
     "localization", "function_description", "cog_category", "cog", "ec", "kegg_ko", "go_terms",
     "pfam", "interpro", "membrane_source", "membrane_evidence", "signal_source",
-    "signal_evidence", "localization_source", "function_source", "annotation_sources",
-    "annotation_confidence",
+    "signal_evidence", "lipoprotein_source", "lipoprotein_evidence", "localization_source",
+    "function_source", "annotation_sources", "annotation_confidence",
+    "membrane_confidence", "signal_peptide_confidence", "lipoprotein_confidence",
+    "localization_confidence", "secreted_confidence", "surface_exposed_confidence",
 ]
 
 TERM_COLUMNS = ["feature_id", "kind", "term_id", "name", "source", "confidence", "evidence"]
@@ -1386,6 +1439,8 @@ def merge_annotation(feature_id: str, results: Sequence[ProviderResult]) -> Func
 
     annotation.signal_source = signal.source
     annotation.signal_evidence = signal.evidence
+    annotation.lipoprotein_source = lipo.source
+    annotation.lipoprotein_evidence = lipo.evidence
     annotation.localization_source = localization.source
     annotation.localization_evidence = localization.evidence
     annotation.description_source = description.source
@@ -1435,7 +1490,16 @@ class AnnotationRun:
             "lipoprotein": sum(1 for a in values if a.lipoprotein),
             "localization": _counts(a.localization or "unknown" for a in values),
             "membrane_flag_source": _counts(a.membrane_source or "none" for a in values),
+            # Per protein, over membrane and signal_peptide only; kept for comparison with
+            # earlier runs. flag_confidence is the per-flag answer (#72).
             "confidence": _counts(a.confidence or "none" for a in values),
+            "confidence_basis": "per protein: weakest of the membrane and signal_peptide sources",
+            "flag_source": {
+                flag: _counts(a.flag_source_label(flag) for a in values) for flag in FLAG_NAMES
+            },
+            "flag_confidence": {
+                flag: _counts(a.flag_confidence()[flag] for a in values) for flag in FLAG_NAMES
+            },
             "heuristic_only": sum(
                 1 for a in values if a.membrane_source == SOURCE_HEURISTIC or a.signal_source == SOURCE_HEURISTIC
             ),

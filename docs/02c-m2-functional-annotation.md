@@ -187,8 +187,18 @@ the weaker of the two comparisons in both directions.
 lipobox scan, SignalP's LIPO class, or a UniProt lipidation feature can. On a run where
 DeepTMHMM is the only provider, `lipoprotein` is still a heuristic call, and because `secreted`
 is `signal_peptide AND no TM AND not lipoprotein`, those heuristic lipobox calls silently veto
-`secreted`. `confidence` does not capture this: it reports the weaker of the membrane and signal
-sources only.
+`secreted`. The per-protein `confidence` does not capture this: it reports the weaker of the
+membrane and signal sources only.
+
+**So every flag now reports its own confidence (#72).** Each protein carries
+`lipoprotein_source` / `lipoprotein_evidence` and a `<flag>_confidence` column for `membrane`,
+`signal_peptide`, `lipoprotein`, `localization`, `secreted` and `surface_exposed`. A derived
+flag is as weak as its weakest input, so on the DeepTMHMM-only run above `secreted` reads
+`heuristic`, not `predicted`. A flag no provider called is `uncovered`, and is written as an empty
+cell (`null` in `report.json`), never `false`. `run.json` adds `flag_source` and
+`flag_confidence` histograms per flag. The old per-protein `confidence` stays, with a
+`confidence_basis` note, so runs remain comparable. **Quote `flag_confidence`, not
+`confidence`.**
 
 The point of the fallback was never to replace a predictor — it is what makes the flags exist at
 all for a protein nothing else reached, and `run.json`'s `heuristic_only` says how many of those
@@ -245,7 +255,7 @@ With `--report`, the flags go into `proteins[].flags` and the evidence into
 | --- | --- |
 | `flags.membrane`, `flags.secreted` | the two required flags — **`null` when no source called them**, which is not `false` |
 | `flags.localization`, `tm_helices`, `signal_peptide`, `lipoprotein`, `surface_exposed` | the rest of the topology picture |
-| `flags.functional_evidence` | `membrane_source`, `membrane_evidence`, `signal_source`, `signal_evidence`, `localization_source`, `confidence`, and every source that contributed |
+| `flags.functional_evidence` | `membrane_source`, `membrane_evidence`, `signal_source`, `signal_evidence`, `lipoprotein_source`, `lipoprotein_evidence`, `localization_source`, `confidence`, `flag_confidence` (per flag, #72), and every source that contributed |
 | `annotations[]` | one row per source, each with its terms, its evidence string, its confidence and `retrieved_at` — merged flags live in `flags`, but `source` is what keeps the evidence apart |
 
 Without `--annotate`, every one of those fields stays `null`: the adapter reserved those slots
@@ -262,7 +272,7 @@ Added to `runs/<run_id>/m2_pdb/`:
 | `function_terms.tsv` | long format, one row per (protein, term, source): GO, EC, KEGG KO, COG, COG category, Pfam, InterPro, gene name |
 | `annotate_all.faa` | cleaned, deduplicated FASTA of every protein — the input for the external tools |
 | `annotate_selected.faa` | the same for the selected ~50, for the tools that are slow per sequence |
-| `run.json` | `functional_annotation`: per-provider counts, unmatched provider rows, flag totals, localization histogram, which source set each membrane flag, `heuristic_only`, the FASTA stats, the InterProScan install record, and `provider_files` |
+| `run.json` | `functional_annotation`: per-provider counts, unmatched provider rows, flag totals, localization histogram, which source set each membrane flag, `flag_source` and `flag_confidence` per flag (#72), `heuristic_only`, the FASTA stats, the InterProScan install record, and `provider_files` |
 
 `provider_files` records the path, size, modification time and **SHA-256** of every provider
 output that was ingested. These tools run out of band — DeepTMHMM in its own environment,
