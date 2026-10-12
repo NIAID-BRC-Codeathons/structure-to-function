@@ -49,7 +49,18 @@ fi
 source "$VENV/bin/activate"
 python -m pip install --quiet --upgrade pip
 
-python -m pip install --quiet -r requirements-common.txt -r requirements-m2.txt
+# Every module's requirements, not a hand-listed subset. Installing only common+m2
+# left scipy and numpy missing (so M1's gene-content tree silently skipped), matplotlib
+# missing (so --figures silently skipped), and jinja2 missing (so M6 and its tests failed
+# at import on any fresh node). A module that adds a requirements file is picked up here
+# without anyone remembering to edit this line.
+REQ_ARGS=""
+for req in requirements-*.txt; do
+    [ -f "$req" ] || continue
+    REQ_ARGS="$REQ_ARGS -r $req"
+done
+echo "installing:$(echo "$REQ_ARGS" | sed 's/-r //g')"
+python -m pip install --quiet $REQ_ARGS
 python -m pip install --quiet pytest
 if [ "$WITH_BIOLIB" = "1" ]; then
     python -m pip install --quiet pybiolib
