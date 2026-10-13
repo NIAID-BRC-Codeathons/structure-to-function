@@ -212,6 +212,8 @@ class ProviderResult:
     lipoprotein: Call = field(default_factory=Call)
     localization: Call = field(default_factory=Call)
     description: Call = field(default_factory=Call)
+    # UniProt's free-text "Function" comment: what the protein does, in a sentence or two.
+    summary: Call = field(default_factory=Call)
     terms: list[Term] = field(default_factory=list)
     # Residue spans behind ``tm_helices``, when the provider reports them. The merge uses these
     # to resolve the signal-peptide / N-terminal-helix ambiguity across providers.
@@ -239,6 +241,9 @@ class FunctionalAnnotation:
     localization_source: str = ""
     localization_evidence: str = ""
     description_source: str = ""
+    summary: str = ""
+    summary_source: str = ""
+    summary_evidence: str = ""
     sources: list[str] = field(default_factory=list)
     terms: list[Term] = field(default_factory=list)
 
@@ -1136,7 +1141,7 @@ def run_interproscan(
 UNIPROT_ENTRY = "https://rest.uniprot.org/uniprotkb/{accession}.json"
 UNIPROT_FIELDS = (
     "accession,protein_name,gene_names,ec,go,xref_kegg,xref_pfam,xref_interpro,"
-    "cc_subcellular_location,ft_transmem,ft_signal,ft_lipid"
+    "cc_function,cc_subcellular_location,ft_transmem,ft_signal,ft_lipid"
 )
 
 
@@ -1243,6 +1248,23 @@ def parse_uniprot_entry(feature_id: str, accession: str, payload: Any) -> Provid
             value=True, source=SOURCE_UNIPROT, evidence=f"UniProt {accession}: lipidation feature"
         )
 
+    summaries: list[str] = []
+    summary_experimental = False
+    for comment in payload.get("comments", []) or []:
+        if not isinstance(comment, dict) or comment.get("commentType") != "FUNCTION":
+            continue
+        for text in comment.get("texts", []) or []:
+            value = ((text or {}).get("value") or "").strip()
+            if value:
+                summaries.append(value)
+                summary_experimental = summary_experimental or bool(_evidence_codes(text) & EXPERIMENTAL_ECO)
+    if summaries:
+        result.summary = Call(
+            value=" ".join(summaries),
+            source=SOURCE_UNIPROT_EXP if summary_experimental else SOURCE_UNIPROT,
+            evidence=f"UniProt {accession}: Function comment",
+        )
+
     for comment in payload.get("comments", []) or []:
         if not isinstance(comment, dict) or comment.get("commentType") != "SUBCELLULAR LOCATION":
             continue
@@ -1328,6 +1350,7 @@ def merge_annotation(feature_id: str, results: Sequence[ProviderResult]) -> Func
     lipo = best_call([result.lipoprotein for result in results])
     localization = best_call([result.localization for result in results])
     description = best_call([result.description for result in results], DESCRIPTION_RANK)
+    summary = best_call([result.summary for result in results], DESCRIPTION_RANK)
 
     # A signal peptide and an N-terminal TM helix have the same hydropathy profile. The
     # heuristic resolves that internally using its own signal call; when a better source says
@@ -1362,7 +1385,7 @@ def merge_annotation(feature_id: str, results: Sequence[ProviderResult]) -> Func
     annotation.sources = sorted(
         {
             call.source
-            for call in (tm, signal, lipo, localization, description)
+            for call in (tm, signal, lipo, localization, description, summary)
             if call.source
         }
         | {term.source for result in results for term in result.terms if term.source}
@@ -1389,6 +1412,9 @@ def merge_annotation(feature_id: str, results: Sequence[ProviderResult]) -> Func
     annotation.localization_source = localization.source
     annotation.localization_evidence = localization.evidence
     annotation.description_source = description.source
+    annotation.summary = str(summary.value or "") if summary.known else ""
+    annotation.summary_source = summary.source
+    annotation.summary_evidence = summary.evidence
 
     annotation.secreted = annotation.localization == LOC_EXTRACELLULAR or (
         annotation.signal_peptide and annotation.tm_helices == 0 and not annotation.lipoprotein
