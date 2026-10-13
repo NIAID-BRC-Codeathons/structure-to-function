@@ -352,6 +352,11 @@ def uniprot_payload(*, experimental: bool) -> dict:
         },
         "comments": [
             {
+                "commentType": "FUNCTION",
+                "texts": [{"value": "Binds a test substrate in the periplasm.",
+                           "evidences": [{"evidenceCode": code}]}],
+            },
+            {
                 "commentType": "SUBCELLULAR LOCATION",
                 "subcellularLocations": [
                     {"location": {"value": "Periplasm", "evidences": [{"evidenceCode": code}]}}
@@ -888,3 +893,37 @@ def test_uniprot_function_without_map_ids_is_skipped_not_guessed(tmp_path):
     manifest = json.loads((run_dir / "m2_pdb" / "run.json").read_text(encoding="utf-8"))
     notes = manifest["functional_annotation"]["notes"]
     assert any("--map-ids" in note for note in notes)
+
+
+# --- function description for the report (issue #107) ---------------------------------------
+
+
+def test_uniprot_function_comment_becomes_the_summary():
+    from s2f.m2_triage.function import merge_annotation
+
+    result = parse_uniprot_entry("f1", "P00000", uniprot_payload(experimental=True))
+    assert result.summary.value == "Binds a test substrate in the periplasm."
+    assert result.summary.source == SOURCE_UNIPROT_EXP
+
+    merged = merge_annotation("f1", [result])
+    assert merged.description == "Test periplasmic binding protein"
+    assert merged.summary == "Binds a test substrate in the periplasm."
+
+
+def test_function_section_groups_go_by_aspect_and_keeps_unknown_apart():
+    from s2f.m2_triage.function import merge_annotation
+    from s2f.m2_triage.report_adapter import function_section
+
+    eggnog = ProviderResult(source=SOURCE_EGGNOG, terms=[Term("go", "GO:0005215", source=SOURCE_EGGNOG)])
+    uniprot = parse_uniprot_entry("f1", "P00000", uniprot_payload(experimental=False))
+    section = function_section(merge_annotation("f1", [uniprot, eggnog]))
+
+    assert section["status"] == "annotated"
+    assert section["go"]["component"] == [
+        {"id": "GO:0042597", "name": "periplasmic space", "source": SOURCE_UNIPROT}
+    ]
+    assert section["go"]["unclassified"][0]["id"] == "GO:0005215"
+    assert section["ec"] == ["1.2.3.4"]
+
+    assert function_section(None) == {"status": "not_run"}
+    assert function_section(merge_annotation("f2", []))["status"] == "none"
