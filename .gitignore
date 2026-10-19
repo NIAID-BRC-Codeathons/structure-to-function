@@ -36,3 +36,14 @@ htmlcov/
 # Large tool outputs that should be regenerated, not committed
 *.pdbqt
 !fixtures/**/*.pdbqt
+
+# Some contributors' global excludes (core.excludesFile) carry a blanket `docs/` rule
+# from data-science templates where docs/ is generated. Here it is source and must be
+# tracked -- without these two lines `git add -A` silently drops every new doc and figure
+# on those machines while reporting a clean tree. A repository-level negation overrides
+# the global file; it is a no-op for anyone who does not have that rule.
+!docs/
+!docs/**
+
+# ...but not OS cruft, which the negation above would otherwise re-include.
+docs/**/.DS_Store
