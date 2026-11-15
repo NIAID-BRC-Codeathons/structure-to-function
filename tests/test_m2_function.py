@@ -888,3 +888,74 @@ def test_uniprot_function_without_map_ids_is_skipped_not_guessed(tmp_path):
     manifest = json.loads((run_dir / "m2_pdb" / "run.json").read_text(encoding="utf-8"))
     notes = manifest["functional_annotation"]["notes"]
     assert any("--map-ids" in note for note in notes)
+
+
+# --- #72: confidence per flag, and a source for lipoprotein -----------------------------------
+
+def _deeptmhmm_plus_heuristic(lipo: bool | None):
+    from s2f.m2_triage.function import (SOURCE_DEEPTMHMM, SOURCE_HEURISTIC, Call,
+                                        ProviderResult, merge_annotation)
+    deeptmhmm = ProviderResult(source=SOURCE_DEEPTMHMM,
+                               tm_helices=Call(value=2, source=SOURCE_DEEPTMHMM))
+    results = [deeptmhmm]
+    if lipo is not None:
+        results.append(ProviderResult(source=SOURCE_HEURISTIC,
+                                      lipoprotein=Call(value=lipo, source=SOURCE_HEURISTIC,
+                                                       evidence="lipobox")))
+    return merge_annotation("p1", results)
+
+
+def test_lipoprotein_carries_the_source_that_called_it() -> None:
+    annotation = _deeptmhmm_plus_heuristic(lipo=False)
+    assert annotation.lipoprotein_source == "heuristic"
+    row = annotation.flag_row()
+    assert row["lipoprotein_source"] == "heuristic"
+    assert row["lipoprotein_evidence"] == "lipobox"
+
+
+def test_a_predicted_flag_and_a_heuristic_flag_are_told_apart() -> None:
+    """The lambda0 case: DeepTMHMM covers membrane, nothing but the heuristic covers lipoprotein."""
+    annotation = _deeptmhmm_plus_heuristic(lipo=False)
+    confidence = annotation.flag_confidence()
+    assert confidence["membrane"] == "predicted"
+    assert confidence["lipoprotein"] == "heuristic"
+    # The old per-protein number still reads "predicted"; that is exactly what #72 is about.
+    assert annotation.confidence == "predicted"
+
+
+def test_a_flag_no_provider_covers_is_uncovered_not_false() -> None:
+    annotation = _deeptmhmm_plus_heuristic(lipo=None)
+    assert annotation.flag_confidence()["lipoprotein"] == "uncovered"
+    assert annotation.flag_row()["lipoprotein"] == ""
+
+
+def test_a_derived_flag_is_as_weak_as_its_weakest_input() -> None:
+    annotation = _deeptmhmm_plus_heuristic(lipo=False)
+    # secreted combines the membrane call (DeepTMHMM) with the lipoprotein call (heuristic).
+    assert annotation.flag_confidence()["secreted"] == "heuristic"
+    assert annotation.flag_source_label("secreted") == "deeptmhmm+heuristic"
+
+
+def test_the_manifest_reports_confidence_per_flag() -> None:
+    from s2f.m2_triage.function import AnnotationRun
+    run = AnnotationRun(annotations={"p1": _deeptmhmm_plus_heuristic(lipo=False),
+                                     "p2": _deeptmhmm_plus_heuristic(lipo=None)})
+    summary = run.summary()
+    assert summary["flag_confidence"]["membrane"] == {"predicted": 2}
+    assert summary["flag_confidence"]["lipoprotein"] == {"heuristic": 1, "uncovered": 1}
+    assert summary["flag_source"]["lipoprotein"] == {"heuristic": 1, "none": 1}
+    assert summary["confidence"] == {"predicted": 2}  # unchanged, and now explained
+    assert "per protein" in summary["confidence_basis"]
+
+
+def test_report_json_gates_lipoprotein_on_its_own_source() -> None:
+    """A signal-peptide call without a lipoprotein call must not become lipoprotein: false."""
+    from s2f.m2_triage.function import (SOURCE_SIGNALP, Call, ProviderResult,
+                                        merge_annotation)
+    from s2f.m2_triage.report_adapter import functional_flags
+    signal_only = merge_annotation("p1", [ProviderResult(
+        source=SOURCE_SIGNALP, signal_peptide=Call(value=True, source=SOURCE_SIGNALP))])
+    flags = functional_flags(signal_only)
+    assert flags["signal_peptide"] is True
+    assert flags["lipoprotein"] is None
+    assert flags["functional_evidence"]["flag_confidence"]["lipoprotein"] == "uncovered"

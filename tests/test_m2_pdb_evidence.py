@@ -179,7 +179,14 @@ def test_classify_components_splits_ligands_metals_and_additives() -> None:
     ligands, metals = classify_components(["MK1", "ZN", "HOH", "GOL", "NAG", "", "mg"])
 
     assert ligands == ["MK1"]
-    assert metals == ["ZN", "MG"]
+    assert metals == ["MG", "ZN"]
+
+
+def test_component_order_from_the_api_does_not_reach_the_output() -> None:
+    """#103: RCSB returns nonpolymer entities in no fixed order; two runs must still agree."""
+    one = classify_components(["G3P", "FAD", "NA", "CA"])
+    other = classify_components(["CA", "FAD", "NA", "G3P"])
+    assert one == other == (["FAD", "G3P"], ["CA", "NA"])
 
 
 def test_parse_entity_metadata_maps_by_rcsb_id() -> None:

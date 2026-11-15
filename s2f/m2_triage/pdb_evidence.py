@@ -183,7 +183,12 @@ class EntityMetadata:
 
 
 def classify_components(comp_ids: Iterable[str]) -> tuple[list[str], list[str]]:
-    """Split entry components into (functional ligands, metals), dropping additives/glycans."""
+    """Split entry components into (functional ligands, metals), dropping additives/glycans.
+
+    Both lists are sorted. RCSB's GraphQL API does not return an entry's nonpolymer entities in
+    a stable order, so two runs on the same input wrote `G3P,FAD` and `FAD,G3P` (#103) and
+    reproducibility diffs were noisy. The order carries no meaning, so it is fixed here.
+    """
     ligands: list[str] = []
     metals: list[str] = []
     for raw in comp_ids:
@@ -198,7 +203,7 @@ def classify_components(comp_ids: Iterable[str]) -> tuple[list[str], list[str]]:
             continue
         if comp not in ligands:
             ligands.append(comp)
-    return ligands, metals
+    return sorted(ligands), sorted(metals)
 
 
 def parse_entity_metadata(payload: dict[str, Any]) -> dict[str, EntityMetadata]:
