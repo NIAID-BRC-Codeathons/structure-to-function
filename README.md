@@ -124,6 +124,9 @@ length and produced a `Poor` genome — `docs/01a-cga-coverage.md` has the numbe
 Useful flags: `--from-cga-dir DIR` reuses a job you already retrieved, `--job-id ID`
 resumes polling a submitted job, `--only m1` / `--skip m2` select stages,
 `--map-ids` and `--kg` turn on M2's id resolution and knowledge graph.
+`--full-evidence` turns on M2's DIAMOND human-homology check and essentiality transfer
+(`--human-homology`, `--essentiality`). Together these carry 0.40 of the triage weight. A run
+without them warns at the end, naming every weighted component that had no evidence (#81).
 
 ## Output
 

@@ -889,8 +889,8 @@ hand-written `m2_triage` invocation afterwards, and then a re-render of the repo
 
 **Definition of done**
 - [ ] One `s2f.run` invocation reproduces a hand-run M2 with the same flags
-- [ ] A run where a weighted component could not be computed says so at the end
-- [ ] A test pins that every M2 flag the runner claims to support actually arrives
+- [x] A run where a weighted component could not be computed says so at the end
+- [x] A test pins that every M2 flag the runner claims to support actually arrives
 
 **Watch out for:** the two rankings look equally finished. Nothing downstream can tell that
 0.40 of the weight mass was absent.
