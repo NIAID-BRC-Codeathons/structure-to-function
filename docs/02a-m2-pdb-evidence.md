@@ -232,6 +232,12 @@ deleting the gene stops growth *in silico*. Transferring it by homology adds a s
 top. Both are recorded, `evidence` stays `FBA`, and the annotation note says plainly that this is
 not an experimental knockout. That matters when M6 writes the report.
 
+**Same-species relatives are kept and flagged.** The reference set can include a close public
+genome, including the query's own species. `run.json` records whether relatedness was measurable,
+plus same-species and same-genus counts for both reference genomes and transferred essentiality
+calls. Genus counts include the same-species subset, so a G37-style run with a public G37 relative
+is distinguishable from a run whose evidence only came from more distant relatives.
+
 ## An "Antibiotic Resistance" row usually is not resistance
 
 BV-BRC classifies most AMR specialty rows as **"antibiotic target in susceptible species"** —
@@ -403,6 +409,29 @@ Written to `runs/<run_id>/m2_pdb/`:
 | `top50.tsv` | the selected set |
 | `no_pdb_hit.tsv` | proteins with no qualifying hit — the input to the Foldseek step (issue #9) |
 | `run.json` | timestamps, parameters, weights, endpoints, counts, cache path, and every failed query with its error |
+
+## Scoring profiles
+
+The weights above are one policy, **`bacterial-target`**: antibacterial target selection. The
+section before this one shows they do not even transfer between bacterial genomes, and they are
+wrong for other questions, such as a viral protein, a single hypothetical, or a human target. So the
+policy is a choice (#93):
+
+- `--profile bacterial-target` (default) is exactly `WEIGHTS`; this change log governs it.
+- `--profile evidence-only` ranks by structural evidence alone (`pdb_evidence` 0.40,
+  `ligandable_homolog` 0.10) with no penalties and no human-homolog disqualification.
+  **Provisional and uncalibrated.**
+- `--weights FILE` takes `{"name": ..., "weights": {...}, "disqualify_human_homologs": bool}`.
+  Every component must be named, so a typo cannot silently drop one to 0.
+
+`run.json` records the profile and its weights, and each protein's `weights_version` reads
+`<profile>@<version>`. To compare policies on recorded evidence without re-querying anything:
+
+    python -m s2f.m2_triage.rescore --run runs/<id> --profile evidence-only
+
+This writes `m2_pdb/rescored/<profile>.tsv` and leaves the run's own ranking untouched. Rescoring
+under the default profile reproduces M2's ranking exactly. Runs that predate per-component output
+(missing `surface_bonus`, `ligandable_homolog` or `membrane_penalty`) are refused, not guessed.
 
 ## Weight change log
 

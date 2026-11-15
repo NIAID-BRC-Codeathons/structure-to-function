@@ -18,7 +18,7 @@ from typing import Any, Iterable
 from ..common.ids import Xrefs
 from .afdb import AlphaFoldModel
 from .bvbrc_input import Protein
-from .function import CONFIDENCE, FunctionalAnnotation
+from .function import CONFIDENCE, FunctionalAnnotation, Term
 from .score import ProteinScore
 
 
@@ -70,6 +70,58 @@ def functional_annotations(
     return rows
 
 
+# UniProt prefixes each GO term name with its aspect ("P:cell division"); eggNOG and
+# InterProScan give bare IDs, which stay "unclassified" until a GO slim mapping exists (#107).
+_GO_ASPECTS = {"P": "process", "F": "function", "C": "component"}
+
+
+def _go_detail_rank(term: Term) -> tuple[bool, bool]:
+    prefix, _, name = term.name.partition(":")
+    return (prefix in _GO_ASPECTS and bool(name), bool(term.name))
+
+
+def function_section(annotation: FunctionalAnnotation | None) -> dict[str, Any]:
+    """What the protein does, in words, for the report (issue #107).
+
+    `status` keeps "not run" apart from "nothing found": a run without `--annotate` or
+    `--uniprot-function` knows nothing about function, which is not the same as a protein no
+    provider could describe.
+    """
+    if annotation is None:
+        return {"status": "not_run"}
+    go: dict[str, list[dict[str, str]]] = {}
+    go_terms: dict[str, Term] = {}
+    for term in annotation.terms:
+        if term.kind != "go":
+            continue
+        previous = go_terms.get(term.term_id)
+        # Local providers often supply only an ID before UniProt supplies its name
+        # and aspect. Deduplicate after choosing the richest display record; the
+        # per-source annotations retain all original evidence.
+        if previous is None or _go_detail_rank(term) > _go_detail_rank(previous):
+            go_terms[term.term_id] = term
+    for term in go_terms.values():
+        prefix, _, name = term.name.partition(":")
+        aspect = _GO_ASPECTS.get(prefix) if name else None
+        go.setdefault(aspect or "unclassified", []).append(
+            {"id": term.term_id, "name": (name if aspect else term.name) or None, "source": term.source}
+        )
+    section: dict[str, Any] = {
+        "description": annotation.description or None,
+        "description_source": annotation.description_source or None,
+        "summary": annotation.summary or None,
+        "summary_source": annotation.summary_source or None,
+        "summary_evidence": annotation.summary_evidence or None,
+        "go": go,
+        "ec": annotation.terms_of("ec"),
+        "kegg_ko": annotation.terms_of("ko"),
+        "cog_category": annotation.terms_of("cog_category"),
+    }
+    known = section["description"] or section["summary"] or go or section["ec"] or section["kegg_ko"]
+    section["status"] = "annotated" if known else "none"
+    return section
+
+
 # Which term identifies the hit, most specific first. A COG or KO names the ortholog group the
 # annotation came from; a COG *category* is a single letter and identifies nothing.
 _HIT_PREFERENCE = ("cog", "ko", "interpro", "pfam", "ec", "signature", "gene_name", "go")
@@ -109,15 +161,19 @@ def functional_flags(annotation: FunctionalAnnotation | None) -> dict[str, Any]:
         "localization": annotation.localization or None,
         "tm_helices": annotation.tm_helices if annotation.membrane_source else None,
         "signal_peptide": annotation.signal_peptide if annotation.signal_source else None,
-        "lipoprotein": annotation.lipoprotein if annotation.signal_source else None,
+        # Gated on its own source (#72): a signal-peptide call says nothing about a lipobox.
+        "lipoprotein": annotation.lipoprotein if annotation.lipoprotein_source else None,
         "surface_exposed": annotation.surface_exposed if located else None,
         "functional_evidence": {
             "membrane_source": annotation.membrane_source or None,
             "membrane_evidence": annotation.membrane_evidence or None,
             "signal_source": annotation.signal_source or None,
             "signal_evidence": annotation.signal_evidence or None,
+            "lipoprotein_source": annotation.lipoprotein_source or None,
+            "lipoprotein_evidence": annotation.lipoprotein_evidence or None,
             "localization_source": annotation.localization_source or None,
             "confidence": annotation.confidence or None,
+            "flag_confidence": annotation.flag_confidence(),
             "sources": list(annotation.sources),
         },
     }
@@ -208,6 +264,7 @@ def protein_enrichment(
             "related_uniprot": list(xrefs.related_uniprot) if xrefs else [],
         },
         "annotations": annotations,
+        "function": function_section(functional),
         "flags": {
             "virulence": bool(score.components.virulence_amr),
             "amr": bool(score.components.virulence_amr),

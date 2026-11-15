@@ -98,6 +98,25 @@ def test_the_limitations_are_always_present() -> None:
     assert "not comparable across proteins" in html
 
 
+def test_essentiality_relatedness_is_available_to_the_report() -> None:
+    html = build_page({}, {
+        "essentiality": {
+            "enabled": True,
+            "reference_genomes": 10,
+            "essential_calls": 158,
+            "relatedness_measured": True,
+            "same_species_reference_genomes": 1,
+            "same_genus_reference_genomes": 2,
+            "same_species_essential_calls": 12,
+            "same_genus_essential_calls": 20,
+        },
+    })
+
+    assert "Essentiality" in html
+    assert "same species reference genomes" in html
+    assert "same genus essential calls" in html
+
+
 def test_cli_writes_the_file_and_records_its_own_section(tmp_path: Path) -> None:
     run_dir = tmp_path / "run"
     run_dir.mkdir()
@@ -123,3 +142,32 @@ def test_cli_dry_run_needs_no_run_directory(tmp_path: Path) -> None:
 
 def test_cli_refuses_a_run_directory_with_no_report(tmp_path: Path) -> None:
     assert main(["--run", str(tmp_path)]) == 2
+
+
+def _one_selected(function: dict | None) -> dict:
+    protein = {"feature_id": "fig|1.1.peg.1", "product": "hypothetical protein",
+               "triage": {"rank": 1, "score": 0.5, "selected": True, "reason": "", "components": {}}}
+    if function is not None:
+        protein["function"] = function
+    return {"run": {"run_id": "fn"}, "proteins": [protein]}
+
+
+def test_selected_targets_say_what_the_protein_does() -> None:
+    """Issue #107: a target carries a function line, not only structural evidence."""
+    html = build_page(_one_selected({
+        "status": "annotated", "description": "Outer membrane porin", "description_source": "uniprot",
+        "summary": "Forms pores that allow passive diffusion.", "summary_source": "uniprot",
+        "go": {"function": [{"id": "GO:0015288", "name": "porin activity", "source": "uniprot"}]},
+        "ec": [], "kegg_ko": ["K09475"],
+    }), {})
+
+    assert "<th>Function</th>" in html
+    assert "Outer membrane porin" in html
+    assert "passive diffusion" in html
+    assert "porin activity" in html
+    assert "K09475" in html
+
+
+def test_function_not_run_is_not_shown_as_nothing_found() -> None:
+    assert "not annotated in this run" in build_page(_one_selected(None), {})
+    assert "no functional annotation found" in build_page(_one_selected({"status": "none"}), {})

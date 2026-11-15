@@ -429,6 +429,38 @@ def _disqualified(triage: dict[str, Any]) -> str:
     return ""
 
 
+def _function_cell(protein: dict[str, Any]) -> str:
+    """What the protein does, in words (issue #107).
+
+    A run that never annotated function says so instead of leaving a blank a reader would
+    take for "nothing known".
+    """
+    function = _mapping(protein.get("function"))
+    status = function.get("status")
+    if not function or status == "not_run":
+        return "<span class='muted'>not annotated in this run</span>"
+    if status == "none":
+        return "<span class='muted'>no functional annotation found</span>"
+    out = []
+    if function.get("description"):
+        out.append(f"<b>{esc(function['description'])}</b> "
+                   f"<span class='muted'>({esc(_fmt(function.get('description_source')))})</span>")
+    if function.get("summary"):
+        out.append(f"<div>{esc(str(function['summary'])[:400])} "
+                   f"<span class='muted'>({esc(_fmt(function.get('summary_source')))})</span></div>")
+    go = _mapping(function.get("go"))
+    for aspect in ("function", "process", "component", "unclassified"):
+        terms = [term for term in go.get(aspect) or [] if isinstance(term, dict)][:5]
+        if terms:
+            label = "GO" if aspect == "unclassified" else f"GO {aspect}"
+            names = ", ".join(str(term.get("name") or term.get("id")) for term in terms)
+            out.append(f"<div class='muted'>{esc(label)}: {esc(names)}</div>")
+    for key, label in (("ec", "EC"), ("kegg_ko", "KO")):
+        if function.get(key):
+            out.append(f"<span class='pill'>{label} {esc(', '.join(function[key][:3]))}</span>")
+    return "".join(out) or "—"
+
+
 def tab_targets(report: dict[str, Any], m2_run: dict[str, Any]) -> str:
     rows = _triage_rows(report)
     if not rows:
@@ -460,8 +492,8 @@ def tab_targets(report: dict[str, Any], m2_run: dict[str, Any]) -> str:
                    "rank and reason below.</div>")
 
     out.append("<h3>Selected</h3><div class='tablewrap'><table><thead><tr>"
-               "<th>Rank</th><th>Score</th><th>Product</th><th>Evidence</th>"
-               "<th>Flags</th><th>Cross-references</th><th>Why</th>"
+               "<th>Rank</th><th>Score</th><th>Product</th><th>Function</th>"
+               "<th>Evidence</th><th>Flags</th><th>Cross-references</th><th>Why</th>"
                "</tr></thead><tbody>")
     best = max((t.get("score") or 0) for _p, t in rows) or 1
     for protein, triage in selected:
@@ -494,6 +526,7 @@ def tab_targets(report: dict[str, Any], m2_run: dict[str, Any]) -> str:
             f"{_bar((triage.get('score') or 0) / best)}</td>"
             f"<td>{esc(_fmt(protein.get('product')))}<br>"
             f"<code>{esc(protein.get('feature_id'))}</code></td>"
+            f"<td>{_function_cell(protein)}</td>"
             f"<td>{parts or '—'}</td><td>{' '.join(pills) or '—'}</td>"
             f"<td>{links or '—'}</td>"
             f"<td class='muted'>{esc(_fmt(triage.get('reason')))}</td></tr>")
@@ -626,7 +659,9 @@ def tab_evidence(report: dict[str, Any], m2_run: dict[str, Any]) -> str:
         out.append("<h3>Essentiality</h3><div class='kv'>")
         for key in ("reference", "reference_query", "reference_proteins",
                     "reference_genomes", "min_identity", "min_coverage",
-                    "essential_calls", "no_call", "not_run"):
+                    "essential_calls", "no_call", "not_run", "relatedness_measured",
+                    "same_species_reference_genomes", "same_genus_reference_genomes",
+                    "same_species_essential_calls", "same_genus_essential_calls"):
             if key in essentiality:
                 out.append(f"<div><b>{esc(key.replace('_', ' '))}:</b> "
                            f"{esc(_fmt(essentiality[key]))}</div>")
@@ -747,6 +782,7 @@ def build_page(report: dict[str, Any], m2_run: dict[str, Any] | None = None) -> 
             out.append(f"<span class='sourcenote'>{esc(note)}</span>")
     elif note:
         out.append(f"<div class='sourcenote' style='margin-top:12px'>{esc(note)}</div>")
+    out.extend(_not_available_note(genome, m2_run))
     out.append("</header>")
 
     out.append("<nav class='tabs' role='tablist'>")
@@ -763,6 +799,25 @@ def build_page(report: dict[str, Any], m2_run: dict[str, Any] | None = None) -> 
 
     out.append("</main><script>" + JS + "</script></body></html>")
     return "".join(out)
+
+
+def _not_available_note(genome: dict[str, Any], m2_run: dict[str, Any]) -> list[str]:
+    """What nobody looked at on this run (#90), so a sequence-only report never passes for a
+    genome report. "Not available" is not "none found": an empty specialty list on a genome
+    route means BV-BRC looked; here it did not."""
+    sources = _mapping(genome.get("not_available"))
+    components = _mapping(m2_run.get("not_available"))
+    if not sources and not components:
+        return []
+    out = ["<div class='note warn' style='margin-top:12px'><b>Not available on this run</b> "
+           "&mdash; never looked at, which is not the same as none found."]
+    if sources:
+        out.append("<br>Inputs: " + "; ".join(f"{esc(k)} ({esc(v)})" for k, v in sources.items()))
+    if components:
+        out.append("<br>Score components contributing 0 because nothing could measure them: "
+                   + "; ".join(f"<code>{esc(k)}</code> ({esc(v)})" for k, v in components.items()))
+    out.append("</div>")
+    return ["".join(out)]
 
 
 def render_run(run_dir: str | Path) -> str:
