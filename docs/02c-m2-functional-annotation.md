@@ -253,6 +253,9 @@ With `--report`, the flags go into `proteins[].flags` and the evidence into
 did but no provider described the protein — the full report prints the two differently, since
 "not looked at" and "nothing known" are different claims. The full report shows `function` as a
 column of the selected-targets table. It is descriptive only and does not enter the score.
+When providers supply the same GO ID, the display prefers a term with a name and aspect
+over a bare ID, regardless of provider order. Each provider's original term remains in
+`annotations[]` and `function_terms.tsv` with its own source.
 
 Without `--annotate`, every one of those fields stays `null`: the adapter reserved those slots
 for this issue and a protein nobody annotated must not reach M3 looking like a confirmed

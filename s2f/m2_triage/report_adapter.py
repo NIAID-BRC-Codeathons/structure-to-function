@@ -18,7 +18,7 @@ from typing import Any, Iterable
 from ..common.ids import Xrefs
 from .afdb import AlphaFoldModel
 from .bvbrc_input import Protein
-from .function import CONFIDENCE, FunctionalAnnotation
+from .function import CONFIDENCE, FunctionalAnnotation, Term
 from .score import ProteinScore
 
 
@@ -75,6 +75,11 @@ def functional_annotations(
 _GO_ASPECTS = {"P": "process", "F": "function", "C": "component"}
 
 
+def _go_detail_rank(term: Term) -> tuple[bool, bool]:
+    prefix, _, name = term.name.partition(":")
+    return (prefix in _GO_ASPECTS and bool(name), bool(term.name))
+
+
 def function_section(annotation: FunctionalAnnotation | None) -> dict[str, Any]:
     """What the protein does, in words, for the report (issue #107).
 
@@ -85,11 +90,17 @@ def function_section(annotation: FunctionalAnnotation | None) -> dict[str, Any]:
     if annotation is None:
         return {"status": "not_run"}
     go: dict[str, list[dict[str, str]]] = {}
-    seen: set[str] = set()
+    go_terms: dict[str, Term] = {}
     for term in annotation.terms:
-        if term.kind != "go" or term.term_id in seen:
+        if term.kind != "go":
             continue
-        seen.add(term.term_id)
+        previous = go_terms.get(term.term_id)
+        # Local providers often supply only an ID before UniProt supplies its name
+        # and aspect. Deduplicate after choosing the richest display record; the
+        # per-source annotations retain all original evidence.
+        if previous is None or _go_detail_rank(term) > _go_detail_rank(previous):
+            go_terms[term.term_id] = term
+    for term in go_terms.values():
         prefix, _, name = term.name.partition(":")
         aspect = _GO_ASPECTS.get(prefix) if name else None
         go.setdefault(aspect or "unclassified", []).append(

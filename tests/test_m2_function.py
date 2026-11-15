@@ -927,3 +927,29 @@ def test_function_section_groups_go_by_aspect_and_keeps_unknown_apart():
 
     assert function_section(None) == {"status": "not_run"}
     assert function_section(merge_annotation("f2", []))["status"] == "none"
+
+
+@pytest.mark.parametrize("bare_source", [SOURCE_EGGNOG, SOURCE_INTERPROSCAN])
+@pytest.mark.parametrize("bare_first", [True, False])
+def test_function_section_keeps_named_go_term_regardless_of_provider_order(bare_source, bare_first):
+    from s2f.m2_triage.report_adapter import function_section
+
+    bare = ProviderResult(
+        source=bare_source,
+        terms=[Term("go", "GO:0042597", source=bare_source)],
+    )
+    uniprot = parse_uniprot_entry("f1", "P00000", uniprot_payload(experimental=False))
+    providers = [bare, uniprot] if bare_first else [uniprot, bare]
+    merged = merge_annotation("f1", providers)
+    section = function_section(merged)
+
+    assert section["go"] == {
+        "component": [
+            {"id": "GO:0042597", "name": "periplasmic space", "source": SOURCE_UNIPROT}
+        ]
+    }
+    # The display chooses one term, but the original providers' evidence survives.
+    rows = functional_annotations(merged, "2026-10-14T00:00:00Z")
+    assert {row["source"] for row in rows if "GO:0042597" in row.get("terms", {}).get("go", [])} == {
+        bare_source, SOURCE_UNIPROT
+    }
