@@ -232,6 +232,12 @@ deleting the gene stops growth *in silico*. Transferring it by homology adds a s
 top. Both are recorded, `evidence` stays `FBA`, and the annotation note says plainly that this is
 not an experimental knockout. That matters when M6 writes the report.
 
+**Same-species relatives are kept and flagged.** The reference set can include a close public
+genome, including the query's own species. `run.json` records whether relatedness was measurable,
+plus same-species and same-genus counts for both reference genomes and transferred essentiality
+calls. Genus counts include the same-species subset, so a G37-style run with a public G37 relative
+is distinguishable from a run whose evidence only came from more distant relatives.
+
 ## An "Antibiotic Resistance" row usually is not resistance
 
 BV-BRC classifies most AMR specialty rows as **"antibiotic target in susceptible species"** —
