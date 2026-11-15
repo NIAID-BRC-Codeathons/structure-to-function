@@ -109,15 +109,19 @@ def functional_flags(annotation: FunctionalAnnotation | None) -> dict[str, Any]:
         "localization": annotation.localization or None,
         "tm_helices": annotation.tm_helices if annotation.membrane_source else None,
         "signal_peptide": annotation.signal_peptide if annotation.signal_source else None,
-        "lipoprotein": annotation.lipoprotein if annotation.signal_source else None,
+        # Gated on its own source (#72): a signal-peptide call says nothing about a lipobox.
+        "lipoprotein": annotation.lipoprotein if annotation.lipoprotein_source else None,
         "surface_exposed": annotation.surface_exposed if located else None,
         "functional_evidence": {
             "membrane_source": annotation.membrane_source or None,
             "membrane_evidence": annotation.membrane_evidence or None,
             "signal_source": annotation.signal_source or None,
             "signal_evidence": annotation.signal_evidence or None,
+            "lipoprotein_source": annotation.lipoprotein_source or None,
+            "lipoprotein_evidence": annotation.lipoprotein_evidence or None,
             "localization_source": annotation.localization_source or None,
             "confidence": annotation.confidence or None,
+            "flag_confidence": annotation.flag_confidence(),
             "sources": list(annotation.sources),
         },
     }
