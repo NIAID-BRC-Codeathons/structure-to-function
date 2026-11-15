@@ -15,6 +15,8 @@ from collections import Counter, defaultdict
 from dataclasses import dataclass, field
 from pathlib import Path
 
+from ..common.annotation import is_uncharacterized
+
 ID_ALIASES = ("patric_id", "feature_id", "brc_id", "genome_feature_id")
 PRODUCT_ALIASES = ("product", "function")
 GENE_ALIASES = ("gene", "gene_name", "gene_symbol")
@@ -34,12 +36,6 @@ DRUG_TARGET_PROPERTIES = {"drug target"}
 HUMAN_HOMOLOG_PROPERTIES = {"human homolog"}
 TRANSPORTER_PROPERTIES = {"transporter"}
 METAL_PROPERTIES = {"metal resistance"}
-
-UNCHARACTERIZED = re.compile(
-    r"hypothetical|uncharacteri[sz]ed|putative|unknown function|unnamed|"
-    r"\bDUF\d+|protein of unknown|predicted protein",
-    re.IGNORECASE,
-)
 
 
 #: An "Antibiotic Resistance" row does not always mean resistance. BV-BRC classifies most of
@@ -159,7 +155,7 @@ class Protein:
 
     @property
     def is_uncharacterized(self) -> bool:
-        return bool(UNCHARACTERIZED.search(self.product or ""))
+        return is_uncharacterized(self.product)
 
 
 @dataclass
