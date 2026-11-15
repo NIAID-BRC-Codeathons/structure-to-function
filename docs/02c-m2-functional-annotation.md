@@ -257,6 +257,15 @@ With `--report`, the flags go into `proteins[].flags` and the evidence into
 | `flags.localization`, `tm_helices`, `signal_peptide`, `lipoprotein`, `surface_exposed` | the rest of the topology picture |
 | `flags.functional_evidence` | `membrane_source`, `membrane_evidence`, `signal_source`, `signal_evidence`, `lipoprotein_source`, `lipoprotein_evidence`, `localization_source`, `confidence`, `flag_confidence` (per flag, #72), and every source that contributed |
 | `annotations[]` | one row per source, each with its terms, its evidence string, its confidence and `retrieved_at` — merged flags live in `flags`, but `source` is what keeps the evidence apart |
+| `function` | what the protein does, for readers (issue #107): `description` (UniProt name → eggNOG → InterPro), `summary` (UniProt's free-text Function comment, with its source and evidence), `go` grouped by aspect (`process` / `function` / `component`; eggNOG and InterProScan IDs carry no aspect and go under `unclassified`), `ec`, `kegg_ko`, `cog_category`, and `status` |
+
+`function.status` is `not_run` when the run did no functional annotation and `none` when it
+did but no provider described the protein — the full report prints the two differently, since
+"not looked at" and "nothing known" are different claims. The full report shows `function` as a
+column of the selected-targets table. It is descriptive only and does not enter the score.
+When providers supply the same GO ID, the display prefers a term with a name and aspect
+over a bare ID, regardless of provider order. Each provider's original term remains in
+`annotations[]` and `function_terms.tsv` with its own source.
 
 Without `--annotate`, every one of those fields stays `null`: the adapter reserved those slots
 for this issue and a protein nobody annotated must not reach M3 looking like a confirmed

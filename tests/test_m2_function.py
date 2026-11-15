@@ -352,6 +352,11 @@ def uniprot_payload(*, experimental: bool) -> dict:
         },
         "comments": [
             {
+                "commentType": "FUNCTION",
+                "texts": [{"value": "Binds a test substrate in the periplasm.",
+                           "evidences": [{"evidenceCode": code}]}],
+            },
+            {
                 "commentType": "SUBCELLULAR LOCATION",
                 "subcellularLocations": [
                     {"location": {"value": "Periplasm", "evidences": [{"evidenceCode": code}]}}
@@ -888,6 +893,66 @@ def test_uniprot_function_without_map_ids_is_skipped_not_guessed(tmp_path):
     manifest = json.loads((run_dir / "m2_pdb" / "run.json").read_text(encoding="utf-8"))
     notes = manifest["functional_annotation"]["notes"]
     assert any("--map-ids" in note for note in notes)
+
+
+# --- function description for the report (issue #107) ---------------------------------------
+
+
+def test_uniprot_function_comment_becomes_the_summary():
+    from s2f.m2_triage.function import merge_annotation
+
+    result = parse_uniprot_entry("f1", "P00000", uniprot_payload(experimental=True))
+    assert result.summary.value == "Binds a test substrate in the periplasm."
+    assert result.summary.source == SOURCE_UNIPROT_EXP
+
+    merged = merge_annotation("f1", [result])
+    assert merged.description == "Test periplasmic binding protein"
+    assert merged.summary == "Binds a test substrate in the periplasm."
+
+
+def test_function_section_groups_go_by_aspect_and_keeps_unknown_apart():
+    from s2f.m2_triage.function import merge_annotation
+    from s2f.m2_triage.report_adapter import function_section
+
+    eggnog = ProviderResult(source=SOURCE_EGGNOG, terms=[Term("go", "GO:0005215", source=SOURCE_EGGNOG)])
+    uniprot = parse_uniprot_entry("f1", "P00000", uniprot_payload(experimental=False))
+    section = function_section(merge_annotation("f1", [uniprot, eggnog]))
+
+    assert section["status"] == "annotated"
+    assert section["go"]["component"] == [
+        {"id": "GO:0042597", "name": "periplasmic space", "source": SOURCE_UNIPROT}
+    ]
+    assert section["go"]["unclassified"][0]["id"] == "GO:0005215"
+    assert section["ec"] == ["1.2.3.4"]
+
+    assert function_section(None) == {"status": "not_run"}
+    assert function_section(merge_annotation("f2", []))["status"] == "none"
+
+
+@pytest.mark.parametrize("bare_source", [SOURCE_EGGNOG, SOURCE_INTERPROSCAN])
+@pytest.mark.parametrize("bare_first", [True, False])
+def test_function_section_keeps_named_go_term_regardless_of_provider_order(bare_source, bare_first):
+    from s2f.m2_triage.report_adapter import function_section
+
+    bare = ProviderResult(
+        source=bare_source,
+        terms=[Term("go", "GO:0042597", source=bare_source)],
+    )
+    uniprot = parse_uniprot_entry("f1", "P00000", uniprot_payload(experimental=False))
+    providers = [bare, uniprot] if bare_first else [uniprot, bare]
+    merged = merge_annotation("f1", providers)
+    section = function_section(merged)
+
+    assert section["go"] == {
+        "component": [
+            {"id": "GO:0042597", "name": "periplasmic space", "source": SOURCE_UNIPROT}
+        ]
+    }
+    # The display chooses one term, but the original providers' evidence survives.
+    rows = functional_annotations(merged, "2026-10-14T00:00:00Z")
+    assert {row["source"] for row in rows if "GO:0042597" in row.get("terms", {}).get("go", [])} == {
+        bare_source, SOURCE_UNIPROT
+    }
 
 
 # --- #72: confidence per flag, and a source for lipoprotein -----------------------------------

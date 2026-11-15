@@ -162,6 +162,24 @@ _TRIAGE = {
     "additionalProperties": True,
 }
 
+_FUNCTION = {
+    "type": "object",
+    "properties": {
+        "status": {"enum": ["annotated", "none", "not_run"]},
+        "description": {"type": ["string", "null"]},
+        "description_source": {"type": ["string", "null"]},
+        "summary": {"type": ["string", "null"]},
+        "summary_source": {"type": ["string", "null"]},
+        "summary_evidence": {"type": ["string", "null"]},
+        "go": {"type": "object"},
+        "ec": {"type": "array", "items": {"type": "string"}},
+        "kegg_ko": {"type": "array", "items": {"type": "string"}},
+        "cog_category": {"type": "array", "items": {"type": "string"}},
+    },
+    "required": ["status"],
+    "additionalProperties": True,
+}
+
 _PROTEIN = {
     "type": "object",
     "properties": {
@@ -177,6 +195,7 @@ _PROTEIN = {
         "specialty": {"type": "array"},
         "xrefs": _XREFS,
         "annotations": {"type": "array", "items": _ANNOTATION},
+        "function": _FUNCTION,
         "flags": _FLAGS,
         "triage": _TRIAGE,
     },
