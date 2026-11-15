@@ -8,6 +8,7 @@ from pathlib import Path
 
 import pytest
 
+from s2f.common.annotation import is_uncharacterized
 from s2f.m1_genome import collect
 from s2f.m1_genome.pathogens import (BASE_REFERENCES, build_reference_list,
                                      resolve_disease_profile, species_disease_label)
@@ -209,6 +210,8 @@ def test_a_failed_optional_request_still_leaves_a_complete_report(kp_payload, tm
     validate_report(report)
     assert len(report["proteins"]) == len(kp_payload["features"])
     assert report["genome"]["annotation_route"] == "api"
+    # #85: what the sequence cap removed is in the manifest, not only on stdout.
+    assert report["run"]["modules"]["m1"]["seq_cap"]["cap"] == 4000
     assert (run_dir / "m1/report.html").exists()
     assert not (run_dir / "m1/gene_content_tree.nwk").exists()
 
@@ -260,7 +263,39 @@ def test_sequences_are_capped_by_priority_not_by_chromosome_position(kp_payload,
     assert by_coordinate[0]["patric_id"] != top
 
     got = fetch_sequences(api, kp_payload["features"], cap=1, priority=ranked)
-    assert list(got) == [top]
+    product = {f["patric_id"]: f.get("product") for f in kp_payload["features"]}
+    assert [fid for fid in got if not is_uncharacterized(product[fid])] == [top]
+
+
+def test_the_sequence_cap_never_drops_an_uncharacterized_protein(kp_payload) -> None:
+    """#85: m1_priority ranks hypotheticals last, so a rank cap removed them first."""
+    from s2f.m1_genome.collect import select_sequence_features
+    from s2f.m1_genome.priority import rank_proteins
+    ranked = rank_proteins(kp_payload["features"], kp_payload["specialty"])
+    hypothetical = {f["patric_id"] for f in kp_payload["features"]
+                    if f.get("aa_sequence_md5") and f.get("patric_id")
+                    and is_uncharacterized(f.get("product"))}
+    assert hypothetical, "the fixture needs an uncharacterized protein to test this"
+
+    wanted, summary = select_sequence_features(kp_payload["features"], cap=1,
+                                               priority=ranked)
+    kept = {f["patric_id"] for f in wanted}
+    assert hypothetical <= kept
+    assert len(kept) == len(hypothetical) + 1
+    assert summary["uncharacterized_exempt"] == len(hypothetical)
+    assert summary["kept"] == len(kept)
+    assert summary["dropped"] == summary["annotated_dropped"]
+    assert summary["candidates"] == summary["kept"] + summary["dropped"]
+
+
+def test_m1_and_m2_agree_on_what_is_uncharacterized() -> None:
+    """The cap exempts exactly what annotation_gap pays for."""
+    from s2f.m2_triage.bvbrc_input import Protein
+    for product in ("hypothetical protein", "DUF1234 domain protein", "putative lipoprotein",
+                    "DNA gyrase subunit A", ""):
+        protein = Protein.__new__(Protein)
+        protein.product = product
+        assert protein.is_uncharacterized == is_uncharacterized(product)
 
 
 def test_the_two_routes_are_mutually_exclusive(tmp_path) -> None:

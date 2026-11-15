@@ -14,6 +14,12 @@
 
 - Contig FASTA (blinded: headers stripped to `contig_1`, …).
 - BV-BRC account; token from `p3-login`.
+- **Or, with no genome:** a protein FASTA via `--from-fasta FAA [--organism NAME]` (#89). No
+  BV-BRC is used. Specialty genes, subsystems, coordinates, contigs and the taxonomy tree are
+  recorded under `not_available`, never as empty lists, and `genome.annotation_route` is
+  `"fasta"`. The organism comes only from `--organism`; FASTA headers are never parsed for one.
+  M2 then lists the score components nothing could measure under `not_available` in
+  `m2_pdb/run.json`, the runner prints them, and the full report shows them in its header (#90).
 
 ## Outputs
 

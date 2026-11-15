@@ -659,7 +659,9 @@ def tab_evidence(report: dict[str, Any], m2_run: dict[str, Any]) -> str:
         out.append("<h3>Essentiality</h3><div class='kv'>")
         for key in ("reference", "reference_query", "reference_proteins",
                     "reference_genomes", "min_identity", "min_coverage",
-                    "essential_calls", "no_call", "not_run"):
+                    "essential_calls", "no_call", "not_run", "relatedness_measured",
+                    "same_species_reference_genomes", "same_genus_reference_genomes",
+                    "same_species_essential_calls", "same_genus_essential_calls"):
             if key in essentiality:
                 out.append(f"<div><b>{esc(key.replace('_', ' '))}:</b> "
                            f"{esc(_fmt(essentiality[key]))}</div>")
@@ -780,6 +782,7 @@ def build_page(report: dict[str, Any], m2_run: dict[str, Any] | None = None) -> 
             out.append(f"<span class='sourcenote'>{esc(note)}</span>")
     elif note:
         out.append(f"<div class='sourcenote' style='margin-top:12px'>{esc(note)}</div>")
+    out.extend(_not_available_note(genome, m2_run))
     out.append("</header>")
 
     out.append("<nav class='tabs' role='tablist'>")
@@ -796,6 +799,25 @@ def build_page(report: dict[str, Any], m2_run: dict[str, Any] | None = None) -> 
 
     out.append("</main><script>" + JS + "</script></body></html>")
     return "".join(out)
+
+
+def _not_available_note(genome: dict[str, Any], m2_run: dict[str, Any]) -> list[str]:
+    """What nobody looked at on this run (#90), so a sequence-only report never passes for a
+    genome report. "Not available" is not "none found": an empty specialty list on a genome
+    route means BV-BRC looked; here it did not."""
+    sources = _mapping(genome.get("not_available"))
+    components = _mapping(m2_run.get("not_available"))
+    if not sources and not components:
+        return []
+    out = ["<div class='note warn' style='margin-top:12px'><b>Not available on this run</b> "
+           "&mdash; never looked at, which is not the same as none found."]
+    if sources:
+        out.append("<br>Inputs: " + "; ".join(f"{esc(k)} ({esc(v)})" for k, v in sources.items()))
+    if components:
+        out.append("<br>Score components contributing 0 because nothing could measure them: "
+                   + "; ".join(f"<code>{esc(k)}</code> ({esc(v)})" for k, v in components.items()))
+    out.append("</div>")
+    return ["".join(out)]
 
 
 def render_run(run_dir: str | Path) -> str:
