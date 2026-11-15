@@ -12,7 +12,7 @@ everywhere else: absent evidence and measured-absent evidence are different clai
 from __future__ import annotations
 
 from dataclasses import dataclass, field
-from datetime import UTC, datetime
+from datetime import datetime, timezone
 from typing import Any
 
 #: Sections the report knows how to show, in the order `docs/06-m6-report.md` lays out.
@@ -140,7 +140,7 @@ def _protein_row(protein: dict[str, Any], structure: dict[str, Any] | None) -> d
 
 def build(report: dict[str, Any], *, top: int = 25) -> ReportView:
     """Build the whole view. Missing sections become 'not run', never empty successes."""
-    view = ReportView(generated_at=datetime.now(UTC).isoformat(timespec="seconds"))
+    view = ReportView(generated_at=datetime.now(timezone.utc).isoformat(timespec="seconds"))
 
     run = report.get("run") or {}
     view.run_id = str(run.get("run_id") or "—")
