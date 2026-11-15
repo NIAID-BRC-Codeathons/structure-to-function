@@ -18,6 +18,8 @@
   BV-BRC is used. Specialty genes, subsystems, coordinates, contigs and the taxonomy tree are
   recorded under `not_available`, never as empty lists, and `genome.annotation_route` is
   `"fasta"`. The organism comes only from `--organism`; FASTA headers are never parsed for one.
+  M2 then lists the score components nothing could measure under `not_available` in
+  `m2_pdb/run.json`, the runner prints them, and the full report shows them in its header (#90).
 
 ## Outputs
 
