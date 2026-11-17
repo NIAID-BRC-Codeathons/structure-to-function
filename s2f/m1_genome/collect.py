@@ -679,6 +679,9 @@ def genome_section(genome: dict[str, Any], bundle: dict[str, Any],
         "cga_job_id": None,
         # --- API-route provenance and metadata (no CGA equivalent) ---
         "annotation_route": "api",
+        # Same keys as the CGA route (#71). Here they describe the reference genome.
+        "contigs": _int_or_none(genome.get("contigs")),
+        "genome_length": _int_or_none(genome.get("genome_length")),
         "annotation_source": bundle.get("annotation", "PATRIC"),
         "resolution": resolution,
         "bvbrc_url": GENOME_URL.format(gid=genome.get("genome_id")),
@@ -895,3 +898,11 @@ def taxonomy_tree_text(lineage: list[dict[str, Any]], genome: dict[str, Any],
             lines.append(f"  - {neighbor.get('genome_name')}  [{flag}]  "
                          f"({neighbor.get('species')})")
     return "\n".join(lines)
+
+
+def _int_or_none(value: Any) -> int | None:
+    """A count from a JSON record, or None; BV-BRC sometimes sends numbers as strings."""
+    try:
+        return int(value) if value not in (None, "") else None
+    except (TypeError, ValueError):
+        return None
