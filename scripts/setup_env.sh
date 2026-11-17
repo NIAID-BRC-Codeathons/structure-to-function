@@ -43,7 +43,13 @@ if [ ! -d "$VENV" ]; then
     "$PY" -m venv "$VENV"
     echo "created $VENV"
 else
-    echo "reusing $VENV"
+    # Report the venv's own interpreter: it is the one that runs everything below, and
+    # it need not be the one discovery picked (#53).
+    have=$("$VENV/bin/python" -V 2>&1)
+    echo "reusing $VENV ($have)"
+    if [ "$have" != "$("$PY" -V 2>&1)" ]; then
+        echo "  note: differs from discovered $("$PY" -V 2>&1); delete .venv to rebuild with it" >&2
+    fi
 fi
 # shellcheck disable=SC1091
 source "$VENV/bin/activate"
@@ -81,6 +87,7 @@ print("imports ok")
 PYCHECK
 
 # --- tests ------------------------------------------------------------------
+echo "testing with $(python -V 2>&1) ($(command -v python))"
 python -m pytest -q
 
 # --- what can actually annotate ---------------------------------------------
