@@ -752,6 +752,11 @@ def run(args: argparse.Namespace) -> int:
         _write_tsv(out_dir / "hits.tsv", HIT_COLUMNS, hit_rows)
         _write_tsv(out_dir / f"top{args.top}.tsv", columns, [r for r in protein_rows if r["selected"]])
         _write_tsv(out_dir / "no_pdb_hit.tsv", columns, [r for r in protein_rows if r["no_pdb_hit"]])
+        # A failed search is not a miss (docs/02a), so it gets its own table rather than
+        # vanishing from both (#69).
+        _write_tsv(
+            out_dir / "pdb_search_failed.tsv", columns, [r for r in protein_rows if r["pdb_search_failed"]]
+        )
 
         status_counts: dict[str, int] = {}
         for score in ranked:
@@ -874,6 +879,7 @@ def run(args: argparse.Namespace) -> int:
                 "selected": sum(1 for r in protein_rows if r["selected"]),
                 "disqualified_human_homolog": sum(1 for s in ranked if s.disqualified),
                 "no_pdb_hit": sum(1 for r in protein_rows if r["no_pdb_hit"]),
+                "pdb_search_failed": sum(1 for r in protein_rows if r["pdb_search_failed"]),
                 "retrieval_status": status_counts,
                 "specialty_rows_without_protein": len(bundle.specialty_without_protein),
                 "table_rows_without_sequence": len(bundle.table_rows_without_sequence),
@@ -936,14 +942,22 @@ def run(args: argparse.Namespace) -> int:
         }
         (out_dir / "run.json").write_text(json.dumps(manifest, indent=2) + "\n", encoding="utf-8")
 
-    print(
+    counts = manifest["counts"]
+    summary = (
         f"{len(ranked)} proteins scored from {len(sequences)} unique sequences; "
-        f"{manifest['counts']['selected']} selected, {manifest['counts']['no_pdb_hit']} without a PDB hit."
+        f"{counts['selected']} selected, {counts['no_pdb_hit']} without a PDB hit"
     )
+    if counts["pdb_search_failed"]:
+        # Failed proteins are neither hits nor misses; say so in the same line (#69).
+        summary += f", {counts['pdb_search_failed']} not known (PDB search failed)"
+    print(summary + ".")
     print(f"Wrote {out_dir}")
     failed = len(manifest["failures"]["search"])
     if failed:
-        print(f"Warning: {failed} sequence searches failed (recorded as query-failed in run.json).")
+        print(
+            f"Warning: {failed} sequence searches failed, covering {counts['pdb_search_failed']} proteins "
+            "(recorded as query-failed in run.json and listed in pdb_search_failed.tsv)."
+        )
     return 0
 
 

@@ -13,12 +13,12 @@ Project page: https://niaid-brc-codeathons.github.io/projects/structure-to-funct
 | Stage      | Module          | State                                                                                                                                                   |
 | ---        | ---             | ---                                                                                                                                                     |
 | M1 genome  | `s2f.m1_genome` | taxon call, CGA submit/poll/parse, quality gate, BV-BRC Data API route, priority ranking, interactive report                                            |
-| M2 triage  | `s2f.m2_triage` | PDB evidence, AlphaFold, knowledge graph, triage scoring                                                                                                |
+| M2 triage  | `s2f.m2_triage` | PDB evidence, AlphaFold, knowledge graph, functional annotation, triage scoring with selectable profiles (`--profile`) |
 | M3 fold    | `s2f.m3_fold`   | Collects existing PDB/AFDB structures and applies preliminary quality checks; Pending: new structure prediction, pocket detection, receptor preparation |
 | M4 ligands | -               | not started                                                                                                                                             |
 | M5 disease | -               | not started                                                                                                                                             |
-| M6 report  | -               | not started                                                                                                                                             |
-| shared     | `s2f.common`    | `report.json` schema, atomic section writer, HTTP cache, id mapping                                                                                     |
+| M6 report  | `s2f.m6_report`, `s2f.full_report` | one self-contained HTML report from `report.json`; the full report covers the whole run directory |
+| shared     | `s2f.common`    | `report.json` schema, atomic section writer, HTTP cache, id mapping, annotation helpers                                                                                     |
 
 `python -m s2f.run` runs the stages that exist, in order, into one
 `runs/<id>/report.json`.
@@ -35,13 +35,25 @@ Project page: https://niaid-brc-codeathons.github.io/projects/structure-to-funct
   (<https://www.bv-brc.org/docs/cli_tutorial/index.html>) and a BV-BRC account.
   Everything else runs offline from fixtures.
 
+### External tools
+
+Not pip-installable, so record anything you add here with its version and what needs it.
+
+| Tool | Version | Install | Needed by |
+| --- | --- | --- | --- |
+| DIAMOND | 2.2.7 | `brew install diamond` (or `conda install -c bioconda diamond`) | M2 human-homology search against the human proteome (#29). 542 × 20,600 proteins in seconds, where BLASTP takes minutes. |
+
+Everything else the pipeline uses is a web API reached through `s2f/common/http.py`, which caches
+responses, so a rerun costs nothing and `--offline` replays a run with no network at all.
+
 ## Install
 
 ```bash
 git clone https://github.com/NIAID-BRC-Codeathons/structure-to-function.git
 cd structure-to-function
 python3 -m venv .venv && source .venv/bin/activate   # python3 must be 3.10 or newer
-pip install -r requirements-common.txt -r requirements-m1.txt -r requirements-m2.txt
+pip install -r requirements-common.txt -r requirements-m1.txt -r requirements-m2.txt \
+            -r requirements-m3.txt -r requirements-m6.txt
 ```
 
 ### Notes
@@ -162,7 +174,7 @@ unassigned on purpose - comment to claim one.
 ## Development
 
 ```bash
-pytest -q                    # 115 tests, no network required
+pytest -q                    # no network or credentials required; CI runs it on 3.10 and 3.12
 ```
 
 Schema changes bump `SCHEMA_VERSION` and update the fixtures in the same commit.
@@ -192,31 +204,3 @@ Train or calibrate an embedding-based function classifier or evidence-ranking mo
 
 - Jiahui Chen
 - Moises Gualapuro
-
-Team assignments are still being finalized. Participants can review their project, and request a reassignment, in the participant spreadsheet circulated by the organizing team.
-
-## Setup
-
-Python 3.10+. Python dependencies:
-
-```bash
-pip install -r requirements-common.txt   # jsonschema, requests — needed by s2f/common
-pip install -r requirements-m2.txt       # adds networkx for the M2 knowledge subgraph
-```
-
-### External tools
-
-Not pip-installable, so record anything you add here with its version and what needs it.
-
-| Tool | Version | Install | Needed by |
-| --- | --- | --- | --- |
-| DIAMOND | 2.2.7 | `brew install diamond` (or `conda install -c bioconda diamond`) | M2 human-homology search against the human proteome (#29). 542 × 20,600 proteins in seconds, where BLASTP takes minutes. |
-
-Everything else the pipeline uses is a web API reached through `s2f/common/http.py`, which caches
-responses, so a rerun costs nothing and `--offline` replays a run with no network at all.
-
-Tests need no network and no credentials: `python -m pytest`.
-
-## Working here
-
-This repository is the team's working space for the codeathon — code, notebooks, data pointers, and notes. Replace this README with the real thing once the charter is written. Team members get access through the [NIAID-BRC-Codeathons](https://github.com/NIAID-BRC-Codeathons) organization; accept the invitation if you have not already.

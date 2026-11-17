@@ -17,14 +17,16 @@ Data flows one way. M2 may read M1; M4 may read M1–M3; nothing writes upstream
 
 ```
 s2f/
-  common/        ids.py  schema.py  io.py  http.py  lit.py  argo.py  provenance.py
-  m1_genome/     m2_triage/  m3_fold/  m4_ligands/  m5_disease/  m6_report/
+  common/        ids.py  schema.py  io.py  http.py  annotation.py
+  m1_genome/     m2_triage/  m3_fold/  m6_report/  full_report/
+  run.py         the pipeline runner: python -m s2f.run
+                 (m4_ligands/ and m5_disease/ are planned, not yet written)
 fixtures/        report.fixture.json + small per-module fixtures
 runs/<run_id>/   report.json, proteins.faa, structures/, docking/, cache/
 tests/
 ```
 
-- Python 3.11. One `requirements.txt` per module plus a root `requirements-common.txt`; no shared conda environment surgery during the codeathon.
+- Python 3.10 or newer (the floor `scripts/setup_env.sh` enforces; CI tests 3.10 and 3.12). One `requirements-<module>.txt` per module plus a root `requirements-common.txt`.
 - Every module is a CLI: `python -m s2f.m2_triage --run runs/<run_id> [--limit N] [--dry-run]`.
 - `--dry-run` must work against `fixtures/` with no network. This is what lets six people build in parallel on day 1.
 
