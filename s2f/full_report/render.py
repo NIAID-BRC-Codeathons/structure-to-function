@@ -230,9 +230,9 @@ def tab_organism(report: dict[str, Any]) -> str:
                        ("Genus", genome.get("genus")),
                        ("Taxon", genome.get("taxon_id")),
                        ("Genetic code", taxonomy.get("genetic_code")),
-                       ("Length", f"{quality.get('genome_length')} bp"
-                        if quality.get("genome_length") else None),
-                       ("Contigs", genome.get("contigs")),
+                       ("Length", f"{_genome_length(genome)} bp"
+                        if _genome_length(genome) else None),
+                       ("Contigs", genome.get("contigs") or quality.get("contigs")),
                        ("Quality", quality.get("genome_quality")),
                        ("Proteins", len(_rows(report.get("proteins"))))]:
         if value not in (None, "", "None bp"):
@@ -734,8 +734,8 @@ def build_page(report: dict[str, Any], m2_run: dict[str, Any] | None = None) -> 
     for key, value in [("Genome", genome.get("genome_id")),
                        ("Taxon", genome.get("taxon_id")),
                        ("Route", (genome.get("annotation_route") or "").upper()),
-                       ("Length", f"{quality.get('genome_length')} bp"
-                        if quality.get("genome_length") else None),
+                       ("Length", f"{_genome_length(genome)} bp"
+                        if _genome_length(genome) else None),
                        ("Quality", quality.get("genome_quality")),
                        ("Proteins", tallies["genes"] or None),
                        ("Selected", tallies["targets"] or None),
@@ -832,3 +832,8 @@ def render_run(run_dir: str | Path) -> str:
         except (json.JSONDecodeError, OSError):
             m2_run = {}
     return build_page(report, m2_run)
+
+
+def _genome_length(genome: dict) -> object:
+    """Top-level since #71; runs written before that only carry it under quality."""
+    return genome.get("genome_length") or _mapping(genome.get("quality")).get("genome_length")

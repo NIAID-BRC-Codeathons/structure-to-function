@@ -268,7 +268,9 @@ def _record_caps(args: argparse.Namespace, stages: list[str]) -> None:
 
 def main(argv: list[str] | None = None) -> int:
     args = build_parser().parse_args(argv)
-    Path(args.run).mkdir(parents=True, exist_ok=True)
+    if not args.dry_run:
+        # A dry run writes nothing, not even the run directory (#70).
+        Path(args.run).mkdir(parents=True, exist_ok=True)
 
     selected = [(name, mod) for name, mod in STAGES
                 if name not in args.skip and (not args.only or name in args.only)]
@@ -297,6 +299,10 @@ def main(argv: list[str] | None = None) -> int:
             print("WARNING: the M2 ranking is missing weighted components:", file=sys.stderr)
             for line in missing:
                 print(f"  {line}", file=sys.stderr)
+    if args.dry_run:
+        # Name no output path a dry run did not write (#70).
+        print(f"dry run: {len(selected)} stage(s) listed, nothing run, nothing written.")
+        return 0
     print(f"done. report: {Path(args.run) / 'report.json'}")
     return 0
 

@@ -228,6 +228,8 @@ SECTION_SCHEMAS: dict[str, dict[str, Any]] = {
             "closest_genomes": {"type": "array"},
             "tree_newick": {"type": ["string", "null"]},
             "cga_job_id": {"type": ["string", "null"]},
+            "contigs": {"type": ["integer", "null"], "description": "number of contigs (#71)"},
+            "genome_length": {"type": ["integer", "null"], "description": "total length in bp (#71)"},
         },
         "additionalProperties": True,
     },

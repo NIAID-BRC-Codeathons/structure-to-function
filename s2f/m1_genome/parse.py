@@ -329,6 +329,10 @@ def genome_section(run: CgaRun, taxon_call: dict[str, Any] | None = None) -> dic
         # fallback stays for runs written before this, but it is no longer the only way
         # to identify a CGA run.
         "annotation_route": "cga",
+        # Top-level so a report can quote the genome's size without digging into the
+        # quality block (#71). Same keys and types on the API route.
+        "contigs": _int_or_none(run.genome.get("contigs")),
+        "genome_length": _int_or_none(run.genome.get("genome_length")),
         "quality": {
             "genome_quality": run.quality,
             "genome_quality_flags": run.quality_flags,
@@ -412,3 +416,11 @@ def write_m1_dir(run: CgaRun, m1_dir: str | Path) -> dict[str, int]:
             spec_rows += 1
 
     return {"proteins_faa": written, "feature_rows": rows, "specialty_rows": spec_rows}
+
+
+def _int_or_none(value: Any) -> int | None:
+    """A count from a JSON record, or None; BV-BRC sometimes sends numbers as strings."""
+    try:
+        return int(value) if value not in (None, "") else None
+    except (TypeError, ValueError):
+        return None

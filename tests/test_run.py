@@ -70,3 +70,16 @@ def test_a_failed_provider_reports_its_error_and_a_full_run_is_quiet(tmp_path) -
 
 def test_no_m2_manifest_means_no_warning(tmp_path) -> None:
     assert missing_evidence(str(tmp_path)) == []
+
+
+def test_a_dry_run_writes_nothing_and_claims_no_report(tmp_path, capsys) -> None:
+    # #70: a dry run used to print "done. report: <run>/report.json" for a file it never wrote.
+    from s2f.run import main
+
+    run_dir = tmp_path / "x"
+    assert main(["--run", str(run_dir), "--from-cga-dir", "fixtures/m1/cga_sample", "--dry-run"]) == 0
+    assert not run_dir.exists()
+    out = capsys.readouterr().out
+    assert "=== m1:" in out
+    assert "report.json" not in out
+    assert "nothing written" in out
