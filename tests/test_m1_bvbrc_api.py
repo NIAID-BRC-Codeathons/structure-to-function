@@ -443,3 +443,25 @@ def test_both_m1_routes_declare_their_own_annotation_route(api_bundle, kp_payloa
         "both routes report the same annotation_route, which defeats the point of the "
         "field: a consumer cannot tell a submitted assembly from a reference genome."
     )
+
+
+def test_both_routes_state_the_genome_size_at_the_top_level(api_bundle, kp_payload) -> None:
+    """#71: `genome.contigs` and `genome.genome_length`, same keys and types on both routes."""
+    from s2f.common.schema import validate
+
+    api = collect.genome_section(kp_payload["genome"], api_bundle, "explicit genome_id")
+    cga = parse.genome_section(
+        parse.load_cga(Path(__file__).resolve().parents[1] / "fixtures/m1/cga_sample"))
+
+    assert (api["contigs"], api["genome_length"]) == (7, 5682322)
+    assert (cga["contigs"], cga["genome_length"]) == (1, 580076)
+    for section in (api, cga):
+        validate("genome", section)
+
+
+def test_the_full_report_shows_contigs_and_length() -> None:
+    from s2f.full_report.render import _genome_length
+
+    assert _genome_length({"genome_length": 580076}) == 580076
+    # Runs written before #71 only carry it under quality.
+    assert _genome_length({"quality": {"genome_length": 580076}}) == 580076
