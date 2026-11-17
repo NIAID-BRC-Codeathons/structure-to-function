@@ -408,6 +408,7 @@ Written to `runs/<run_id>/m2_pdb/`:
 | `proteins.tsv` | every protein, all score components, best hit, rank, selected, reason, retrieval status |
 | `top50.tsv` | the selected set |
 | `no_pdb_hit.tsv` | proteins with no qualifying hit — the input to the Foldseek step (issue #9) |
+| `pdb_search_failed.tsv` | proteins whose PDB search failed — neither a hit nor a miss; `counts.pdb_search_failed` in `run.json` and the stdout summary report them (issue #69) |
 | `run.json` | timestamps, parameters, weights, endpoints, counts, cache path, and every failed query with its error |
 
 ## Scoring profiles

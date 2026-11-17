@@ -88,3 +88,31 @@ def test_limit_restricts_work_without_breaking_the_manifest(tmp_path: Path) -> N
     assert manifest["counts"]["proteins_loaded"] == 4
     assert manifest["counts"]["proteins_scored"] == 1
     assert manifest["parameters"]["limit"] == 1
+
+
+def test_every_failed_search_is_counted_not_hidden(tmp_path: Path, capsys) -> None:
+    # An empty cache in offline mode: every sequence search fails (#69).
+    run_dir = tmp_path / "run"
+    assert main(["--dry-run", "--run", str(run_dir), "--cache", str(tmp_path / "cold.sqlite")]) == 0
+
+    out = run_dir / "m2_pdb"
+    manifest = json.loads((out / "run.json").read_text())
+    counts = manifest["counts"]
+    assert len(manifest["failures"]["search"]) == counts["unique_sequences"] == 3
+    # A failed search is never a miss, but it is counted.
+    assert counts["no_pdb_hit"] == 0
+    assert counts["pdb_search_failed"] == counts["proteins_scored"] == 4
+    assert len(_read_tsv(out / "pdb_search_failed.tsv")) == 4
+    assert _read_tsv(out / "no_pdb_hit.tsv") == []
+
+    summary = next(line for line in capsys.readouterr().out.splitlines() if "proteins scored" in line)
+    assert "0 without a PDB hit, 4 not known (PDB search failed)" in summary
+
+
+def test_a_clean_run_reports_no_failed_searches(tmp_path: Path, capsys) -> None:
+    run_dir = tmp_path / "run"
+    main(["--dry-run", "--run", str(run_dir)])
+    counts = json.loads((run_dir / "m2_pdb" / "run.json").read_text())["counts"]
+    assert counts["pdb_search_failed"] == 0
+    assert _read_tsv(run_dir / "m2_pdb" / "pdb_search_failed.tsv") == []
+    assert "search failed" not in capsys.readouterr().out
