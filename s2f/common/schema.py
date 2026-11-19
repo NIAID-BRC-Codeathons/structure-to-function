@@ -245,7 +245,61 @@ SECTION_SCHEMAS: dict[str, dict[str, Any]] = {
                 "path": {"type": ["string", "null"]},
                 "confidence": {"type": ["number", "string", "null"]},
                 "holo_template": {"type": ["object", "null"]},
-                "pockets": {"type": "array"},
+                # One binding site for M4 (#14). `residues` is the contract: M4 needs a
+                # residue list or a box, never a score alone. `cofactor_required` carries
+                # pitfalls.md #2 forward -- a site whose cofactor a model lacks is incomplete.
+                "pockets": {
+                    "type": "array",
+                    "items": {
+                        "type": "object",
+                        "properties": {
+                            "id": {"type": "string", "minLength": 1},
+                            "method": {"type": "string", "minLength": 1},
+                            "component": {"type": ["string", "null"]},
+                            "component_kind": {
+                                "type": ["string", "null"],
+                                "enum": ["ligand", "metal", None],
+                            },
+                            # M3 writes one object per residue, because a bare number is
+                            # ambiguous once an entry has more than one chain. Plain
+                            # integers remain valid for records written before #14.
+                            "residues": {
+                                "type": "array",
+                                "items": {
+                                    "anyOf": [
+                                        {
+                                            "type": "object",
+                                            "properties": {
+                                                "chain": {"type": "string"},
+                                                "seq_id": {"type": ["integer", "null"]},
+                                                "auth_seq_id": {"type": ["string", "null"]},
+                                                "comp_id": {"type": "string"},
+                                            },
+                                            "required": ["chain"],
+                                            "additionalProperties": True,
+                                        },
+                                        {"type": "integer"},
+                                    ]
+                                },
+                            },
+                            "score": {"type": ["number", "null"]},
+                            "center": {
+                                "type": ["array", "null"],
+                                "items": {"type": "number"},
+                                "minItems": 3,
+                                "maxItems": 3,
+                            },
+                            "aligned_to_known_site": {"type": "boolean"},
+                            "cofactor_required": {"type": "boolean"},
+                            "usable": {"type": "boolean"},
+                            "reason": {"type": ["string", "null"]},
+                            "confidence": {"type": ["number", "null"]},
+                        },
+                        "required": ["id", "method", "residues", "aligned_to_known_site"],
+                        "additionalProperties": True,
+                    },
+                },
+                "pocket_search": {"type": ["object", "null"]},
                 "usable_for_docking": {"type": ["boolean", "null"]},
                 "reason": {"type": ["string", "null"]},
             },

@@ -14,12 +14,14 @@ def _protein(
     selected: bool = True,
     experimental: dict | None = None,
     predicted: dict | None = None,
+    holo_template: dict | None = None,
 ) -> dict:
     return {
         "feature_id": feature_id,
         "flags": {
             "experimental_homolog": experimental,
             "predicted_model": predicted,
+            "holo_template": holo_template,
         },
         "triage": {"selected": selected},
     }
@@ -186,3 +188,54 @@ def test_limit_applies_to_selected_proteins_only(tmp_path: Path) -> None:
 
     assert summary.selected == 1
     assert [record["feature_id"] for record in summary.structures] == ["first-selected"]
+
+
+# --- #14: which entry the site is read from ----------------------------------------------
+
+HOLO_TEMPLATE = {
+    "pdb_entity": "2xyz_1",
+    "identity": 0.78,
+    "coverage": 0.93,
+    "resolution": 1.9,
+    "method": "X-ray",
+    "ligands": ["ATP"],
+    "metals": ["MG"],
+    "is_best_hit": False,
+    "identity_drop": 0.13,
+}
+
+
+def test_a_holo_homolog_is_preferred_over_the_best_identity_apo_one() -> None:
+    """pitfalls.md #2: a site to transfer is worth more than the last points of identity."""
+    apo = {**EXPERIMENTAL, "pdb_entity": "1apo_1", "holo": False, "ligands": []}
+
+    candidate = choose_existing(
+        _protein("fig|1.1.peg.1", experimental=apo, holo_template=HOLO_TEMPLATE))
+
+    assert candidate.accession == "2xyz_1"
+    assert candidate.url.endswith("2XYZ.cif")
+    # The swap is recorded, never silent: it costs sequence match.
+    preference = candidate.template_preference
+    assert preference["best_identity_entity"] == "1apo_1"
+    assert preference["chosen_entity"] == "2xyz_1"
+    assert preference["identity_drop"] == 0.13
+    assert preference["binds"] == ["ATP", "MG"]
+
+
+def test_the_best_hit_is_kept_when_it_is_already_holo() -> None:
+    template = {**HOLO_TEMPLATE, "pdb_entity": "1abc_2", "is_best_hit": True,
+                "identity_drop": 0.0}
+
+    candidate = choose_existing(
+        _protein("fig|1.1.peg.1", experimental=EXPERIMENTAL, holo_template=template))
+
+    assert candidate.accession == "1abc_2"
+    assert candidate.template_preference is None
+
+
+def test_nothing_is_swapped_when_no_homolog_binds_anything() -> None:
+    candidate = choose_existing(_protein("fig|1.1.peg.1", experimental=EXPERIMENTAL))
+
+    assert candidate.accession == "1abc_2"
+    assert candidate.template_preference is None
+    assert candidate.holo_template is None

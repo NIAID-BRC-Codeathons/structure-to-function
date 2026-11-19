@@ -211,6 +211,7 @@ def protein_enrichment(
 ) -> dict[str, Any]:
     """The `xrefs` / `annotations` / `flags` / `triage` fields for one protein."""
     top = score.best_hit
+    holo = score.holo_hit
     retrieved = _now()
 
     annotations: list[dict[str, Any]] = []
@@ -289,9 +290,34 @@ def protein_enrichment(
                     "method": top.experimental_method or None,
                     "holo": bool(top.ligands),
                     "ligands": list(top.ligands),
+                    # Metals are not a ligand bonus, but a metal in the homolog's site is
+                    # what M3 must flag as a cofactor the model lacks (pitfalls.md #2).
+                    # They were computed all along and stopped here, never reaching M3.
+                    "metals": list(top.metals),
                     "organism": top.organism or None,
                 }
                 if top is not None
+                else None
+            ),
+            # The best qualifying homolog that binds something, which is not always the
+            # best-identity one. M3 transfers a site from this entry's own coordinates
+            # (#14); `identity_drop` is what preferring it costs in sequence match.
+            "holo_template": (
+                {
+                    "pdb_entity": holo.entity_id,
+                    "identity": round(holo.identity, 4),
+                    "coverage": round(holo.query_coverage, 4),
+                    "resolution": holo.resolution,
+                    "method": holo.experimental_method or None,
+                    "ligands": list(holo.ligands),
+                    "metals": list(holo.metals),
+                    "organism": holo.organism or None,
+                    "is_best_hit": top is not None and holo.entity_id == top.entity_id,
+                    "identity_drop": (
+                        round(top.identity - holo.identity, 4) if top is not None else None
+                    ),
+                }
+                if holo is not None
                 else None
             ),
             "predicted_model": (

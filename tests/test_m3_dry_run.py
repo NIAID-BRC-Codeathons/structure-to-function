@@ -17,7 +17,7 @@ def test_dry_run_collects_fixture_structures_without_network(tmp_path: Path) -> 
 
     report = read_report(run_dir)
     structures = report["structures"]
-    assert len(structures) == 3
+    assert len(structures) == 4
     assert {record["source"] for record in structures} == {"pdb"}
     assert all(record["collection_status"] == "collected" for record in structures)
     assert all(record["usable_for_docking"] is True for record in structures)
@@ -31,9 +31,9 @@ def test_dry_run_collects_fixture_structures_without_network(tmp_path: Path) -> 
     manifest = json.loads((run_dir / "m3_fold" / "run.json").read_text())
     assert manifest["module"] == "m3_fold"
     assert manifest["command"][-2:] == ["--run", str(run_dir)]
-    assert manifest["counts"]["selected"] == 3
-    assert manifest["counts"]["collected"] == 3
-    assert manifest["counts"]["usable_for_docking"] == 3
+    assert manifest["counts"]["selected"] == 4
+    assert manifest["counts"]["collected"] == 4
+    assert manifest["counts"]["usable_for_docking"] == 4
     assert manifest["counts"]["not_usable_for_docking"] == 0
     assert manifest["counts"]["quality_pending"] == 0
     assert manifest["parameters"]["confidence_gate_applied"] is True
@@ -48,3 +48,30 @@ def test_dry_run_collects_fixture_structures_without_network(tmp_path: Path) -> 
     assert "proteins" in report
     assert "kg" in report
     assert "ligands" in report
+
+
+def test_the_dry_run_defines_a_site_from_the_holo_fixture(tmp_path: Path) -> None:
+    """#14, offline: 6MU0 binds ribose-5-phosphate, and its site reaches report.json."""
+    run_dir = tmp_path / "run"
+    assert main(["--dry-run", "--run", str(run_dir)]) == 0
+
+    structures = read_report(run_dir)["structures"]
+    holo = [record for record in structures if record["accession"] == "6MU0_1"]
+    assert len(holo) == 1
+    pockets = holo[0]["pockets"]
+    assert len(pockets) == 1
+    assert pockets[0]["component"] == "5RP"
+    assert pockets[0]["aligned_to_known_site"] is True
+    assert len(pockets[0]["residues"]) >= 5
+    validate("structures", structures)
+
+    # The three apo proteins get no pocket, and each says why rather than looking unexamined.
+    apo = [record for record in structures if not record["pockets"]]
+    assert len(apo) == 3
+    assert all(record["pocket_search"]["status"] == "no_pocket" for record in apo)
+    assert all("P2Rank" in record["pocket_search"]["reason"] for record in apo)
+
+    counts = json.loads((run_dir / "m3_fold" / "run.json").read_text())["counts"]
+    assert counts["with_pocket"] == 1
+    assert counts["usable_pockets"] == 1
+    assert counts["cofactor_required_pockets"] == 0

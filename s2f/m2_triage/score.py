@@ -110,6 +110,21 @@ def best_hit(hits: list[SequenceHit]) -> SequenceHit | None:
     return max(qualifying, key=lambda hit: (hit_score(hit), hit.bitscore))
 
 
+def best_holo_hit(hits: list[SequenceHit]) -> SequenceHit | None:
+    """Best qualifying hit whose entry binds something, or None.
+
+    M3 transfers a binding site from this entry's own coordinates (issue #14), so what
+    matters is that *some* qualifying homolog is holo, not that the best-identity one is.
+    A drug-like ligand outranks a metal: both mark a real site, but only the ligand shows
+    the site accommodates a drug-sized molecule. Metal-only entries are still returned,
+    because a cofactor site is what pitfalls.md #2 asks M3 to flag rather than discard.
+    """
+    qualifying = [hit for hit in hits if hit_qualifies(hit) and (hit.ligands or hit.metals)]
+    if not qualifying:
+        return None
+    return max(qualifying, key=lambda hit: (bool(hit.ligands), hit_score(hit), hit.bitscore))
+
+
 @dataclass
 class TriageComponents:
     """The scored components, written to proteins.tsv so scoring is reproducible."""
@@ -138,6 +153,8 @@ class ProteinScore:
     score: float
     retrieval_status: str
     best_hit: SequenceHit | None = None
+    #: Best qualifying hit that binds a ligand or metal, for M3's site transfer (#14).
+    holo_hit: SequenceHit | None = None
     distinct_entries: int = 0
     qualifying_hits: int = 0
     flags: dict[str, object] = field(default_factory=dict)
@@ -187,6 +204,7 @@ def score_protein(
     """
     qualifying = [hit for hit in hits if hit_qualifies(hit)]
     top = best_hit(hits)
+    holo = best_holo_hit(hits)
     pdb_evidence = (hit_score(top) / MAX_HIT_SCORE) if top is not None else 0.0
 
     if human_identity is None:
@@ -302,6 +320,7 @@ def score_protein(
         score=triage_score_from_components(components, weights),
         retrieval_status=retrieval_status,
         best_hit=top,
+        holo_hit=holo,
         distinct_entries=len({hit.entry_id for hit in qualifying}),
         qualifying_hits=len(qualifying),
         flags=flags,

@@ -561,18 +561,33 @@ def tab_structures(report: dict[str, Any]) -> str:
             if key not in keys:
                 keys.append(key)
     usable = sum(1 for row in structures if row.get("usable") is True)
+    with_pocket = sum(1 for row in structures if row.get("pockets"))
+    cofactor = sum(1 for row in structures for pocket in _rows(row.get("pockets"))
+                   if pocket.get("cofactor_required"))
     out = ["<div class='card'><h2>Structures</h2>",
            f"<p class='lead'><b>{len(structures)}</b> collected"
            + (f", <b>{usable}</b> passing the quality gate" if usable else "")
+           + f", <b>{with_pocket}</b> with a defined pocket"
            + ". Existing PDB and AlphaFold models are reused; nothing here is a new "
-             "prediction unless a row says so.</p>",
+             "prediction unless a row says so."
+           + (f" {cofactor} pocket(s) need a cofactor the structure may not carry, so the "
+              "site is incomplete without it." if cofactor else "")
+           + " A protein with no pocket has not been shown to lack one: the reason column "
+             "says which case it fell into.</p>",
            "<div class='tablewrap'><table><thead><tr>"
            + "".join(f"<th>{esc(k.replace('_', ' '))}</th>" for k in keys)
            + "</tr></thead><tbody>"]
     for row in structures:
-        out.append("<tr>" + "".join(
-            f"<td>{esc(_fmt(row.get(k)) if not isinstance(row.get(k), (dict, list)) else json.dumps(row.get(k))[:120])}</td>"
-            for k in keys) + "</tr>")
+        cells = []
+        for key in keys:
+            value = row.get(key)
+            if key == "pockets":
+                cells.append(f"<td>{_pocket_cell(row)}</td>")
+            elif isinstance(value, (dict, list)):
+                cells.append(f"<td>{esc(json.dumps(value)[:120])}</td>")
+            else:
+                cells.append(f"<td>{esc(_fmt(value))}</td>")
+        out.append("<tr>" + "".join(cells) + "</tr>")
     out.append("</tbody></table></div></div>")
     return "".join(out)
 
@@ -837,3 +852,30 @@ def render_run(run_dir: str | Path) -> str:
 def _genome_length(genome: dict) -> object:
     """Top-level since #71; runs written before that only carry it under quality."""
     return genome.get("genome_length") or _mapping(genome.get("quality")).get("genome_length")
+
+
+def _pocket_cell(structure: dict[str, Any]) -> str:
+    """Pockets as something a reader can act on, not a truncated JSON dump (#14)."""
+    pockets = _rows(structure.get("pockets"))
+    if not pockets:
+        reason = _mapping(structure.get("pocket_search")).get("reason")
+        return f"<span class='muted'>none &mdash; {esc(str(reason))}</span>" if reason else ""
+    parts = []
+    for pocket in pockets:
+        residues = _rows(pocket.get("residues"))
+        label = esc(str(pocket.get("component") or pocket.get("id") or "site"))
+        bits = [f"<b>{label}</b>", f"{len(residues)} residues"]
+        if pocket.get("cofactor_required"):
+            bits.append("needs cofactor")
+        if pocket.get("usable") is False:
+            bits.append("rejected")
+        lining = ", ".join(
+            f"{residue.get('comp_id', '')}{residue.get('auth_seq_id', '')}"
+            for residue in residues[:6]
+        )
+        line = " &middot; ".join(bits)
+        if lining:
+            line += f"<br><span class='muted'>{esc(lining)}"
+            line += "&hellip;</span>" if len(residues) > 6 else "</span>"
+        parts.append(line)
+    return "<div>" + "</div><div>".join(parts) + "</div>"
