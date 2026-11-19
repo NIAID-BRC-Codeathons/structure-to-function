@@ -8,10 +8,10 @@ second hidden policy.
 
 from __future__ import annotations
 
-import shlex
 from dataclasses import asdict, dataclass
 from typing import Any
 
+from .mmcif import read_atoms
 
 POLICY_VERSION = "provisional-2026-09-17"
 
@@ -242,71 +242,15 @@ def _maximum_check(metric: str, value: float | None, threshold: float) -> dict[s
 def _mmcif_residue_plddt(payload: bytes) -> list[tuple[str, int, float]]:
     """Read one pLDDT value per residue from an AlphaFold mmCIF atom-site loop.
 
-    AlphaFold stores pLDDT in ``_atom_site.B_iso_or_equiv``.  CA atoms are used so each residue
-    appears once.  The small parser is intentionally limited to this standard atom-site loop;
-    malformed or non-AlphaFold files return no values and fail the auditable local-confidence
-    check instead of silently passing.
+    AlphaFold stores pLDDT in ``_atom_site.B_iso_or_equiv``. CA atoms are used so each
+    residue appears once. A file the shared reader cannot parse yields no values and fails
+    the auditable local-confidence check instead of silently passing.
     """
-    lines = payload.decode("utf-8", errors="replace").splitlines()
-    index = 0
-    while index < len(lines):
-        if lines[index].strip() != "loop_":
-            index += 1
-            continue
-
-        index += 1
-        headers: list[str] = []
-        while index < len(lines) and lines[index].lstrip().startswith("_"):
-            headers.append(lines[index].split()[0])
-            index += 1
-        if "_atom_site.B_iso_or_equiv" not in headers:
-            continue
-
-        data_tokens: list[str] = []
-        while index < len(lines):
-            line = lines[index].strip()
-            if line == "#" or line == "loop_" or line.startswith("_"):
-                break
-            if line:
-                try:
-                    data_tokens.extend(shlex.split(line, comments=False, posix=True))
-                except ValueError:
-                    return []
-            index += 1
-        return _atom_site_plddt_rows(headers, data_tokens)
-    return []
-
-
-def _atom_site_plddt_rows(
-    headers: list[str], tokens: list[str]
-) -> list[tuple[str, int, float]]:
-    width = len(headers)
-    if not width or len(tokens) % width:
-        return []
-
-    positions = {name: index for index, name in enumerate(headers)}
-    atom_column = positions.get("_atom_site.label_atom_id")
-    sequence_column = positions.get("_atom_site.label_seq_id")
-    chain_column = positions.get("_atom_site.label_asym_id")
-    confidence_column = positions.get("_atom_site.B_iso_or_equiv")
-    model_column = positions.get("_atom_site.pdbx_PDB_model_num")
-    if None in {atom_column, sequence_column, chain_column, confidence_column}:
-        return []
-
-    residues: list[tuple[str, int, float]] = []
-    for start in range(0, len(tokens), width):
-        row = tokens[start : start + width]
-        if model_column is not None and row[model_column] not in {"1", ".", "?"}:
-            continue
-        if row[atom_column].upper() != "CA":
-            continue
-        try:
-            sequence_id = int(row[sequence_column])
-            confidence = float(row[confidence_column])
-        except (TypeError, ValueError):
-            continue
-        residues.append((row[chain_column], sequence_id, confidence))
-    return residues
+    return [
+        (atom.chain, atom.seq_id, atom.b_factor)
+        for atom in read_atoms(payload)
+        if atom.atom_id.upper() == "CA" and atom.seq_id is not None and atom.b_factor is not None
+    ]
 
 
 def _low_confidence_regions(

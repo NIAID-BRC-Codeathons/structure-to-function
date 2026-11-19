@@ -162,6 +162,34 @@ def _write_manifest(
             "quality_pending": sum(
                 record.get("usable_for_docking") is None for record in summary.structures
             ),
+            # #14: how many selected proteins M3 could define a site for, and how many it
+            # could not. A protein with no pocket is uncovered, not pocket-free.
+            "with_pocket": sum(1 for record in summary.structures if record.get("pockets")),
+            "pockets": sum(len(record.get("pockets") or []) for record in summary.structures),
+            "usable_pockets": sum(
+                1
+                for record in summary.structures
+                for pocket in record.get("pockets") or []
+                if pocket.get("usable")
+            ),
+            "cofactor_required_pockets": sum(
+                1
+                for record in summary.structures
+                for pocket in record.get("pockets") or []
+                if pocket.get("cofactor_required")
+            ),
+            "no_pocket": dict(
+                sorted(
+                    Counter(
+                        (record.get("pocket_search") or {}).get("reason", "")
+                        for record in summary.structures
+                        if not record.get("pockets")
+                    ).items()
+                )
+            ),
+            "holo_template_preferred": sum(
+                1 for record in summary.structures if record.get("template_preference")
+            ),
         },
         "failures": [
             {"feature_id": record["feature_id"], "reason": record.get("reason")}

@@ -404,3 +404,62 @@ def test_ligandability_is_tractability_not_potency() -> None:
     assert "ligand bound in" in scored.flags["ligandable_basis"]
     ranked = rank_and_select([scored], top_n=1)
     assert "ligandable homolog" in ranked[0].reason
+
+
+# --- #14: the holo template M3 transfers a binding site from -----------------------------
+
+
+def test_the_best_holo_hit_is_not_always_the_best_hit() -> None:
+    from s2f.m2_triage.score import best_holo_hit
+
+    apo = make_hit(entity_id="1APO_1", identity=1.0, bitscore=400.0)
+    holo = make_hit(entity_id="2HOL_1", identity=0.80, bitscore=300.0, ligands=["ATP"])
+
+    assert best_holo_hit([apo, holo]) is holo
+    assert best_holo_hit([apo]) is None
+
+
+def test_a_drug_like_ligand_outranks_a_metal_as_a_template() -> None:
+    from s2f.m2_triage.score import best_holo_hit
+
+    metal = make_hit(entity_id="1MET_1", identity=1.0, bitscore=400.0, metals=["ZN"])
+    ligand = make_hit(entity_id="2LIG_1", identity=0.85, bitscore=320.0, ligands=["ATP"])
+
+    assert best_holo_hit([metal, ligand]) is ligand
+    # A metal-only entry is still a template: the site is real, and M3 flags the cofactor.
+    assert best_holo_hit([metal]) is metal
+
+
+def test_a_hit_that_does_not_qualify_is_never_a_template() -> None:
+    from s2f.m2_triage.score import best_holo_hit, hit_qualifies
+
+    poor = make_hit(entity_id="3BAD_1", identity=0.05, evalue=1.0, bitscore=20.0,
+                    ligands=["ATP"])
+    assert hit_qualifies(poor) is False
+    assert best_holo_hit([poor]) is None
+
+
+def test_the_report_carries_the_template_and_its_metals_to_m3() -> None:
+    """Metals were computed all along and never reached M3 (pitfalls.md #2)."""
+    from s2f.m2_triage.report_adapter import protein_enrichment
+
+    apo = make_hit(entity_id="1APO_1", identity=1.0, bitscore=400.0, metals=["MG"])
+    holo = make_hit(entity_id="2HOL_1", identity=0.90, bitscore=300.0,
+                    ligands=["ATP"], metals=["MG"])
+    score = score_protein(make_protein(), [apo, holo], "found")
+
+    flags = protein_enrichment(score)["flags"]
+    assert flags["experimental_homolog"]["pdb_entity"] == "1APO_1"
+    assert flags["experimental_homolog"]["metals"] == ["MG"]
+    template = flags["holo_template"]
+    assert template["pdb_entity"] == "2HOL_1"
+    assert template["ligands"] == ["ATP"]
+    assert template["is_best_hit"] is False
+    assert template["identity_drop"] == pytest.approx(0.10)
+
+
+def test_no_holo_template_when_nothing_binds() -> None:
+    from s2f.m2_triage.report_adapter import protein_enrichment
+
+    score = score_protein(make_protein(), [make_hit()], "found")
+    assert protein_enrichment(score)["flags"]["holo_template"] is None

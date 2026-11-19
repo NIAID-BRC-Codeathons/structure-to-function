@@ -391,6 +391,77 @@
         "selected": false,
         "reason": "no qualifying PDB hit; uncharacterized product"
       }
+    },
+    {
+      "feature_id": "fig|243273.25.peg.463",
+      "locus_tag": "MG_438",
+      "product": "Ribose-5-phosphate isomerase B (EC 5.3.1.6)",
+      "aa_length": null,
+      "xrefs": {
+        "uniprot": "Q49434",
+        "uniparc": null,
+        "route": "proteome_checksum",
+        "afdb": "AF-Q49434-F1",
+        "pdb": [
+          "6MU0"
+        ],
+        "chembl_target": [],
+        "refseq": [],
+        "gene_name": null,
+        "related_uniprot": []
+      },
+      "flags": {
+        "virulence": false,
+        "amr": false,
+        "essential_ortholog": false,
+        "human_homolog": false,
+        "human_homolog_identity": null,
+        "secreted": null,
+        "membrane": null,
+        "experimental_homolog": {
+          "pdb_entity": "6MU0_1",
+          "identity": 1.0,
+          "coverage": 1.0,
+          "resolution": 1.1,
+          "method": "X-ray",
+          "holo": true,
+          "ligands": [
+            "5RP"
+          ],
+          "metals": [],
+          "organism": "Mycoplasmoides genitalium G37"
+        },
+        "holo_template": {
+          "pdb_entity": "6MU0_1",
+          "identity": 1.0,
+          "coverage": 1.0,
+          "resolution": 1.1,
+          "method": "X-ray",
+          "holo": true,
+          "ligands": [
+            "5RP"
+          ],
+          "metals": [],
+          "organism": "Mycoplasmoides genitalium G37",
+          "is_best_hit": true,
+          "identity_drop": 0.0
+        }
+      },
+      "triage": {
+        "score": 0.65,
+        "components": {
+          "pdb_evidence": 0.875,
+          "virulence_amr": 0.0,
+          "essential": 0.0,
+          "drug_target": 0.0,
+          "annotation_gap": 1.0,
+          "human_homolog_penalty": 0.0
+        },
+        "weights_version": "2026-09-16",
+        "rank": 1,
+        "selected": true,
+        "reason": "PDB 1YDX_1 identity 100%, coverage 100%, 2.30 A; uncharacterized product"
+      }
     }
   ],
   "kg": {

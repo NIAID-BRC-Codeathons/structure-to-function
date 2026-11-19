@@ -41,7 +41,7 @@ def test_fixture_validates() -> None:
 
 def test_fixture_has_the_shape_the_issue_asks_for() -> None:
     report = load_fixture()
-    assert len(report["proteins"]) == 5
+    assert len(report["proteins"]) == 6
     assert len(report["structures"]) == 1
     assert len(report["ligands"]) == 3
     assert len(report["docking"]) == 2

@@ -14,6 +14,7 @@ from typing import Any, Callable
 from urllib.parse import urlparse
 
 from ..common.http import DownloadedFile
+from .pockets import find_pockets
 from .quality import QualityThresholds, assess_structure
 
 PDB_DOWNLOAD_URL = "https://files.rcsb.org/download/{entry_id}.cif"
@@ -35,6 +36,12 @@ class StructureCandidate:
     confidence_metric: str
     experimental_homolog: dict[str, Any] | None = None
     predicted_model: dict[str, Any] | None = None
+    #: M2's best ligand- or metal-bearing qualifying homolog, which M3 reads a binding site
+    #: from when it is the entry collected here (#14).
+    holo_template: dict[str, Any] | None = None
+    #: Set when the holo template was preferred over the best-identity hit, with what the
+    #: swap cost in sequence identity.
+    template_preference: dict[str, Any] | None = None
 
     @property
     def suffix(self) -> str:
@@ -70,17 +77,36 @@ def choose_existing(protein: dict[str, Any]) -> StructureCandidate | None:
 
     flags = protein.get("flags") or {}
     experimental = flags.get("experimental_homolog")
+    holo = flags.get("holo_template")
+    holo = dict(holo) if isinstance(holo, dict) and holo.get("pdb_entity") else None
+
     if isinstance(experimental, dict) and experimental.get("pdb_entity"):
-        entity = str(experimental["pdb_entity"])
-        entry_id = _pdb_entry_id(entity)
+        chosen, preference = dict(experimental), None
+        # A pocket can only be read from an entry that binds something, so a holo homolog is
+        # worth more here than the last few points of sequence identity (pitfalls.md #2).
+        # The swap is recorded, never silent: it trades sequence match for site evidence.
+        if holo is not None and not holo.get("is_best_hit"):
+            chosen = holo
+            preference = {
+                "policy": "prefer_holo_over_best_identity",
+                "best_identity_entity": experimental.get("pdb_entity"),
+                "best_identity": experimental.get("identity"),
+                "chosen_entity": holo.get("pdb_entity"),
+                "chosen_identity": holo.get("identity"),
+                "identity_drop": holo.get("identity_drop"),
+                "binds": [*(holo.get("ligands") or []), *(holo.get("metals") or [])],
+            }
+        entity = str(chosen["pdb_entity"])
         return StructureCandidate(
             feature_id=feature_id,
             source="pdb",
             accession=entity,
-            url=PDB_DOWNLOAD_URL.format(entry_id=entry_id),
-            confidence=_number_or_none(experimental.get("resolution")),
+            url=PDB_DOWNLOAD_URL.format(entry_id=_pdb_entry_id(entity)),
+            confidence=_number_or_none(chosen.get("resolution")),
             confidence_metric="resolution_angstrom",
-            experimental_homolog=dict(experimental),
+            experimental_homolog=chosen,
+            holo_template=holo,
+            template_preference=preference,
         )
 
     predicted = flags.get("predicted_model")
@@ -93,6 +119,7 @@ def choose_existing(protein: dict[str, Any]) -> StructureCandidate | None:
             confidence=_number_or_none(predicted.get("mean_plddt")),
             confidence_metric="mean_plddt",
             predicted_model=dict(predicted),
+            holo_template=holo,
         )
 
     # The richer flags above are preferred, but tolerate a report containing only xrefs.
@@ -176,6 +203,15 @@ def collect_existing(
             )
             quality = assess_structure(candidate.source, evidence, payload, quality_thresholds)
             record["params"]["confidence_gate_applied"] = True
+            pockets, pocket_summary = find_pockets(
+                payload,
+                source=candidate.source,
+                holo_template=candidate.holo_template,
+                structure_accession=candidate.accession,
+                min_plddt=quality_thresholds.min_local_plddt,
+            )
+            record["pockets"] = pockets
+            record["pocket_search"] = pocket_summary
             record.update(
                 path=str(destination.relative_to(run_dir)),
                 sha256=hashlib.sha256(payload).hexdigest(),
@@ -218,9 +254,11 @@ def _candidate_record(candidate: StructureCandidate) -> dict[str, Any]:
             "format": candidate.suffix.lstrip("."),
             "confidence_gate_applied": False,
         },
-        "holo_template": None,
+        "holo_template": candidate.holo_template,
         "pockets": [],
     }
+    if candidate.template_preference is not None:
+        record["template_preference"] = candidate.template_preference
     if candidate.experimental_homolog is not None:
         record["experimental_homolog"] = candidate.experimental_homolog
     if candidate.predicted_model is not None:
