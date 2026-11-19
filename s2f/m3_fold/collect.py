@@ -15,6 +15,7 @@ from urllib.parse import urlparse
 
 from ..common.http import DownloadedFile
 from .pockets import find_pockets
+from .receptor import available_tool, docking_box, prepare_receptor, vina_config
 from .quality import QualityThresholds, assess_structure
 
 PDB_DOWNLOAD_URL = "https://files.rcsb.org/download/{entry_id}.cif"
@@ -155,6 +156,9 @@ def collect_existing(
     *,
     limit: int = 0,
     quality_thresholds: QualityThresholds | None = None,
+    receptors: bool = True,
+    pdbqt_fallback: bool = False,
+    find_tool: Callable[[], str | None] = available_tool,
     clock: Callable[[], float] = time.monotonic,
     now: Callable[[], datetime] = _utc_now,
 ) -> CollectionSummary:
@@ -212,6 +216,16 @@ def collect_existing(
             )
             record["pockets"] = pockets
             record["pocket_search"] = pocket_summary
+            if receptors and quality.usable_for_docking:
+                _prepare_for_docking(
+                    record,
+                    payload,
+                    candidate=candidate,
+                    run_dir=run_dir,
+                    pockets=pockets,
+                    allow_fallback=pdbqt_fallback,
+                    find_tool=find_tool,
+                )
             record.update(
                 path=str(destination.relative_to(run_dir)),
                 sha256=hashlib.sha256(payload).hexdigest(),
@@ -352,3 +366,45 @@ def _atomic_write(path: Path, payload: bytes) -> None:
     except BaseException:
         Path(handle.name).unlink(missing_ok=True)
         raise
+
+
+def _prepare_for_docking(
+    record: dict[str, Any],
+    payload: bytes,
+    *,
+    candidate: StructureCandidate,
+    run_dir: Path,
+    pockets: list[dict[str, Any]],
+    allow_fallback: bool,
+    find_tool: Callable[[], str | None],
+) -> None:
+    """Write the receptor and a search box per pocket (#14 part B).
+
+    Only for a structure that passed the quality gate: preparing a receptor M3 has already
+    called unusable would hand M4 something to dock that M3 said not to.
+    """
+    stem = run_dir / "receptors" / _safe_name(candidate.feature_id)
+    entity = candidate.accession.split("_", 1)[1] if "_" in candidate.accession else ""
+    prepared = prepare_receptor(
+        payload,
+        entity_id=entity if candidate.source == "pdb" else "",
+        destination_stem=stem,
+        run_dir=run_dir,
+        allow_fallback=allow_fallback,
+        find_tool=find_tool,
+    )
+    record["receptor"] = prepared.as_dict()
+
+    docking_target = prepared.pdbqt_path or prepared.pdb_path
+    for index, pocket in enumerate(pockets, 1):
+        box = docking_box(payload, pocket)
+        if box is None:
+            continue
+        pocket["box"] = box
+        if not pocket.get("usable") or not docking_target:
+            continue
+        config = stem.parent / f"{stem.name}_pocket_{index:02d}.vina.txt"
+        config.write_text(
+            vina_config(box, Path(docking_target).name), encoding="utf-8"
+        )
+        pocket["vina_config"] = str(config.relative_to(run_dir))
