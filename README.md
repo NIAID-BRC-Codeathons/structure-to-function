@@ -14,7 +14,7 @@ Project page: https://niaid-brc-codeathons.github.io/projects/structure-to-funct
 | ---        | ---             | ---                                                                                                                                                     |
 | M1 genome  | `s2f.m1_genome` | taxon call, CGA submit/poll/parse, quality gate, BV-BRC Data API route, priority ranking, interactive report                                            |
 | M2 triage  | `s2f.m2_triage` | PDB evidence, AlphaFold, knowledge graph, functional annotation, triage scoring with selectable profiles (`--profile`) |
-| M3 fold    | `s2f.m3_fold`   | Collects existing PDB/AFDB structures and applies preliminary quality checks; Pending: new structure prediction, pocket detection, receptor preparation |
+| M3 fold    | `s2f.m3_fold`   | Collects existing PDB/AFDB structures, quality-gates them, defines binding sites from what the homolog binds, and prepares receptors and search boxes; Pending: new structure prediction, pockets for apo structures |
 | M4 ligands | -               | not started                                                                                                                                             |
 | M5 disease | -               | not started                                                                                                                                             |
 | M6 report  | `s2f.m6_report`, `s2f.full_report` | one self-contained HTML report from `report.json`; the full report covers the whole run directory |

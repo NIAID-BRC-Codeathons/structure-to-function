@@ -51,13 +51,44 @@ reason — uncovered, not "no pocket exists", the distinction issue #90 draws. T
 are what a detector such as P2Rank is for; `find_pockets` is where it plugs in, discovered on
 `PATH` like M2's annotation providers rather than required.
 
+## Receptors and search boxes (issue #14, part B)
+
+Two of the three things M4 needs can be produced exactly, with nothing installed:
+
+- **The receptor.** Our entity's polymer chains, first model, no waters, no ligands, no
+  hydrogens, written as PDB. The bound components stay in the collected structure file,
+  which is never modified — docking into a site that still holds its ligand finds the ligand.
+- **The search box**, per pocket, drawn round the site's *own* atoms (the lining residues and
+  the bound component together) with 4 Å of padding and a 16 Å floor on each axis. A fixed
+  cube at the pocket centre is the usual shortcut, and it either clips an elongated site or
+  spends the search on empty volume. A Vina config is written beside it; M3 runs no docking.
+
+**The PDBQT is the part that cannot be faked.** Assigning atom types and adding the polar
+hydrogens Vina needs is what Meeko, OpenBabel and PDB2PQR exist for, and a homemade
+substitute that merely parses is a receptor that docks and lies about it. So:
+
+| `receptor.fidelity` | When | What M4 should do |
+| --- | --- | --- |
+| `full` | a preparation tool was on `PATH` (`mk_prepare_receptor.py`, then `obabel`) | use it |
+| `pdb_only` | no tool, the default | prepare it yourself; M3 wrote no PDBQT rather than approximating one |
+| `reduced` | `--pdbqt-fallback` was passed | smoke test only, never a reported result |
+| `none` | no polymer atoms could be read | nothing to dock |
+
+`--pdbqt-fallback` turns on the built-in converter adapted from Ping Hu's
+`bacteria_structure_docking.py`: AutoDock atom types, no added hydrogens, zero partial
+charges. Every record it writes says so. `--no-receptors` skips this step entirely.
+
+Receptors are prepared only for structures that passed the quality gate. Preparing one M3
+has already called unusable would hand M4 something to dock that M3 said not to.
+
 ## Steps
 
 1. `collect_existing()` — copy or download PDB/AFDB structures; prefer experimental, prefer holo.
 2. `predict_missing()` — one job per protein; record model, version, seed.
 3. `quality_gate()` — mean pLDDT and per-region confidence; trim or mask low-confidence tails; if the whole model is poor, set `usable_for_docking: false`.
 4. `find_pockets()` — read the holo template's own site (above). P2Rank for the rest, and superposition for a site held in an entry other than the collected one, are not built yet.
-5. `prep_receptors()` — protonation and PDBQT for M4, saved per protein.
+5. `prep_receptors()` — receptor PDB and search box per pocket, always; PDBQT where a
+   preparation tool exists (above). Protonation and PDB2PQR are not built yet.
 
 ## Acceptance checks
 

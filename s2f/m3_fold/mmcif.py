@@ -101,6 +101,10 @@ class Atom:
     def has_coordinates(self) -> bool:
         return None not in (self.x, self.y, self.z)
 
+    def b_iso_value(self) -> float:
+        """The B_iso column for writing out, 0.0 when the file carried none."""
+        return 0.0 if self.b_factor is None else self.b_factor
+
 
 def read_atoms(payload: bytes, *, first_model_only: bool = True) -> list[Atom]:
     """Every atom of the first model, or an empty list if the file cannot be read."""

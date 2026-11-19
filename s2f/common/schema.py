@@ -283,6 +283,9 @@ SECTION_SCHEMAS: dict[str, dict[str, Any]] = {
                                 },
                             },
                             "score": {"type": ["number", "null"]},
+                            # The search box M4 docks in, drawn round the site's own atoms.
+                            "box": {"type": ["object", "null"]},
+                            "vina_config": {"type": ["string", "null"]},
                             "center": {
                                 "type": ["array", "null"],
                                 "items": {"type": "number"},
@@ -300,6 +303,25 @@ SECTION_SCHEMAS: dict[str, dict[str, Any]] = {
                     },
                 },
                 "pocket_search": {"type": ["object", "null"]},
+                # The prepared receptor (#14 part B). `fidelity` is the honesty flag M4 must
+                # read: "full" came from a real preparation tool, "reduced" from the
+                # built-in converter and is not fit for a reported result, "pdb_only" means
+                # no PDBQT was written rather than one being approximated.
+                "receptor": {
+                    "type": ["object", "null"],
+                    "properties": {
+                        "pdb_path": {"type": ["string", "null"]},
+                        "pdbqt_path": {"type": ["string", "null"]},
+                        "prepared_by": {"type": "string"},
+                        "fidelity": {
+                            "type": "string",
+                            "enum": ["full", "reduced", "pdb_only", "none"],
+                        },
+                        "reason": {"type": "string"},
+                    },
+                    "required": ["prepared_by", "fidelity"],
+                    "additionalProperties": True,
+                },
                 "usable_for_docking": {"type": ["boolean", "null"]},
                 "reason": {"type": ["string", "null"]},
             },
