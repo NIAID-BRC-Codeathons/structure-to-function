@@ -75,3 +75,32 @@ def test_the_dry_run_defines_a_site_from_the_holo_fixture(tmp_path: Path) -> Non
     assert counts["with_pocket"] == 1
     assert counts["usable_pockets"] == 1
     assert counts["cofactor_required_pockets"] == 0
+
+
+def test_the_dry_run_prepares_a_receptor_and_a_box(tmp_path: Path) -> None:
+    """#14 part B, offline and with no preparation tool required."""
+    run_dir = tmp_path / "run"
+    assert main(["--dry-run", "--run", str(run_dir), "--no-receptors"]) == 0
+    assert not (run_dir / "receptors").exists()
+
+    run_dir = tmp_path / "with"
+    assert main(["--dry-run", "--run", str(run_dir)]) == 0
+
+    holo = [r for r in read_report(run_dir)["structures"] if r["accession"] == "6MU0_1"][0]
+    receptor = holo["receptor"]
+    assert receptor["chains"] == ["A"]
+    assert receptor["atoms"] > 100
+    # The feature id ends in a number, which must survive the filename.
+    assert receptor["pdb_path"].endswith("peg.463.pdb")
+    assert (run_dir / receptor["pdb_path"]).exists()
+    # Fidelity depends on what is installed, so assert the honesty rule, not the tool.
+    assert receptor["fidelity"] in {"full", "pdb_only", "reduced"}
+    if receptor["fidelity"] == "pdb_only":
+        assert receptor["pdbqt_path"] is None
+
+    box = holo["pockets"][0]["box"]
+    assert {"center_x", "size_x", "atoms"} <= set(box)
+
+    counts = json.loads((run_dir / "m3_fold" / "run.json").read_text())["counts"]
+    assert counts["receptors_prepared"] == 1
+    assert counts["search_boxes"] == 1

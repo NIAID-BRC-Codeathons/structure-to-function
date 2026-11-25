@@ -80,7 +80,13 @@ def run(args: argparse.Namespace) -> int:
         min_local_plddt=args.min_local_plddt,
     )
     summary = collect_existing(
-        report, run_dir, fetch, limit=args.limit, quality_thresholds=quality_thresholds
+        report,
+        run_dir,
+        fetch,
+        limit=args.limit,
+        quality_thresholds=quality_thresholds,
+        receptors=args.receptors,
+        pdbqt_fallback=args.pdbqt_fallback,
     )
     update_section(run_dir, "structures", summary.structures)
     _write_manifest(
@@ -190,6 +196,22 @@ def _write_manifest(
             "holo_template_preferred": sum(
                 1 for record in summary.structures if record.get("template_preference")
             ),
+            "receptors_prepared": sum(
+                1
+                for record in summary.structures
+                if (record.get("receptor") or {}).get("pdb_path")
+            ),
+            "receptors_docking_ready": sum(
+                1
+                for record in summary.structures
+                if (record.get("receptor") or {}).get("fidelity") == "full"
+            ),
+            "search_boxes": sum(
+                1
+                for record in summary.structures
+                for pocket in record.get("pockets") or []
+                if pocket.get("box")
+            ),
         },
         "failures": [
             {"feature_id": record["feature_id"], "reason": record.get("reason")}
@@ -266,6 +288,21 @@ def build_parser() -> argparse.ArgumentParser:
         type=float,
         default=70.0,
         help="mask AFDB residues below this pLDDT (default: 70)",
+    )
+
+    docking = parser.add_argument_group("receptor preparation (#14)")
+    docking.add_argument(
+        "--no-receptors",
+        dest="receptors",
+        action="store_false",
+        help="skip receptor and search-box preparation for M4",
+    )
+    docking.add_argument(
+        "--pdbqt-fallback",
+        action="store_true",
+        help="write a PDBQT with the built-in converter when no preparation tool is on "
+             "PATH: AutoDock types but no added hydrogens and zero charges, so the result "
+             "is recorded as reduced fidelity and is a smoke test, not a docking result",
     )
     return parser
 

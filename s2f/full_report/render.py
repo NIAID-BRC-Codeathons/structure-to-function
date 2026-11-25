@@ -553,7 +553,7 @@ def tab_structures(report: dict[str, Any]) -> str:
     keys: list[str] = []
     for preferred in ("feature_id", "source", "accession", "entry_id", "method",
                       "resolution", "confidence", "plddt", "coverage", "quality",
-                      "usable", "reason", "pockets", "pocket_count", "path"):
+                      "usable", "reason", "pockets", "pocket_count", "receptor", "path"):
         if any(preferred in row for row in structures):
             keys.append(preferred)
     for row in structures:
@@ -583,6 +583,8 @@ def tab_structures(report: dict[str, Any]) -> str:
             value = row.get(key)
             if key == "pockets":
                 cells.append(f"<td>{_pocket_cell(row)}</td>")
+            elif key == "receptor":
+                cells.append(f"<td>{_receptor_cell(row)}</td>")
             elif isinstance(value, (dict, list)):
                 cells.append(f"<td>{esc(json.dumps(value)[:120])}</td>")
             else:
@@ -879,3 +881,22 @@ def _pocket_cell(structure: dict[str, Any]) -> str:
             line += "&hellip;</span>" if len(residues) > 6 else "</span>"
         parts.append(line)
     return "<div>" + "</div><div>".join(parts) + "</div>"
+
+
+#: What each receptor fidelity means to someone reading the report (#14 part B).
+_FIDELITY = {
+    "full": ("ready", "prepared by a docking tool"),
+    "reduced": ("smoke test only", "built-in converter: no added hydrogens, zero charges"),
+    "pdb_only": ("no PDBQT", "no preparation tool was available; none was approximated"),
+    "none": ("none", "no receptor could be built"),
+}
+
+
+def _receptor_cell(structure: dict[str, Any]) -> str:
+    receptor = _mapping(structure.get("receptor"))
+    if not receptor:
+        return ""
+    label, note = _FIDELITY.get(str(receptor.get("fidelity")), ("", ""))
+    prepared_by = esc(str(receptor.get("prepared_by") or ""))
+    return (f"<b>{esc(label)}</b> &middot; {prepared_by}"
+            f"<br><span class='muted'>{esc(note)}</span>")
